@@ -1,0 +1,16 @@
+{
+  "name": "video",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "remotion preview src/index.js",
+    "build": "remotion render src/index.js CodingShort out/video.mp4"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.522",
+    "@remotion/captions": "4.0.522",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "remotion": "4.0.522"
+  }
+}

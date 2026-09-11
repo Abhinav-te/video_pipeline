@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+engine/.cache/
+engine/cache/
+
+# Node / Remotion
+node_modules/
+.DS_Store
+out/
+.remotion/
+
+# Media Artifacts
+video/public/final_video_*.mp4
+video/public/audio_*.mp3
+video/public/data_*.json
+video/public/audio_current.mp3
+video/public/data_current.json

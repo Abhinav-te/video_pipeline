@@ -1,0 +1,71 @@
+{
+  "code": "print(True == 1)",
+  "script": "In Python, True is equal to 1 because booleans inherit directly from integers.",
+  "words": [
+    {
+      "word": "In",
+      "start": 0.2,
+      "end": 0.44
+    },
+    {
+      "word": "Python,",
+      "start": 0.44,
+      "end": 0.92
+    },
+    {
+      "word": "true",
+      "start": 1.14,
+      "end": 1.48
+    },
+    {
+      "word": "is",
+      "start": 1.48,
+      "end": 1.68
+    },
+    {
+      "word": "equal",
+      "start": 1.68,
+      "end": 1.98
+    },
+    {
+      "word": "to",
+      "start": 1.98,
+      "end": 2.2
+    },
+    {
+      "word": "1",
+      "start": 2.2,
+      "end": 2.42
+    },
+    {
+      "word": "because",
+      "start": 2.42,
+      "end": 2.78
+    },
+    {
+      "word": "Boolean's",
+      "start": 2.78,
+      "end": 3.38
+    },
+    {
+      "word": "inherit",
+      "start": 3.38,
+      "end": 3.72
+    },
+    {
+      "word": "directly",
+      "start": 3.72,
+      "end": 4.12
+    },
+    {
+      "word": "from",
+      "start": 4.12,
+      "end": 4.38
+    },
+    {
+      "word": "integers.",
+      "start": 4.38,
+      "end": 4.76
+    }
+  ]
+}
