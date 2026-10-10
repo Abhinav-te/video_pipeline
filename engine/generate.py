@@ -2,6 +2,7 @@
 
 import argparse
 import asyncio
+import datetime
 import glob
 import hashlib
 import json
@@ -9,10 +10,15 @@ import os
 import re
 import shutil
 import sys
+import uuid
 from pathlib import Path
 
+ENGINE_DIR = Path(__file__).resolve().parent
+if str(ENGINE_DIR) not in sys.path:
+    sys.path.insert(0, str(ENGINE_DIR))
+
 from director.script import generate_script
-from validation.code import check_syntax, check_terminal_snippet
+from validation import validate_script_plan
 from audio.tts_whisper import generate_voice, extract_word_timings
 from timeline.beats import align_timeline
 
@@ -21,19 +27,64 @@ from timeline.beats import align_timeline
 # Paths
 # ---------------------------------------------------------------------------
 
-ENGINE_DIR = Path(__file__).resolve().parent
 VIDEO_DIR = ENGINE_DIR.parent / "video"
 PUBLIC_DIR = VIDEO_DIR / "public"
-
-DATA_FILE = PUBLIC_DIR / "data_current.json"
-AUDIO_FILE = PUBLIC_DIR / "audio_current.mp3"
+RUNS_DIR = PUBLIC_DIR / "runs"
 
 CACHE_DIR = ENGINE_DIR / ".cache"
 SCRIPT_CACHE_DIR = CACHE_DIR / "scripts"
 
 
 # ---------------------------------------------------------------------------
-# Numbered output archiving (audio_N.mp3 / data_N.json, matching final_video_N.mp4)
+# Run Identification & Isolation
+# ---------------------------------------------------------------------------
+
+def generate_run_id() -> str:
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    short_id = uuid.uuid4().hex[:6]
+    return f"run_{timestamp}_{short_id}"
+
+
+def cleanup_run_artifacts(run_dir: Path) -> None:
+    """
+    Cleans up partial or corrupted files in public/runs/<run_id>/ on failure.
+    Guarantees zero stale or half-baked artifacts remain.
+    """
+    if run_dir and run_dir.exists():
+        try:
+            shutil.rmtree(run_dir, ignore_errors=True)
+            log(f"🧹 Cleaned up failed run directory: {run_dir}")
+        except Exception as exc:
+            print(f"[ENGINE:WARN] Failed to clean up run directory {run_dir}: {exc}", file=sys.stderr)
+
+
+# ---------------------------------------------------------------------------
+# Standardized Logging
+# ---------------------------------------------------------------------------
+
+def stage_start(stage: str, message: str):
+    print(f"[{stage}:START] {message}", flush=True)
+
+
+def stage_success(stage: str, message: str):
+    print(f"[{stage}:SUCCESS] {message}", flush=True)
+
+
+def stage_error(stage: str, message: str, exit_code: int = 1):
+    print(f"\n[{stage}:ERROR] {message}", file=sys.stderr, flush=True)
+    raise SystemExit(exit_code)
+
+
+def log(message):
+    print(f"[ENGINE] {message}", flush=True)
+
+
+def fatal(message, stage="PIPELINE", exit_code=1):
+    stage_error(stage, message, exit_code=exit_code)
+
+
+# ---------------------------------------------------------------------------
+# Numbered output archiving (audio_N.mp3 / data_N.json for legacy --index)
 # ---------------------------------------------------------------------------
 
 def get_next_output_index(public_dir):
@@ -51,20 +102,17 @@ def get_next_output_index(public_dir):
     return max(indices) + 1
 
 
-def archive_numbered_outputs(index):
+def archive_numbered_outputs(index, audio_file: Path, data_file: Path):
     """
-    Copies the just-generated _current files into permanent numbered
-    files (audio_N.mp3 / data_N.json), so past runs aren't overwritten
-    the next time generate.py runs. The archived JSON's audio_file field
-    is rewritten to point at the archived audio file, so the pair is
-    self-contained even after audio_current.mp3 gets replaced later.
+    Copies run files into permanent numbered files (audio_N.mp3 / data_N.json)
+    if legacy --index was requested.
     """
     numbered_audio = PUBLIC_DIR / f"audio_{index}.mp3"
     numbered_data = PUBLIC_DIR / f"data_{index}.json"
 
-    shutil.copyfile(AUDIO_FILE, numbered_audio)
+    shutil.copyfile(audio_file, numbered_audio)
 
-    with open(DATA_FILE, "r", encoding="utf-8") as f:
+    with open(data_file, "r", encoding="utf-8") as f:
         payload = json.load(f)
 
     payload["audio_file"] = numbered_audio.name
@@ -77,21 +125,9 @@ def archive_numbered_outputs(index):
         f"🗄️ Archived outputs as {numbered_audio.name} / {numbered_data.name}"
     )
 
+
 SCHEMA_VERSION = "2.1"
 ENGINE_VERSION = "2.0"
-
-
-# ---------------------------------------------------------------------------
-# Logging
-# ---------------------------------------------------------------------------
-
-def log(message):
-    print(f"[ENGINE] {message}", flush=True)
-
-
-def fatal(message, exit_code=1):
-    print(f"\n❌ FATAL: {message}", file=sys.stderr, flush=True)
-    raise SystemExit(exit_code)
 
 
 # ---------------------------------------------------------------------------
@@ -104,7 +140,7 @@ def build_cache_key(topic, duration):
 
     This prevents unrelated topics from sharing one stale JSON file.
     """
-    model = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
+    model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
     raw = json.dumps(
         {
@@ -164,147 +200,23 @@ def save_script_cache(topic, duration, data):
 
 
 # ---------------------------------------------------------------------------
-# Script validation
+# Script validation (delegated to centralized engine/validation module)
 # ---------------------------------------------------------------------------
-
-VALID_SCENE_TYPES = {
-    "fullscreen_text",
-    "code_reveal",
-    "code_transform",
-    "terminal",
-    "diagram",
-    "comparison",
-}
-
 
 def validate_script(script):
     """
     Validate the structure returned by Gemini before touching TTS/timeline.
+    Delegates to the centralized engine/validation module.
     """
+    scenes = script.get("scenes", []) if isinstance(script, dict) else []
+    log(f"🔍 Validating {len(scenes)} scenes via Validation Gate...")
 
-    if not isinstance(script, dict):
-        fatal("Gemini returned something other than a JSON object.")
+    is_valid, errors = validate_script_plan(script)
+    if not is_valid:
+        error_msg = "Script validation failed:\n" + "\n".join(f"  • {e}" for e in errors)
+        stage_error("VALIDATION", error_msg)
 
-    scenes = script.get("scenes")
-
-    if not isinstance(scenes, list):
-        fatal("Generated script does not contain a valid 'scenes' list.")
-
-    if not scenes:
-        fatal("Generated script contains zero scenes.")
-
-    log(f"🔍 Validating {len(scenes)} scenes...")
-
-    for index, scene in enumerate(scenes, start=1):
-        if not isinstance(scene, dict):
-            fatal(f"Scene {index} is not an object.")
-
-        scene_type = scene.get("scene_type")
-
-        if scene_type not in VALID_SCENE_TYPES:
-            fatal(
-                f"Scene {index} has invalid scene_type: "
-                f"{scene_type!r}. "
-                f"Allowed: {sorted(VALID_SCENE_TYPES)}"
-            )
-
-        spoken_text = scene.get("spoken_text", "")
-
-        if not isinstance(spoken_text, str):
-            fatal(f"Scene {index} spoken_text is not a string.")
-
-        if not spoken_text.strip():
-            fatal(f"Scene {index} has empty spoken_text.")
-
-        word_count = len(spoken_text.split())
-
-        if word_count > 11:
-            fatal(
-                f"Scene {index} contains {word_count} spoken words. "
-                f"Maximum is 11."
-            )
-
-        # Validate code-bearing scenes.
-        if scene_type in {
-            "code_reveal",
-            "code_transform",
-            "terminal",
-        }:
-            code = scene.get("code_snippet", "")
-
-            if not isinstance(code, str) or not code.strip():
-                fatal(
-                    f"Scene {index} ({scene_type}) has no code_snippet."
-                )
-
-            # "terminal" scenes show command-line OUTPUT (e.g. "Done in 2.5s",
-            # tracebacks, prompts) — that text is not valid Python and must
-            # not be run through ast.parse(). Only code_reveal/code_transform
-            # claim to hold real, executable Python.
-            if scene_type == "terminal":
-                valid, error = check_terminal_snippet(code)
-            else:
-                valid, error = check_syntax(code)
-
-            if not valid:
-                fatal(
-                    f"Scene {index} ({scene_type}) contains invalid content:\n"
-                    f"{error}\n\n"
-                    f"{code}"
-                )
-
-        # Comparison has two code blocks.
-        if scene_type == "comparison":
-            problem_code = scene.get("problem_code", "")
-            solution_code = scene.get("solution_code", "")
-
-            if not problem_code.strip():
-                fatal(f"Scene {index} comparison has empty problem_code.")
-
-            if not solution_code.strip():
-                fatal(f"Scene {index} comparison has empty solution_code.")
-
-            valid, error = check_syntax(problem_code)
-
-            if not valid:
-                fatal(
-                    f"Scene {index} problem_code is invalid:\n{error}"
-                )
-
-            valid, error = check_syntax(solution_code)
-
-            if not valid:
-                fatal(
-                    f"Scene {index} solution_code is invalid:\n{error}"
-                )
-
-        # Diagram requires nodes.
-        if scene_type == "diagram":
-            nodes = scene.get("nodes")
-
-            if not isinstance(nodes, list) or not nodes:
-                fatal(f"Scene {index} diagram has no nodes.")
-
-            if len(nodes) > 3:
-                fatal(
-                    f"Scene {index} diagram has {len(nodes)} nodes. "
-                    f"Maximum is 3."
-                )
-
-    # The director requires the first scene to be fullscreen text.
-    if scenes[0].get("scene_type") != "fullscreen_text":
-        fatal(
-            "Scene 1 must be 'fullscreen_text', "
-            f"got {scenes[0].get('scene_type')!r}."
-        )
-
-    if not any(
-        scene.get("scene_type") == "comparison"
-        for scene in scenes
-    ):
-        fatal("Generated script contains no comparison scene.")
-
-    log("✅ Script validation passed.")
+    stage_success("VALIDATION", f"Script validation passed ({len(scenes)} scenes)")
 
 
 # ---------------------------------------------------------------------------
@@ -317,25 +229,23 @@ def build_spoken_text(script):
     """
 
     scenes = script.get("scenes", [])
-
     parts = []
 
     for scene in scenes:
         text = scene.get("spoken_text", "").strip()
-
         if text:
             parts.append(text)
 
     text = " ".join(parts).strip()
 
     if not text:
-        fatal("Generated script produced empty narration.")
+        stage_error("DIRECTOR", "Generated script produced empty narration.")
 
     return text
 
 
 # ---------------------------------------------------------------------------
-# Phase 1
+# Stage Execution
 # ---------------------------------------------------------------------------
 
 def generate_or_load_script(topic, duration, no_cache=False):
@@ -343,16 +253,22 @@ def generate_or_load_script(topic, duration, no_cache=False):
         cached = load_script_cache(topic, duration)
 
         if cached is not None:
+            stage_start("DIRECTOR", f"Loading cached script for '{topic}' ({duration}s)")
+            stage_success("DIRECTOR", f"Cache hit: loaded script ({len(cached.get('scenes', []))} scenes)")
+            stage_start("VALIDATION", f"Validating cached script ({len(cached.get('scenes', []))} scenes)")
             validate_script(cached)
             return cached
 
-    log("🤖 CACHE MISS: Generating script with Gemini...")
+    stage_start("DIRECTOR", f"Generating script with Gemini for '{topic}' ({duration}s)")
 
     try:
         script = generate_script(topic, duration)
     except Exception as exc:
-        fatal(f"Gemini generation failed:\n{exc}")
+        stage_error("DIRECTOR", f"Gemini generation failed:\n{exc}")
 
+    stage_success("DIRECTOR", f"Generated script successfully ({len(script.get('scenes', []))} scenes)")
+
+    stage_start("VALIDATION", f"Validating generated script ({len(script.get('scenes', []))} scenes)")
     validate_script(script)
 
     save_script_cache(topic, duration, script)
@@ -360,86 +276,83 @@ def generate_or_load_script(topic, duration, no_cache=False):
     return script
 
 
-async def generate_audio(text):
-    PUBLIC_DIR.mkdir(parents=True, exist_ok=True)
+async def generate_audio(text, audio_file: Path):
+    audio_file.parent.mkdir(parents=True, exist_ok=True)
 
-    log("🎙️ Generating Edge-TTS narration...")
+    stage_start("AUDIO", f"Generating Edge-TTS narration ({len(text.split())} words)")
 
     try:
-        await generate_voice(text, str(AUDIO_FILE))
+        await generate_voice(text, str(audio_file))
     except Exception as exc:
-        fatal(f"Edge-TTS generation failed:\n{exc}")
+        stage_error("AUDIO", f"Edge-TTS generation failed:\n{exc}")
 
-    if not AUDIO_FILE.exists():
-        fatal(
-            f"TTS completed without creating audio file:\n"
-            f"{AUDIO_FILE}"
+    if not audio_file.exists():
+        stage_error(
+            "AUDIO",
+            f"TTS completed without creating audio file:\n{audio_file}"
         )
 
-    if AUDIO_FILE.stat().st_size == 0:
-        fatal("Generated audio file is empty.")
+    if audio_file.stat().st_size == 0:
+        stage_error("AUDIO", "Generated audio file is empty.")
 
-    log(
-        f"✅ Audio generated: "
-        f"{AUDIO_FILE.name} "
-        f"({AUDIO_FILE.stat().st_size:,} bytes)"
+    stage_success(
+        "AUDIO",
+        f"Audio generated: {audio_file.name} ({audio_file.stat().st_size:,} bytes)"
     )
 
 
-def generate_timeline(script):
-    log("📝 Extracting Whisper word timestamps...")
+def generate_timeline(script, audio_file: Path):
+    stage_start("TIMELINE", "Extracting Whisper word timestamps and aligning timeline")
 
     try:
-        words = extract_word_timings(str(AUDIO_FILE))
+        words = extract_word_timings(str(audio_file))
     except Exception as exc:
-        fatal(f"Whisper timestamp extraction failed:\n{exc}")
+        stage_error("TIMELINE", f"Whisper timestamp extraction failed:\n{exc}")
 
     if not words:
-        fatal("Whisper returned zero word timestamps.")
+        stage_error("TIMELINE", "Whisper returned zero word timestamps.")
 
-    log(f"✅ Whisper extracted {len(words)} words.")
+    log(f"Whisper extracted {len(words)} words.")
 
-    log("⏱️ Aligning scenes to narration...")
+    log("Aligning scenes to narration...")
 
     scenes = script.get("scenes", [])
 
     try:
         timed_scenes = align_timeline(scenes, words)
     except Exception as exc:
-        fatal(f"Timeline alignment failed:\n{exc}")
+        stage_error("TIMELINE", f"Timeline alignment failed:\n{exc}")
 
     if not timed_scenes:
-        fatal("Timeline alignment produced zero scenes.")
+        stage_error("TIMELINE", "Timeline alignment produced zero scenes.")
 
-    # Basic sanity check.
+    # Basic sanity check
     previous_start = -1.0
 
     for index, scene in enumerate(timed_scenes, start=1):
         start_time = scene.get("start_time")
 
         if not isinstance(start_time, (int, float)):
-            fatal(
-                f"Timed scene {index} has invalid start_time: "
-                f"{start_time!r}"
+            stage_error(
+                "TIMELINE",
+                f"Timed scene {index} has invalid start_time: {start_time!r}"
             )
 
         if start_time < 0:
-            fatal(f"Timed scene {index} has negative start_time.")
+            stage_error("TIMELINE", f"Timed scene {index} has negative start_time.")
 
         if start_time < previous_start:
-            fatal(
-                f"Timeline is not chronological at scene {index}: "
-                f"{start_time} < {previous_start}"
+            stage_error(
+                "TIMELINE",
+                f"Timeline is not chronological at scene {index}: {start_time} < {previous_start}"
             )
 
         previous_start = start_time
 
-    log(f"✅ Timeline contains {len(timed_scenes)} scenes.")
-
     return timed_scenes, words
 
 
-def build_final_payload(script, timed_scenes, words):
+def build_final_payload(script, timed_scenes, words, run_id: str):
     """
     Build the exact top-level object expected by Remotion/CodingShort.jsx.
     """
@@ -451,19 +364,20 @@ def build_final_payload(script, timed_scenes, words):
             SCHEMA_VERSION,
         ),
         "engine_version": ENGINE_VERSION,
+        "run_id": run_id,
         "scenes": timed_scenes,
         "words": words,
-        "audio_file": AUDIO_FILE.name,
+        "audio_file": f"runs/{run_id}/audio.mp3",
     }
 
     return payload
 
 
-def write_data_file(payload):
-    PUBLIC_DIR.mkdir(parents=True, exist_ok=True)
+def write_data_file(payload, data_file: Path):
+    data_file.parent.mkdir(parents=True, exist_ok=True)
 
     # Write atomically so Remotion never sees half-written JSON.
-    temp_file = DATA_FILE.with_suffix(".tmp")
+    temp_file = data_file.with_suffix(".tmp")
 
     try:
         with open(temp_file, "w", encoding="utf-8") as f:
@@ -475,23 +389,23 @@ def write_data_file(payload):
             )
             f.write("\n")
 
-        os.replace(temp_file, DATA_FILE)
+        os.replace(temp_file, data_file)
 
     except Exception as exc:
         if temp_file.exists():
             temp_file.unlink(missing_ok=True)
 
-        fatal(f"Could not write {DATA_FILE}:\n{exc}")
+        stage_error("TIMELINE", f"Could not write {data_file}:\n{exc}")
 
-    if not DATA_FILE.exists():
-        fatal(f"Expected output was not created: {DATA_FILE}")
+    if not data_file.exists():
+        stage_error("TIMELINE", f"Expected output was not created: {data_file}")
 
-    if DATA_FILE.stat().st_size == 0:
-        fatal(f"Generated JSON is empty: {DATA_FILE}")
+    if data_file.stat().st_size == 0:
+        stage_error("TIMELINE", f"Generated JSON is empty: {data_file}")
 
-    log(
-        f"💾 Wrote {DATA_FILE.name} "
-        f"({DATA_FILE.stat().st_size:,} bytes)"
+    stage_success(
+        "TIMELINE",
+        f"Timeline assembled and saved: {data_file.name} ({data_file.stat().st_size:,} bytes)"
     )
 
 
@@ -526,14 +440,19 @@ def main():
     )
 
     parser.add_argument(
+        "--run-id",
+        type=str,
+        default=None,
+        help="Unique identifier for run isolation.",
+    )
+
+    parser.add_argument(
         "--index",
         type=int,
         default=None,
         help=(
-            "Numbered output index for this run's archive copies "
-            "(audio_N.mp3 / data_N.json). If omitted, auto-detects the "
-            "next free index from existing public/ files, keeping it in "
-            "sync with final_video_N.mp4 numbering."
+            "Numbered output index for legacy archive copies "
+            "(audio_N.mp3 / data_N.json)."
         ),
     )
 
@@ -542,143 +461,143 @@ def main():
     topic = args.topic.strip()
 
     if not topic:
-        fatal("--topic cannot be empty.")
+        stage_error("DIRECTOR", "--topic cannot be empty.")
 
     # ---------------------------------------------------------------
     # Environment check
     # ---------------------------------------------------------------
 
     if not os.getenv("GEMINI_API_KEY"):
-        fatal(
+        stage_error(
+            "DIRECTOR",
             "GEMINI_API_KEY environment variable is not set.\n\n"
             "Set it before running the engine, for example:\n"
             "export GEMINI_API_KEY='YOUR_KEY'"
         )
 
     # ---------------------------------------------------------------
-    # Startup
+    # Run Isolation Setup
     # ---------------------------------------------------------------
+
+    run_id = args.run_id or generate_run_id()
+    run_dir = RUNS_DIR / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    data_file = run_dir / "data.json"
+    audio_file = run_dir / "audio.mp3"
 
     print()
     print("=" * 70)
-    print("🚀 V2 PHASE 1 — AI SCRIPTING PIPELINE")
+    print(f"🚀 V2 PHASE 1 — AI SCRIPTING PIPELINE [Run: {run_id}]")
     print("=" * 70)
     print(f"Topic:    {topic}")
     print(f"Length:   {args.length}s")
     print(f"Cache:    {'DISABLED' if args.no_cache else 'ENABLED'}")
+    print(f"Run Dir:  {run_dir}")
     print("=" * 70)
     print()
-
-    # ---------------------------------------------------------------
-    # Clean previous runtime artifacts
-    # ---------------------------------------------------------------
-    #
-    # IMPORTANT:
-    # We remove the previous data/audio BEFORE generation.
-    #
-    # That way, if Phase 1 fails, generate_and_render.py cannot
-    # accidentally render yesterday's video.
-    # ---------------------------------------------------------------
-
-    if DATA_FILE.exists():
-        log("🗑️ Removing previous data_current.json")
-        DATA_FILE.unlink()
-
-    if AUDIO_FILE.exists():
-        log("🗑️ Removing previous audio_current.mp3")
-        AUDIO_FILE.unlink()
-
-    # ---------------------------------------------------------------
-    # Step 1 — Gemini
-    # ---------------------------------------------------------------
-
-    script = generate_or_load_script(
-        topic=topic,
-        duration=args.length,
-        no_cache=args.no_cache,
-    )
-
-    # ---------------------------------------------------------------
-    # Step 2 — Build narration
-    # ---------------------------------------------------------------
-
-    narration = build_spoken_text(script)
-
-    word_count = len(narration.split())
-
-    log(
-        f"🗣️ Narration: {word_count} words"
-    )
-
-    # ---------------------------------------------------------------
-    # Step 3 — Edge-TTS
-    # ---------------------------------------------------------------
-
-    asyncio.run(generate_audio(narration))
-
-    # ---------------------------------------------------------------
-    # Step 4 — Whisper
-    # ---------------------------------------------------------------
-
-    timed_scenes, words = generate_timeline(script)
-
-    # ---------------------------------------------------------------
-    # Step 5 — Final JSON
-    # ---------------------------------------------------------------
-
-    payload = build_final_payload(
-        script=script,
-        timed_scenes=timed_scenes,
-        words=words,
-    )
-
-    write_data_file(payload)
-
-    # ---------------------------------------------------------------
-    # Step 6 — Archive numbered copies (audio_N.mp3 / data_N.json)
-    # ---------------------------------------------------------------
-
-    output_index = args.index if args.index is not None else get_next_output_index(PUBLIC_DIR)
-    archive_numbered_outputs(output_index)
-
-    # ---------------------------------------------------------------
-    # Final verification
-    # ---------------------------------------------------------------
-
-    log("🔎 Running final Phase 1 verification...")
-
-    if not DATA_FILE.exists():
-        fatal("Phase 1 finished but data_current.json is missing.")
-
-    if not AUDIO_FILE.exists():
-        fatal("Phase 1 finished but audio_current.mp3 is missing.")
 
     try:
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            verification_data = json.load(f)
-    except Exception as exc:
-        fatal(f"Final data_current.json is invalid JSON:\n{exc}")
+        # Clean existing artifacts in this run_dir if re-running same run_id
+        if data_file.exists():
+            data_file.unlink()
+        if audio_file.exists():
+            audio_file.unlink()
 
-    if not verification_data.get("scenes"):
-        fatal("Final data_current.json contains no scenes.")
+        # ---------------------------------------------------------------
+        # Step 1 & 2 — Gemini & Validation
+        # ---------------------------------------------------------------
 
-    if not verification_data.get("words"):
-        fatal("Final data_current.json contains no Whisper words.")
-
-    if verification_data.get("audio_file") != AUDIO_FILE.name:
-        fatal(
-            "Final JSON audio_file does not match generated audio: "
-            f"{verification_data.get('audio_file')!r}"
+        script = generate_or_load_script(
+            topic=topic,
+            duration=args.length,
+            no_cache=args.no_cache,
         )
+
+        # ---------------------------------------------------------------
+        # Step 2 — Build narration
+        # ---------------------------------------------------------------
+
+        narration = build_spoken_text(script)
+        word_count = len(narration.split())
+        log(f"🗣️ Narration: {word_count} words")
+
+        # ---------------------------------------------------------------
+        # Step 3 — Edge-TTS
+        # ---------------------------------------------------------------
+
+        asyncio.run(generate_audio(narration, audio_file))
+
+        # ---------------------------------------------------------------
+        # Step 4 — Whisper & Timeline
+        # ---------------------------------------------------------------
+
+        timed_scenes, words = generate_timeline(script, audio_file)
+
+        # ---------------------------------------------------------------
+        # Step 5 — Final JSON Payload & Atomic Write
+        # ---------------------------------------------------------------
+
+        payload = build_final_payload(
+            script=script,
+            timed_scenes=timed_scenes,
+            words=words,
+            run_id=run_id,
+        )
+
+        write_data_file(payload, data_file)
+
+        # ---------------------------------------------------------------
+        # Step 6 — Archive numbered copies (if requested)
+        # ---------------------------------------------------------------
+
+        if args.index is not None:
+            archive_numbered_outputs(args.index, audio_file, data_file)
+
+        # ---------------------------------------------------------------
+        # Final verification
+        # ---------------------------------------------------------------
+
+        log("🔎 Running run artifact verification...")
+
+        if not data_file.exists():
+            stage_error("TIMELINE", f"Run finished but {data_file.name} is missing.")
+
+        if not audio_file.exists():
+            stage_error("AUDIO", f"Run finished but {audio_file.name} is missing.")
+
+        try:
+            with open(data_file, "r", encoding="utf-8") as f:
+                verification_data = json.load(f)
+        except Exception as exc:
+            stage_error("TIMELINE", f"Final data.json is invalid JSON:\n{exc}")
+
+        if not verification_data.get("scenes"):
+            stage_error("TIMELINE", "Final data.json contains no scenes.")
+
+        if not verification_data.get("words"):
+            stage_error("TIMELINE", "Final data.json contains no Whisper words.")
+
+        expected_audio_rel = f"runs/{run_id}/audio.mp3"
+        if verification_data.get("audio_file") != expected_audio_rel:
+            stage_error(
+                "TIMELINE",
+                f"Final JSON audio_file does not match expected path:\n"
+                f"Expected: {expected_audio_rel!r}\n"
+                f"Got:      {verification_data.get('audio_file')!r}"
+            )
+    except BaseException:
+        cleanup_run_artifacts(run_dir)
+        raise
 
     print()
     print("=" * 70)
-    print("✅ PHASE 1 COMPLETE")
+    print("✅ ENGINE GENERATION COMPLETE")
     print("=" * 70)
-    print(f"📄 JSON:  {DATA_FILE}")
-    print(f"🎙️ Audio: {AUDIO_FILE}")
-    print(f"🎬 Scenes: {len(verification_data['scenes'])}")
-    print(f"🗣️ Words:  {len(verification_data['words'])}")
+    print(f"🆔 Run ID:  {run_id}")
+    print(f"📄 JSON:    {data_file}")
+    print(f"🎙️ Audio:   {audio_file}")
+    print(f"🎬 Scenes:  {len(verification_data['scenes'])}")
+    print(f"🗣️ Words:   {len(verification_data['words'])}")
     print("=" * 70)
     print()
 

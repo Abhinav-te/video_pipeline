@@ -28,16 +28,23 @@ def _get_client(api_key):
     return _clients[api_key]
 
 # GEMINI_MODEL can be a single model or a comma-separated fallback chain,
-# e.g. GEMINI_MODEL="gemini-3.6-flash,gemini-flash-latest,gemini-3.5-flash"
-# Quota (429 RESOURCE_EXHAUSTED) is generally tracked per-model, so falling
-# through to the next model in the chain is the right move when one is
-# exhausted — unlike a 503, retrying the SAME model won't help.
+# e.g. GEMINI_MODEL="gemini-3.8-flash,gemini-2.5-flash,gemini-2.0-flash"
+# Quota (429 RESOURCE_EXHAUSTED) or model availability (404 NOT_FOUND) is
+# handled by falling through to the next model in the chain.
 DEFAULT_MODEL_CHAIN = [
-    "gemini-3.6-flash",
-    "gemini-flash-latest",
-    "gemini-3.5-flash",
+    "gemini-3.8-flash",
     "gemini-2.5-flash",
+    "gemini-2.0-flash",
 ]
+
+
+def _is_404_error(exc: Exception) -> bool:
+    """Detects 404 Not Found / Model Not Found client errors."""
+    code = getattr(exc, "code", None) or getattr(exc, "status_code", None)
+    if code == 404:
+        return True
+    msg = str(exc)
+    return "404" in msg or "not_found" in msg.lower() or "not found" in msg.lower()
 
 
 def get_model_chain():
@@ -125,10 +132,12 @@ def _call_model(client, model, contents, prompt, max_retries=4):
             msg = str(e)
             if "429" in msg or "RESOURCE_EXHAUSTED" in msg or "quota" in msg.lower():
                 raise  # quota issue — don't waste retries on the same model
+            if _is_404_error(e):
+                raise  # model not found / 404 — don't waste retries on the same model
             last_err = e
             if "503" in msg or "UNAVAILABLE" in msg:
                 wait = 2 ** attempt  # 1s, 2s, 4s, 8s
-                print(f"[ENGINE] ⚠️ {model} 503, retrying in {wait}s... (attempt {attempt + 1}/{max_retries})")
+                print(f"[DIRECTOR:RETRY] ⚠️ {model} 503, retrying in {wait}s... (attempt {attempt + 1}/{max_retries})")
                 time.sleep(wait)
                 continue
             raise
@@ -163,28 +172,31 @@ def generate_script(topic, duration):
 
         for i, model in enumerate(model_chain):
             try:
-                print(f"[ENGINE] 🤖 Trying {model} on {key_label} ({i + 1}/{len(model_chain)})")
+                print(f"[DIRECTOR:INFO] 🤖 Trying {model} on {key_label} ({i + 1}/{len(model_chain)})")
                 return _call_model(client, model, contents, prompt)
             except Exception as e:
                 last_err = e
                 msg = str(e)
                 if "429" in msg or "RESOURCE_EXHAUSTED" in msg or "quota" in msg.lower():
-                    print(f"[ENGINE] ⚠️ {model} quota exhausted on {key_label}, trying next model...")
+                    print(f"[DIRECTOR:WARN] ⚠️ {model} quota exhausted on {key_label}, trying next model...")
+                    continue
+                if _is_404_error(e):
+                    print(f"[DIRECTOR:WARN] ⚠️ {model} not found / unsupported (404) on {key_label}, trying next model in chain...")
                     continue
                 if "503" in msg or "UNAVAILABLE" in msg:
                     # Retries inside _call_model already failed. A 503 is
                     # specific to THIS model being overloaded right now —
                     # it says nothing about other models, so still worth
                     # trying the next one instead of giving up entirely.
-                    print(f"[ENGINE] ⚠️ {model} still unavailable after retries on {key_label}, trying next model...")
+                    print(f"[DIRECTOR:WARN] ⚠️ {model} still unavailable after retries on {key_label}, trying next model...")
                     continue
                 # Some other, non-retryable error (e.g. bad request) — no
                 # point trying other models/keys with the same broken request.
                 raise
 
-        print(f"[ENGINE] ⚠️ All models exhausted on {key_label}.")
+        print(f"[DIRECTOR:WARN] ⚠️ All models exhausted on {key_label}.")
         if key_index + 1 < len(keys):
-            print("[ENGINE] 🔁 Switching to next API key (separate project quota)...")
+            print("[DIRECTOR:INFO] 🔁 Switching to next API key (separate project quota)...")
 
     raise RuntimeError(
         f"All {len(keys)} key(s) × {len(model_chain)} model(s) exhausted or failed. "

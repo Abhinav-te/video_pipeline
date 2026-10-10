@@ -18,3 +18,4 @@ video/public/audio_*.mp3
 video/public/data_*.json
 video/public/audio_current.mp3
 video/public/data_current.json
+video/public/runs/

@@ -91,7 +91,7 @@ export const CodingShort = ({ data }) => {
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#0d1117', color: 'white', fontFamily: 'sans-serif' }}>
-      <Audio src={staticFile(data.audio_file)} />
+      {data?.audio_file ? <Audio src={staticFile(data.audio_file)} /> : null}
       {isPopTime && <Audio src={staticFile('pop.mp3')} volume={0.5} />}
 
       {/* Subtitles Overlay */}

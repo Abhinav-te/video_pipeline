@@ -1,11 +1,12 @@
 import React from 'react';
 import { Composition, getInputProps } from 'remotion';
 import { CodingShort } from './CodingShort';
-import fallbackData from '../public/data_current.json';
+import fallbackData from '../public/data.json';
 
 export const RemotionRoot = () => {
   const cliProps = getInputProps();
-  const data = cliProps && Object.keys(cliProps).length > 0 ? cliProps : fallbackData;
+  const rawData = cliProps && Object.keys(cliProps).length > 0 ? cliProps : fallbackData;
+  const data = rawData?.data || rawData;
 
   const fps = 30;
   const lastWordTime = data?.words?.length > 0 
