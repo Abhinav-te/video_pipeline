@@ -53,13 +53,13 @@ Final Production Video (1080x1920, H.264/AAC, 30fps)
 ## Pipeline Stages
 
 ### 1. `[DIRECTOR]` — AI Director (`engine/director/`)
-- Generates structured multi-scene JSON plans using Google Gemini models with automatic fallback across the active model chain: `gemini-3.8-flash` -> `gemini-2.5-flash` -> `gemini-2.0-flash` -> `gemini-1.5-flash`.
+- Generates structured multi-scene JSON plans using Google Gemini models with automatic fallback across the verified active v1beta model chain: `gemini-3.8-flash` -> `gemini-3.7-flash` -> `gemini-3.5-flash` -> `gemini-3.5-flash-lite` -> `gemini-3.1-flash-lite`.
 - Automatically detects topic domain (`code`, `math`, `physics`, `chemistry`, `quantum_physics`, `mechanics`, `electrical`, `ml`, `systems`).
 - Dynamically scales spoken narration and scene counts with duration:
   - **15s**: ~35 words across 3–4 scenes.
-  - **30s**: ~70 words across 5–7 scenes.
+  - **30s / 35s**: ~70 words across 5–7 scenes.
   - **60s**: ~135 words across 10–11 scenes (~13–15 words per scene).
-- Includes strict 30-second request timeouts and fast backoff to eliminate indefinite API hangs.
+- Includes strict 30-second request timeouts, instant skipping of 404/invalid keys without retry sleeps, and fast backoff to eliminate indefinite API hangs.
 
 ### 2. `[VALIDATION]` — Polymorphic Validation Gate (`engine/validation/`)
 - Pre-flight validation gate before audio synthesis or Remotion rendering runs.

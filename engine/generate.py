@@ -517,7 +517,7 @@ def main():
     parser.add_argument(
         "--length",
         type=int,
-        choices=[15, 30, 60],
+        choices=[15, 30, 35, 60],
         default=60,
         help="Video target length in seconds.",
     )
@@ -570,7 +570,7 @@ def main():
     # Environment check
     # ---------------------------------------------------------------
 
-    if not os.getenv("GEMINI_API_KEY"):
+    if not os.getenv("GEMINI_API_KEY") and not os.getenv("GEMINI_API_KEYS"):
         stage_error(
             "DIRECTOR",
             "GEMINI_API_KEY environment variable is not set.\n\n"

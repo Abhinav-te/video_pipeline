@@ -193,17 +193,17 @@ class TestMilestone2ValidationGate(unittest.TestCase):
 
     def test_director_fallback_chain_cleaned(self):
         """Verify fallback chain in engine/director/script.py contains only valid active models."""
-        invalid_models = ["gemini-3.6-flash", "gemini-3.5-flash"]
+        invalid_models = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.0-pro"]
         for bad_model in invalid_models:
             self.assertNotIn(
                 bad_model,
                 DEFAULT_MODEL_CHAIN,
-                f"Unreleased model {bad_model} found in DEFAULT_MODEL_CHAIN: {DEFAULT_MODEL_CHAIN}",
+                f"Retired model {bad_model} found in DEFAULT_MODEL_CHAIN: {DEFAULT_MODEL_CHAIN}",
             )
         self.assertTrue(len(DEFAULT_MODEL_CHAIN) >= 3, "Expected at least 3 fallback models in chain")
         self.assertEqual(DEFAULT_MODEL_CHAIN[0], "gemini-3.8-flash")
-        self.assertIn("gemini-2.5-flash", DEFAULT_MODEL_CHAIN)
-        self.assertIn("gemini-2.0-flash", DEFAULT_MODEL_CHAIN)
+        self.assertIn("gemini-3.7-flash", DEFAULT_MODEL_CHAIN)
+        self.assertIn("gemini-3.5-flash", DEFAULT_MODEL_CHAIN)
 
     def test_scene_count_bounds(self):
         """Verify scene count limits (minimum 2 scenes, maximum 35 scenes)."""
@@ -263,7 +263,7 @@ class TestMilestone2ValidationGate(unittest.TestCase):
             script = generate_script("Python Tuples", 60)
 
         self.assertEqual(script["title"], valid_script["title"])
-        self.assertEqual(calls, ["gemini-3.8-flash", "gemini-2.5-flash"])
+        self.assertEqual(calls, ["gemini-3.8-flash", "gemini-3.7-flash"])
 
     @patch("director.script._get_client")
     def test_director_fails_when_all_models_404(self, mock_get_client):
@@ -285,6 +285,32 @@ class TestMilestone2ValidationGate(unittest.TestCase):
 
         self.assertIn("exhausted or failed", str(ctx.exception))
         self.assertEqual(calls, DEFAULT_MODEL_CHAIN)
+
+    @patch("director.script._get_client")
+    def test_director_skips_invalid_key_immediately(self, mock_get_client):
+        """Verify that API_KEY_INVALID skips all remaining models on that key and advances to next key."""
+        import json
+        client_key1 = MagicMock()
+        client_key2 = MagicMock()
+
+        valid_script = create_valid_test_script()
+        mock_success = MagicMock()
+        mock_success.text = json.dumps(valid_script)
+
+        # Key 1 throws API_KEY_INVALID on model 1
+        client_key1.models.generate_content.side_effect = Exception("400 Bad Request: API_KEY_INVALID")
+        # Key 2 succeeds on model 1
+        client_key2.models.generate_content.return_value = mock_success
+
+        mock_get_client.side_effect = lambda key: client_key1 if key == "bad_key" else client_key2
+
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "bad_key,good_key"}):
+            script = generate_script("Python Tuples", 60)
+
+        self.assertEqual(script["title"], valid_script["title"])
+        # Key 1 must only have been called ONCE (model 1), skipping the remaining models
+        self.assertEqual(client_key1.models.generate_content.call_count, 1)
+        self.assertEqual(client_key2.models.generate_content.call_count, 1)
 
     @patch("generate.generate_script")
     def test_generate_or_load_script_retries_on_validation_failure_then_succeeds(self, mock_generate_script):
@@ -326,6 +352,26 @@ class TestMilestone2ValidationGate(unittest.TestCase):
         self.assertEqual(mock_generate_script.call_count, 3)
         self.assertIn("[VALIDATION:RETRY]", captured_stdout.getvalue())
         self.assertIn("[VALIDATION:ERROR]", captured_stderr.getvalue())
+
+    def test_call_model_no_retry_on_404_or_invalid_key(self):
+        """Verify _call_model raises immediately (call_count == 1) on 404 and API_KEY_INVALID without retries."""
+        from director.script import _call_model
+
+        # 1. 404 Not Found
+        mock_client_404 = MagicMock()
+        mock_client_404.models.generate_content.side_effect = Exception("404 NOT_FOUND: model not found")
+        with self.assertRaises(Exception) as ctx:
+            _call_model(mock_client_404, "gemini-3.8-flash", "test", "prompt", max_retries=3)
+        self.assertIn("404", str(ctx.exception))
+        self.assertEqual(mock_client_404.models.generate_content.call_count, 1)
+
+        # 2. Invalid Key
+        mock_client_key = MagicMock()
+        mock_client_key.models.generate_content.side_effect = Exception("400 Bad Request: API_KEY_INVALID")
+        with self.assertRaises(Exception) as ctx:
+            _call_model(mock_client_key, "gemini-3.8-flash", "test", "prompt", max_retries=3)
+        self.assertIn("API_KEY_INVALID", str(ctx.exception))
+        self.assertEqual(mock_client_key.models.generate_content.call_count, 1)
 
 
 if __name__ == "__main__":

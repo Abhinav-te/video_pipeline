@@ -60,10 +60,29 @@ def get_next_video_index(public_dir):
     return max(indices) + 1 if indices else 1
 
 
+def load_dotenv():
+    """Loads environment variables from .env if present into os.environ."""
+    env_file = REPO_DIR / ".env"
+    if env_file.exists():
+        try:
+            with open(env_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    k, v = line.split("=", 1)
+                    k, v = k.strip(), v.strip().strip("'\"")
+                    if k and k not in os.environ:
+                        os.environ[k] = v
+        except Exception:
+            pass
+
+
 def main():
+    load_dotenv()
     parser = argparse.ArgumentParser(description="V2 Video Engine: One-Click Pipeline")
     parser.add_argument("--topic", type=str, required=True, help="Topic for the video short")
-    parser.add_argument("--length", type=int, choices=[15, 30, 60], default=60, help="Target duration in seconds")
+    parser.add_argument("--length", type=int, choices=[15, 30, 35, 60], default=60, help="Target duration in seconds")
     parser.add_argument("--subject", type=str, choices=["auto", "code", "math", "physics", "systems", "ml", "chemistry", "quantum_physics", "mechanics", "electrical"], default="auto", help="Subject domain for video")
     parser.add_argument("--no-cache", action="store_true", help="Force regenerate AI script")
     parser.add_argument("--run-id", type=str, default=None, help="Explicit run ID (auto-generated if omitted)")

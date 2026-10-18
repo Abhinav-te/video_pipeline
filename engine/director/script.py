@@ -2,6 +2,7 @@ import json
 import os
 import re
 import time
+from pathlib import Path
 from google import genai
 from google.genai import types
 
@@ -13,11 +14,55 @@ except ImportError:
 DOMAINS = {"code", "math", "physics", "systems", "ml", "chemistry", "quantum_physics", "mechanics", "electrical"}
 
 
+def _read_env_file(path: Path) -> dict:
+    env_vars = {}
+    if path.exists():
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    k, v = line.split("=", 1)
+                    k, v = k.strip(), v.strip().strip("'\"")
+                    if k:
+                        env_vars[k] = v
+        except Exception:
+            pass
+    return env_vars
+
+
+def _merge_env_at_startup():
+    repo_dir = Path(__file__).resolve().parent.parent.parent
+    for p in [Path.cwd() / ".env", repo_dir / ".env", repo_dir / "engine" / ".env"]:
+        env_dict = _read_env_file(p)
+        for var in ("GEMINI_API_KEY", "GEMINI_API_KEYS"):
+            if var in env_dict:
+                existing = os.environ.get(var, "")
+                if existing:
+                    merged = list(dict.fromkeys([k.strip() for k in existing.split(",") + env_dict[var].split(",") if k.strip()]))
+                    os.environ[var] = ",".join(merged)
+                else:
+                    os.environ[var] = env_dict[var]
+
+
+_merge_env_at_startup()
+
+
 def get_api_keys():
-    raw = os.environ["GEMINI_API_KEY"]
-    keys = [k.strip() for k in raw.split(",") if k.strip()]
-    if not keys:
-        raise RuntimeError("GEMINI_API_KEY is set but empty.")
+    raw = os.environ.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEYS", "")
+    if not raw:
+        _merge_env_at_startup()
+        raw = os.environ.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEYS", "")
+    if not raw:
+        raise KeyError("GEMINI_API_KEY environment variable is not set.")
+    keys = []
+    seen = set()
+    for k in raw.split(","):
+        k = k.strip()
+        if k and k not in seen:
+            seen.add(k)
+            keys.append(k)
     return keys
 
 
@@ -34,14 +79,14 @@ def _get_client(api_key):
 
 
 # GEMINI_MODEL can be a single model or a comma-separated fallback chain,
-# e.g. GEMINI_MODEL="gemini-3.8-flash,gemini-2.5-flash,gemini-2.0-flash"
-# Quota (429 RESOURCE_EXHAUSTED) or model availability (404 NOT_FOUND) is
-# handled by falling through to the next model in the chain.
+# e.g. GEMINI_MODEL="gemini-3.8-flash,gemini-3.7-flash,gemini-3.5-flash"
+# Active verified v1beta models discovered via client.models.list()
 DEFAULT_MODEL_CHAIN = [
-    "gemini-3.8-flash",       # Primary: Latest Flash model
-    "gemini-2.5-flash",       # Fallback 1: Proven high-capacity 2.5 Flash
-    "gemini-2.0-flash",       # Fallback 2: Ultra-fast 2.0 Flash
-    "gemini-1.5-flash",       # Fallback 3: Production backup
+    "gemini-3.8-flash",       # Primary: Latest 3.8 Flash model
+    "gemini-3.7-flash",       # Fallback 1: High-capacity 3.7 Flash
+    "gemini-3.5-flash",       # Fallback 2: Stable 3.5 Flash
+    "gemini-3.5-flash-lite",  # Fallback 3: Cost-effective 3.5 Flash Lite
+    "gemini-3.1-flash-lite",  # Fallback 4: Ultra-fast 3.1 Flash Lite
 ]
 
 
@@ -140,6 +185,18 @@ def _is_404_error(exc: Exception) -> bool:
         return True
     msg = str(exc)
     return "404" in msg or "not_found" in msg.lower() or "not found" in msg.lower()
+
+
+def _is_invalid_key_error(exc: Exception) -> bool:
+    """Detects invalid API key errors (e.g. API_KEY_INVALID, 400 Bad Request on key)."""
+    msg = str(exc).lower()
+    return (
+        "api_key_invalid" in msg
+        or "api key not valid" in msg
+        or "invalid api key" in msg
+        or "api key expired" in msg
+        or ("permission_denied" in msg and "api_key" in msg)
+    )
 
 
 def get_model_chain():
@@ -353,6 +410,8 @@ def _call_model(client, model, contents, prompt, max_retries=2):
                 raise  # quota issue — don't waste retries on the same model
             if _is_404_error(e):
                 raise  # model not found / 404 — don't waste retries on the same model
+            if _is_invalid_key_error(e):
+                raise  # invalid API key — don't waste retries
             last_err = e
             is_timeout_or_stall = any(
                 k in msg.lower() for k in ("timeout", "timed out", "deadline", "ssl", "readtimeout", "connecterror")
@@ -452,6 +511,10 @@ def generate_script(topic, duration, subject="auto"):
             except Exception as e:
                 last_err = e
                 msg = str(e)
+                if _is_invalid_key_error(e):
+                    print(
+                        f"[DIRECTOR:WARN] ⚠️ Invalid API key on {key_label} (API_KEY_INVALID), skipping remaining models on this key...")
+                    break
                 if "429" in msg or "RESOURCE_EXHAUSTED" in msg or "quota" in msg.lower():
                     print(
                         f"[DIRECTOR:WARN] ⚠️ {model} quota exhausted on {key_label}, trying next model...")

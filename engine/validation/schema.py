@@ -428,48 +428,67 @@ def validate_script_plan(script_data: Any) -> Tuple[bool, List[str]]:
             if not any(k in scene for k in ("steps", "equations")) or (
                 scene.get("steps") is None and scene.get("equations") is None
             ):
-                if scene.get("title") or is_60s_scale:
-                    step_title = scene.get("title") or "Equation Derivation"
+                if scene.get("title") or scene.get("label") or is_60s_scale:
+                    step_title = scene.get("title") or scene.get("label") or "Equation Derivation"
                     scene["steps"] = [{"step": 1, "formula": step_title, "label": step_title}]
 
             steps = scene.get("steps") or scene.get("equations")
             if not steps or not isinstance(steps, list):
                 errors.append(f"Scene {index} (math_equation) requires non-empty 'steps' or 'equations' list.")
             else:
+                cleaned_steps = []
                 for s_idx, step in enumerate(steps, start=1):
                     if isinstance(step, str):
                         if not step.strip():
                             errors.append(f"Scene {index} (math_equation) step {s_idx} formula string is empty.")
+                        else:
+                            cleaned_steps.append({"step": s_idx, "formula": step.strip(), "label": step.strip()})
                     elif isinstance(step, dict):
                         formula = step.get("formula") or step.get("latex") or step.get("equation")
                         if not formula or not isinstance(formula, str) or not formula.strip():
-                            step["formula"] = scene.get("title") or "f(x) = y"
+                            step["formula"] = scene.get("title") or scene.get("label") or "f(x) = y"
+                        cleaned_steps.append(step)
                     else:
                         errors.append(f"Scene {index} (math_equation) step {s_idx} must be a string or object.")
+                if cleaned_steps:
+                    scene["steps"] = cleaned_steps
 
         # 7. STEM: Function Graph Plotting
         elif scene_type == "function_graph":
-            if not any(k in scene for k in ("functions", "curves", "function")) or (
-                scene.get("functions") is None and scene.get("curves") is None and scene.get("function") is None
-            ):
-                if scene.get("title") or is_60s_scale:
-                    scene["functions"] = [{"fn": "x^2", "label": scene.get("title") or "f(x)"}]
+            if not scene.get("functions") and not scene.get("curves") and not scene.get("function"):
+                if scene.get("function_expression"):
+                    fn_expr = str(scene["function_expression"]).strip()
+                    scene["functions"] = [{"fn": fn_expr, "label": scene.get("label") or scene.get("title") or "f(x)"}]
+                elif scene.get("title") or scene.get("label") or is_60s_scale:
+                    scene["functions"] = [{"fn": "x^2", "label": scene.get("title") or scene.get("label") or "f(x)"}]
 
             functions = scene.get("functions") or scene.get("curves") or scene.get("function")
             if not functions:
                 errors.append(f"Scene {index} (function_graph) requires 'functions' or 'curves' definition.")
             elif isinstance(functions, list) and len(functions) == 0:
                 errors.append(f"Scene {index} (function_graph) 'functions' list cannot be empty.")
+            elif isinstance(functions, list):
+                cleaned_fns = []
+                for f in functions:
+                    if isinstance(f, dict):
+                        cleaned_fns.append(f)
+                    elif isinstance(f, str) and f.strip():
+                        cleaned_fns.append({"fn": f.strip(), "label": scene.get("title") or scene.get("label") or "f(x)"})
+                scene["functions"] = cleaned_fns if cleaned_fns else [{"fn": "x^2", "label": scene.get("title") or scene.get("label") or "f(x)"}]
 
-            x_dom = scene.get("x_domain") or scene.get("x_range") or scene.get("domain")
+            x_dom = scene.get("x_domain") or scene.get("x_range") or scene.get("domain") or scene.get("domain_range")
             if x_dom is not None:
                 if not (isinstance(x_dom, (list, tuple)) and len(x_dom) == 2 and x_dom[0] < x_dom[1]):
                     errors.append(f"Scene {index} (function_graph) 'x_domain' must be [min, max] with min < max.")
+                else:
+                    scene["x_domain"] = list(x_dom)
 
             y_dom = scene.get("y_domain") or scene.get("y_range")
             if y_dom is not None:
                 if not (isinstance(y_dom, (list, tuple)) and len(y_dom) == 2 and y_dom[0] < y_dom[1]):
                     errors.append(f"Scene {index} (function_graph) 'y_domain' must be [min, max] with min < max.")
+                else:
+                    scene["y_domain"] = list(y_dom)
 
         # 8. STEM: Physics Simulation
         elif scene_type == "physics_sim":
@@ -478,7 +497,7 @@ def validate_script_plan(script_data: Any) -> Tuple[bool, List[str]]:
                 for k in ("objects", "vectors", "forces", "trajectory", "sim_type")
             )
             if not has_physics_payload:
-                if scene.get("title") or is_60s_scale:
+                if scene.get("title") or scene.get("label") or is_60s_scale:
                     scene["sim_type"] = "forces"
                     scene["forces"] = [{"name": "F_net", "magnitude": "10N", "direction": 0}]
                 else:
@@ -527,8 +546,8 @@ def validate_script_plan(script_data: Any) -> Tuple[bool, List[str]]:
                 for k in ("reaction_name", "mode", "molecules", "reactants", "products", "mechanism_steps", "reagents", "rate_law")
             )
             if not has_chem_payload:
-                if scene.get("title") or is_60s_scale:
-                    scene["reaction_name"] = scene.get("title") or "Reaction Mechanism"
+                if scene.get("title") or scene.get("label") or is_60s_scale:
+                    scene["reaction_name"] = scene.get("title") or scene.get("label") or "Reaction Mechanism"
                     scene["mode"] = "sn2_concerted"
                 else:
                     errors.append(
@@ -538,32 +557,26 @@ def validate_script_plan(script_data: Any) -> Tuple[bool, List[str]]:
         # 13. Quantum Physics Simulation
         elif scene_type == "quantum_sim":
             sub_mode = scene.get("sub_mode")
-            if not sub_mode:
+            if not sub_mode or sub_mode not in {"schrodinger_tunneling", "heisenberg_uncertainty", "dirac_atomic_orbitals"}:
                 scene["sub_mode"] = "schrodinger_tunneling"
-            elif sub_mode not in {"schrodinger_tunneling", "heisenberg_uncertainty", "dirac_atomic_orbitals"}:
-                errors.append(
-                    f"Scene {index} (quantum_sim) invalid sub_mode '{sub_mode}'. Must be one of 'schrodinger_tunneling', 'heisenberg_uncertainty', 'dirac_atomic_orbitals'."
-                )
 
         # 14. Advanced Mechanics Free-Body Diagram
         elif scene_type == "mechanics_fbd":
             sub_mode = scene.get("sub_mode")
-            if not sub_mode:
+            if not sub_mode or sub_mode not in {"beam_weight_distribution", "inclined_plane_fbd", "axle_center_of_mass"}:
                 scene["sub_mode"] = "beam_weight_distribution"
-            elif sub_mode not in {"beam_weight_distribution", "inclined_plane_fbd", "axle_center_of_mass"}:
-                errors.append(
-                    f"Scene {index} (mechanics_fbd) invalid sub_mode '{sub_mode}'. Must be one of 'beam_weight_distribution', 'inclined_plane_fbd', 'axle_center_of_mass'."
-                )
 
         # 15. Electrical Circuits & Smart Grid
         elif scene_type == "electrical_grid":
             sub_mode = scene.get("sub_mode")
-            if not sub_mode:
+            if not sub_mode or sub_mode not in {"kvl_kcl_mesh", "thevenin_equivalence", "smart_grid_opf"}:
                 scene["sub_mode"] = "kvl_kcl_mesh"
-            elif sub_mode not in {"kvl_kcl_mesh", "thevenin_equivalence", "smart_grid_opf"}:
-                errors.append(
-                    f"Scene {index} (electrical_grid) invalid sub_mode '{sub_mode}'. Must be one of 'kvl_kcl_mesh', 'thevenin_equivalence', 'smart_grid_opf'."
-                )
+
+        # 16. Manim Sub-Renderer Scene
+        elif scene_type == "manim_scene":
+            sub_mode = scene.get("sub_mode")
+            if not sub_mode or sub_mode not in {"equation_morph", "calculus_graph", "vector_field", "quantum_wave"}:
+                scene["sub_mode"] = "equation_morph"
 
     return (len(errors) == 0, errors)
 

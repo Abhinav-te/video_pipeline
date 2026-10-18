@@ -272,3 +272,4 @@ export const ManimScene = ({
 };
 
 export default ManimScene;
+

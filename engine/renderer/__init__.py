@@ -23,3 +23,4 @@ __all__ = [
     "render_manim_clips_for_timeline",
     "is_manim_available",
 ]
+
