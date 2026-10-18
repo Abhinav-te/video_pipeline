@@ -2,20 +2,83 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environments
 .venv/
+venv/
+ENV/
+env/
+engine/.venv/
 engine/.cache/
 engine/cache/
 
+# Testing & Type Checking
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.tox/
+.nox/
+
 # Node / Remotion
 node_modules/
+video/node_modules/
+video/dist/
+dist/
 .DS_Store
 out/
+video/out/
+*.mp4
+*.webm
 .remotion/
+video/.remotion/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Media Artifacts
-video/public/final_video_*.mp4
-video/public/audio_*.mp3
-video/public/data_*.json
-video/public/audio_current.mp3
-video/public/data_current.json
+# Environment & Credentials
+.env
+.env.*
+*.env
+*.pem
+*.key
+
+# Temporary & Workspace Artifacts
+repomix*
+*.xml
+*.log
+
+# Editor & IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.directory
+
+# Media & Render Artifacts (preserve static audio assets like pop.mp3)
+video/public/*.mp4
+video/public/*.mp3
+!video/public/pop.mp3
+video/public/*.wav
+video/public/*.aac
+video/public/*.json
 video/public/runs/

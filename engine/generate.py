@@ -20,7 +20,15 @@ if str(ENGINE_DIR) not in sys.path:
 from director.script import generate_script
 from validation import validate_script_plan
 from audio.tts_whisper import generate_voice, extract_word_timings
-from timeline.beats import align_timeline
+from timeline.beats import (
+    align_timeline,
+    align_script_tokens_to_whisper,
+    enforce_minimum_scene_durations,
+    calculate_target_scenes,
+    merge_excess_scenes,
+)
+from timeline.enhancer import enhance_scenes
+from timeline.choreographer import choreograph_scenes
 
 
 # ---------------------------------------------------------------------------
@@ -134,18 +142,19 @@ ENGINE_VERSION = "2.0"
 # Cache
 # ---------------------------------------------------------------------------
 
-def build_cache_key(topic, duration):
+def build_cache_key(topic, duration, subject="auto"):
     """
     Create a stable cache key from the actual generation inputs.
 
     This prevents unrelated topics from sharing one stale JSON file.
     """
-    model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    model = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 
     raw = json.dumps(
         {
             "topic": topic.strip(),
             "duration": duration,
+            "subject": subject,
             "model": model,
             "schema_version": SCHEMA_VERSION,
             "engine_version": ENGINE_VERSION,
@@ -156,13 +165,13 @@ def build_cache_key(topic, duration):
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
 
 
-def get_script_cache_path(topic, duration):
-    key = build_cache_key(topic, duration)
+def get_script_cache_path(topic, duration, subject="auto"):
+    key = build_cache_key(topic, duration, subject=subject)
     return SCRIPT_CACHE_DIR / f"{key}.json"
 
 
-def load_script_cache(topic, duration):
-    cache_file = get_script_cache_path(topic, duration)
+def load_script_cache(topic, duration, subject="auto"):
+    cache_file = get_script_cache_path(topic, duration, subject=subject)
 
     if not cache_file.exists():
         return None
@@ -187,16 +196,17 @@ def load_script_cache(topic, duration):
         return None
 
 
-def save_script_cache(topic, duration, data):
+def save_script_cache(topic, duration, data, subject="auto"):
     SCRIPT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
-    cache_file = get_script_cache_path(topic, duration)
+    cache_file = get_script_cache_path(topic, duration, subject=subject)
 
     with open(cache_file, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
         f.write("\n")
 
     log(f"💾 CACHE SAVED: {cache_file.name}")
+
 
 
 # ---------------------------------------------------------------------------
@@ -232,7 +242,7 @@ def build_spoken_text(script):
     parts = []
 
     for scene in scenes:
-        text = scene.get("spoken_text", "").strip()
+        text = (scene.get("spoken_text") or scene.get("narration") or "").strip()
         if text:
             parts.append(text)
 
@@ -248,32 +258,79 @@ def build_spoken_text(script):
 # Stage Execution
 # ---------------------------------------------------------------------------
 
-def generate_or_load_script(topic, duration, no_cache=False):
+def generate_or_load_script(topic, duration, no_cache=False, subject="auto"):
     if not no_cache:
-        cached = load_script_cache(topic, duration)
+        cached = load_script_cache(topic, duration, subject=subject)
 
         if cached is not None:
             stage_start("DIRECTOR", f"Loading cached script for '{topic}' ({duration}s)")
+            target_scenes = calculate_target_scenes(duration)
+            cached.setdefault("duration", duration)
+            if "scenes" in cached and len(cached.get("scenes", [])) > target_scenes + 1:
+                cached["scenes"] = merge_excess_scenes(cached["scenes"], target_scenes=target_scenes)
             stage_success("DIRECTOR", f"Cache hit: loaded script ({len(cached.get('scenes', []))} scenes)")
             stage_start("VALIDATION", f"Validating cached script ({len(cached.get('scenes', []))} scenes)")
-            validate_script(cached)
-            return cached
+            is_valid, errors = validate_script_plan(cached)
+            if is_valid:
+                stage_success("VALIDATION", f"Script validation passed ({len(cached.get('scenes', []))} scenes)")
+                return cached
+            log(f"⚠️ Cached script failed validation: {errors}. Bypassing cache for fresh generation.")
 
-    stage_start("DIRECTOR", f"Generating script with Gemini for '{topic}' ({duration}s)")
+    MAX_ATTEMPTS = 3
+    last_errors = []
+    last_exception = None
 
-    try:
-        script = generate_script(topic, duration)
-    except Exception as exc:
-        stage_error("DIRECTOR", f"Gemini generation failed:\n{exc}")
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        attempt_str = f" (attempt {attempt}/{MAX_ATTEMPTS})" if attempt > 1 else ""
+        stage_start("DIRECTOR", f"Generating script with Gemini for '{topic}' ({duration}s){attempt_str}")
 
-    stage_success("DIRECTOR", f"Generated script successfully ({len(script.get('scenes', []))} scenes)")
+        try:
+            script = generate_script(topic, duration, subject=subject)
+        except KeyError as exc:
+            stage_error("DIRECTOR", f"Gemini generation failed: Environment variable {exc} is not set.")
+        except Exception as exc:
+            last_exception = exc
+            if attempt < MAX_ATTEMPTS:
+                print(
+                    f"[DIRECTOR:RETRY] Gemini generation attempt {attempt}/{MAX_ATTEMPTS} failed:\n{exc}\nRetrying fresh generation...",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                continue
+            stage_error("DIRECTOR", f"Gemini generation failed after {MAX_ATTEMPTS} attempts:\n{exc}")
 
-    stage_start("VALIDATION", f"Validating generated script ({len(script.get('scenes', []))} scenes)")
-    validate_script(script)
+        target_scenes = calculate_target_scenes(duration)
+        if isinstance(script, dict):
+            script.setdefault("duration", duration)
+            if "scenes" in script and len(script.get("scenes", [])) > target_scenes + 1:
+                script["scenes"] = merge_excess_scenes(script["scenes"], target_scenes=target_scenes)
 
-    save_script_cache(topic, duration, script)
+        stage_success("DIRECTOR", f"Generated script successfully ({len(script.get('scenes', []))} scenes)")
 
-    return script
+        stage_start("VALIDATION", f"Validating generated script ({len(script.get('scenes', []))} scenes)")
+        is_valid, errors = validate_script_plan(script)
+
+        if is_valid:
+            stage_success("VALIDATION", f"Script validation passed ({len(script.get('scenes', []))} scenes)")
+            save_script_cache(topic, duration, script, subject=subject)
+            return script
+
+        last_errors = errors
+        violation_details = "\n".join(f"  • {e}" for e in errors)
+
+        if attempt < MAX_ATTEMPTS:
+            print(
+                f"[VALIDATION:RETRY] Script validation failed on attempt {attempt}/{MAX_ATTEMPTS}:\n{violation_details}\nRequesting fresh generation from Gemini...",
+                flush=True,
+            )
+        else:
+            error_msg = f"Script validation failed after {MAX_ATTEMPTS} attempts:\n{violation_details}"
+            stage_error("VALIDATION", error_msg)
+
+    if last_errors:
+        stage_error("VALIDATION", f"Script validation failed:\n" + "\n".join(f"  • {e}" for e in last_errors))
+    elif last_exception:
+        stage_error("DIRECTOR", f"Gemini generation failed:\n{last_exception}")
 
 
 async def generate_audio(text, audio_file: Path):
@@ -314,9 +371,16 @@ def generate_timeline(script, audio_file: Path):
 
     log(f"Whisper extracted {len(words)} words.")
 
+    # Phase 7: Align Whisper timestamps back to original script tokens
+    # (Preserves script spelling over Whisper phonetic mishears: DBSCAN vs DISCAN, partitions vs PETITIONS)
+    narration_text = build_spoken_text(script)
+    words = align_script_tokens_to_whisper(narration_text, words)
+
     log("Aligning scenes to narration...")
 
     scenes = script.get("scenes", [])
+    if len(scenes) > 8:
+        scenes = merge_excess_scenes(scenes, target_scenes=8)
 
     try:
         timed_scenes = align_timeline(scenes, words)
@@ -325,6 +389,28 @@ def generate_timeline(script, audio_file: Path):
 
     if not timed_scenes:
         stage_error("TIMELINE", "Timeline alignment produced zero scenes.")
+
+    # Phase 2 Milestone 3: Semantic Visual Enhancer Pass
+    try:
+        timed_scenes = enhance_scenes(timed_scenes)
+    except Exception as exc:
+        stage_error("TIMELINE", f"Semantic enhancement pass failed:\n{exc}")
+
+    badged_count = sum(1 for s in timed_scenes if s.get("badge"))
+    log(f"🏷️ Attached semantic badges to {badged_count}/{len(timed_scenes)} scenes.")
+
+    # Phase 3 & 7: Context-Aware AI Scene Choreographer Pass
+    try:
+        domain = script.get("subject") or script.get("domain") or "auto"
+        timed_scenes = choreograph_scenes(timed_scenes, words, domain=domain, fps=30)
+    except Exception as exc:
+        stage_error("TIMELINE", f"Context-aware choreography pass failed:\n{exc}")
+
+    # Phase 7: Final post-processing pass guaranteeing duration >= 2.5s across every scene in data.json
+    timed_scenes = enforce_minimum_scene_durations(timed_scenes, min_duration=2.5)
+
+    domain_tag = timed_scenes[0].get("choreography", {}).get("domain", "code") if timed_scenes else "code"
+    log(f"🎬 Choreographed {len(timed_scenes)} scenes for domain '{domain_tag}'.")
 
     # Basic sanity check
     previous_start = -1.0
@@ -434,6 +520,14 @@ def main():
     )
 
     parser.add_argument(
+        "--subject",
+        type=str,
+        choices=["auto", "code", "math", "physics", "systems", "ml", "chemistry", "quantum_physics", "mechanics", "electrical"],
+        default="auto",
+        help="Subject domain for video.",
+    )
+
+    parser.add_argument(
         "--no-cache",
         action="store_true",
         help="Force fresh Gemini generation.",
@@ -490,6 +584,7 @@ def main():
     print(f"🚀 V2 PHASE 1 — AI SCRIPTING PIPELINE [Run: {run_id}]")
     print("=" * 70)
     print(f"Topic:    {topic}")
+    print(f"Subject:  {args.subject}")
     print(f"Length:   {args.length}s")
     print(f"Cache:    {'DISABLED' if args.no_cache else 'ENABLED'}")
     print(f"Run Dir:  {run_dir}")
@@ -511,6 +606,7 @@ def main():
             topic=topic,
             duration=args.length,
             no_cache=args.no_cache,
+            subject=args.subject,
         )
 
         # ---------------------------------------------------------------

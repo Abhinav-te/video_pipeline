@@ -64,10 +64,16 @@ def main():
     parser = argparse.ArgumentParser(description="V2 Video Engine: One-Click Pipeline")
     parser.add_argument("--topic", type=str, required=True, help="Topic for the video short")
     parser.add_argument("--length", type=int, choices=[15, 30, 60], default=60, help="Target duration in seconds")
+    parser.add_argument("--subject", type=str, choices=["auto", "code", "math", "physics", "systems", "ml", "chemistry", "quantum_physics", "mechanics", "electrical"], default="auto", help="Subject domain for video")
     parser.add_argument("--no-cache", action="store_true", help="Force regenerate AI script")
     parser.add_argument("--run-id", type=str, default=None, help="Explicit run ID (auto-generated if omitted)")
     parser.add_argument("--output", type=str, default=None, help="Explicit output MP4 path")
+    parser.add_argument("--frames", type=str, default=None, help="Frame range to render (e.g. '0-89') for benchmarks")
+    parser.add_argument("--fast-test", action="store_true", help="Quick 90-frame (3s) benchmark render (equivalent to --frames 0-89)")
     args = parser.parse_args()
+
+    if args.fast_test and not args.frames:
+        args.frames = "0-89"
 
     topic = args.topic.strip()
     if not topic:
@@ -75,7 +81,7 @@ def main():
 
     run_id = args.run_id or generate_run_id()
 
-    stage_start("PIPELINE", f"Run ID: {run_id} | Topic: '{topic}' | Length: {args.length}s")
+    stage_start("PIPELINE", f"Run ID: {run_id} | Topic: '{topic}' | Subject: {args.subject} | Length: {args.length}s")
 
     python_exec = ENGINE_DIR / ".venv" / "bin" / "python"
     if not python_exec.exists():
@@ -89,9 +95,11 @@ def main():
 
     # Step 1: Execute Python Generation Subprocess
     cmd = [
+
         str(python_exec), str(gen_script),
         "--length", str(args.length),
         "--topic", args.topic,
+        "--subject", args.subject,
         "--run-id", run_id,
     ]
     if args.no_cache:
@@ -142,6 +150,8 @@ def main():
         "--codec", "h264",
         "--props", str(data_file_path),
     ]
+    if args.frames:
+        remotion_cmd.extend(["--frames", str(args.frames)])
 
     try:
         res = subprocess.run(remotion_cmd, cwd=str(VIDEO_DIR))
@@ -160,7 +170,7 @@ def main():
     try:
         is_valid, errors, meta = validate_video_output(
             video_path=out_file_path,
-            expected_audio_path=audio_file_path if audio_file_path.exists() else None,
+            expected_audio_path=audio_file_path if (audio_file_path.exists() and not args.frames) else None,
             tolerance_sec=1.5,
         )
     except Exception as exc:

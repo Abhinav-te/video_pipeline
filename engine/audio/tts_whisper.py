@@ -31,6 +31,8 @@ def get_whisper_device() -> str:
         try:
             # Runtime kernel sanity check to detect unsupported compute capability (e.g. sm_120)
             _ = torch.zeros(1, device="cuda") + 1
+            gpu_name = torch.cuda.get_device_name(0) if torch.cuda.device_count() > 0 else "NVIDIA GPU"
+            print(f"[AUDIO:INFO] 🚀 Whisper device: cuda ({gpu_name})", flush=True)
             return "cuda"
         except Exception as exc:
             print(
@@ -170,15 +172,110 @@ async def generate_voice(text: str, output_file: str, max_retries: int = 3) -> N
     )
 
 
+def merge_hyphenated_tokens(words: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Merges split hyphenated tokens (e.g. 'K', '-means' or 'Non-', 'convex') into
+    single intact word tokens so subtitles and visual callouts never split them.
+    """
+    if not words:
+        return []
+
+    merged: List[Dict[str, Any]] = []
+    i = 0
+    n = len(words)
+
+    KNOWN_PAIRS = {
+        ("k", "means"): "K-MEANS",
+        ("t", "sne"): "T-SNE",
+        ("auto", "encoders"): "AUTO-ENCODERS",
+        ("auto", "encoder"): "AUTO-ENCODER",
+        ("non", "convex"): "NON-CONVEX",
+        ("high", "dimensional"): "HIGH-DIMENSIONAL",
+        ("low", "dimensional"): "LOW-DIMENSIONAL",
+    }
+
+    while i < n:
+        curr = words[i]
+        curr_text = str(curr.get("word", "")).strip()
+
+        # Check for isolated hyphen between previous and next
+        if curr_text in {"-", "—", "--"} and merged and (i + 1 < n):
+            nxt = words[i + 1]
+            prev = merged[-1]
+            merged[-1] = {
+                "word": f"{prev['word'].rstrip('-')}-{str(nxt.get('word', '')).strip().lstrip('-')}",
+                "start": prev["start"],
+                "end": max(nxt["end"], prev["end"]),
+            }
+            i += 2
+            continue
+
+        # Check known compound pairs
+        if i + 1 < n:
+            nxt = words[i + 1]
+            nxt_text = str(nxt.get("word", "")).strip()
+            pair_key = (curr_text.lower().rstrip("-"), nxt_text.lower().lstrip("-"))
+            if pair_key in KNOWN_PAIRS:
+                merged.append({
+                    "word": KNOWN_PAIRS[pair_key],
+                    "start": curr["start"],
+                    "end": nxt["end"],
+                })
+                i += 2
+                continue
+
+        # Check trailing hyphen on curr or leading hyphen on nxt
+        if curr_text.endswith("-") and i + 1 < n:
+            nxt = words[i + 1]
+            nxt_text = str(nxt.get("word", "")).strip()
+            merged.append({
+                "word": f"{curr_text.rstrip('-')}-{nxt_text.lstrip('-')}",
+                "start": curr["start"],
+                "end": nxt["end"],
+            })
+            i += 2
+            continue
+
+        if i + 1 < n and str(words[i + 1].get("word", "")).strip().startswith("-"):
+            nxt = words[i + 1]
+            nxt_text = str(nxt.get("word", "")).strip()
+            if nxt_text in {"-", "—", "--"} and i + 2 < n:
+                nxt2 = words[i + 2]
+                nxt2_text = str(nxt2.get("word", "")).strip().lstrip("-")
+                merged.append({
+                    "word": f"{curr_text.rstrip('-')}-{nxt2_text}",
+                    "start": curr["start"],
+                    "end": nxt2["end"],
+                })
+                i += 3
+                continue
+            elif nxt_text not in {"-", "—", "--"}:
+                merged.append({
+                    "word": f"{curr_text.rstrip('-')}-{nxt_text.lstrip('-')}",
+                    "start": curr["start"],
+                    "end": nxt["end"],
+                })
+                i += 2
+                continue
+
+        merged.append(curr)
+        i += 1
+
+    return merged
+
+
 def validate_and_sanitize_word_timestamps(words: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Sanitizes word timestamps:
+    - Merges split hyphenated tokens into single intact tokens (Phase 6).
     - Guarantees strictly non-negative timestamps (>= 0.0).
     - Guarantees start < end (min duration 0.05s).
     - Guarantees monotonic progression (start >= previous end).
     """
     if not words:
         raise ValueError("Whisper produced zero word timestamps.")
+
+    words = merge_hyphenated_tokens(words)
 
     sanitized: List[Dict[str, Any]] = []
     last_end = 0.0

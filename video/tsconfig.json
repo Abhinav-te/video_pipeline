@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "jsx": "react-jsx",
+    "strict": false,
+    "noEmit": true,
+    "lib": ["es2022", "dom"]
+  }
+}
+

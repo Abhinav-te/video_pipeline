@@ -286,8 +286,50 @@ class TestMilestone2ValidationGate(unittest.TestCase):
         self.assertIn("exhausted or failed", str(ctx.exception))
         self.assertEqual(calls, DEFAULT_MODEL_CHAIN)
 
+    @patch("generate.generate_script")
+    def test_generate_or_load_script_retries_on_validation_failure_then_succeeds(self, mock_generate_script):
+        """Verify generate_or_load_script retries on validation failure, logs [VALIDATION:RETRY], and succeeds on fresh script."""
+        import io
+        bad_script = create_valid_test_script()
+        bad_script["scenes"][1]["code_snippet"] = "def broken(code: pass"  # invalid AST
+
+        good_script = create_valid_test_script()
+
+        mock_generate_script.side_effect = [bad_script, good_script]
+
+        captured_stdout = io.StringIO()
+        with patch("sys.stdout", captured_stdout):
+            result = gen_module.generate_or_load_script("Test Topic", 60, no_cache=True)
+
+        self.assertEqual(result["title"], good_script["title"])
+        self.assertEqual(mock_generate_script.call_count, 2)
+        output = captured_stdout.getvalue()
+        self.assertIn("[VALIDATION:RETRY]", output)
+        self.assertIn("Requesting fresh generation from Gemini", output)
+
+    @patch("generate.generate_script")
+    def test_generate_or_load_script_fails_after_max_attempts(self, mock_generate_script):
+        """Verify generate_or_load_script attempts up to 3 times before calling stage_error on persistent validation failure."""
+        import io
+        bad_script = create_valid_test_script()
+        bad_script["scenes"][1]["code_snippet"] = "def broken(code: pass"
+
+        mock_generate_script.return_value = bad_script
+
+        captured_stdout = io.StringIO()
+        captured_stderr = io.StringIO()
+        with patch("sys.stdout", captured_stdout), patch("sys.stderr", captured_stderr):
+            with self.assertRaises(SystemExit) as cm:
+                gen_module.generate_or_load_script("Test Topic", 60, no_cache=True)
+
+        self.assertNotEqual(cm.exception.code, 0)
+        self.assertEqual(mock_generate_script.call_count, 3)
+        self.assertIn("[VALIDATION:RETRY]", captured_stdout.getvalue())
+        self.assertIn("[VALIDATION:ERROR]", captured_stderr.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
 

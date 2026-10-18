@@ -1,6 +1,20 @@
-# Automated Technical Video Generation Engine
+# Automated Technical & STEM Video Generation Engine
 
-An end-to-end programmatic video pipeline that transforms technical coding topics into 9:16 vertical shorts (TikTok/Reels/Shorts) using an automated multi-stage architecture.
+An end-to-end programmatic video generation engine that transforms technical topics across Computer Science and STEM domains into professional 9:16 vertical shorts (TikTok, YouTube Shorts, Instagram Reels) using an automated, decoupled multi-stage architecture.
+
+---
+
+## Supported Domains
+
+The engine natively generates visual simulations, LaTeX derivations, kinetic badges, and domain-tuned color palettes for:
+
+- **Computer Science & Algorithms** (`code`) — Syntax typewriter, AST validation, before/after morphing, terminal output.
+- **Machine Learning & Systems** (`ml`, `systems`) — 3-tier algorithm exploration (K-Means, DBSCAN, PCA, t-SNE) and dual-pane neural network simulations.
+- **Organic & Physical Chemistry** (`chemistry`) — Curved arrow electron pushing, $S_N2$ backside inversion, steric hindrance shields, and $S_N1$ planar carbocation ionization.
+- **Quantum Physics** (`quantum_physics`) — Dirac relativistic atomic orbitals ($1s, 2p, 3d$), Schrödinger potential barrier tunneling, and Heisenberg position-momentum squeezing.
+- **Advanced Mechanics & Statics** (`mechanics`) — Multi-support beam reaction forces, live $V(x)/M(x)$ shear-moment diagrams, inclined plane vector decomposition, and chassis dynamic load transfer.
+- **Electrical Engineering & Smart Grids** (`electrical`) — KVL/KCL multi-loop mesh analysis, Thévenin/Norton linear reduction, and multi-bus optimal power flow (OPF) grids.
+- **Applied Mathematics & Physics** (`math`, `physics`) — Multi-step LaTeX derivation studio and 2D coordinate calculus plots.
 
 ---
 
@@ -10,25 +24,25 @@ An end-to-end programmatic video pipeline that transforms technical coding topic
 generate_and_render.py (CLI / Orchestrator)
        │
        ▼
-[Stage 1: AI Director]       --> engine/director/ (Gemini API)
+[Stage 1: AI Director]       --> engine/director/ (Gemini API Fallback Chain)
        │ (JSON Scene Plan)
        ▼
-[Stage 2: Validation Gate]   --> engine/validation/ (AST & Schema Gate)
+[Stage 2: Validation Gate]   --> engine/validation/ (Polymorphic AST & Schema Gate)
        │ (Validated JSON)
        ▼
 [Stage 3: Audio Generation]  --> engine/audio/ (Edge-TTS + Integrity Check)
        │ (Playable Audio + Word Timestamps)
        ▼
-[Stage 4: Timeline Assembly] --> engine/timeline/ (Whisper Beats & Mapping)
+[Stage 4: Timeline Assembly] --> engine/timeline/ (Whisper Beats & Domain Choreographer)
        │ (Remotion-Ready Data: video/public/runs/<run_id>/)
        ▼
-[Stage 5: Video Renderer]    --> Remotion / React (Subprocess Render)
+[Stage 5: Video Renderer]    --> Remotion / React 18 (GPU Accelerated / Headless Linux)
        │ (Raw Video File: video/out/<run_id>.mp4)
        ▼
 [Stage 6: Output Validation] --> engine/validation/output.py (ffprobe Verification)
        │
        ▼
-Final MP4 Output (1080x1920, h264/aac, 30fps)
+Final Production Video (1080x1920, H.264/AAC, 30fps)
 ```
 
 ---
@@ -36,46 +50,80 @@ Final MP4 Output (1080x1920, h264/aac, 30fps)
 ## Pipeline Stages
 
 ### 1. `[DIRECTOR]` — AI Director (`engine/director/`)
-- Generates structured multi-scene JSON plans using Google Gemini models (`gemini-2.5-flash`, `gemini-2.0-flash`, `gemini-1.5-flash`).
-- Enforces 5–11 words per spoken beat to ensure optimal mobile pacing.
-- Selects from 6 visual primitives: `fullscreen_text`, `code_reveal`, `code_transform`, `diagram`, `terminal`, `comparison`.
-- Enforces an initial curiosity hook in Scene 1 and at least one bug-vs-fix `comparison` scene.
+- Generates structured multi-scene JSON plans using Google Gemini models with automatic fallback across the active model chain: `gemini-3.8-flash` -> `gemini-2.5-flash` -> `gemini-2.0-flash` -> `gemini-1.5-flash`.
+- Automatically detects topic domain (`code`, `math`, `physics`, `chemistry`, `quantum_physics`, `mechanics`, `electrical`, `ml`, `systems`).
+- Dynamically scales spoken narration and scene counts with duration:
+  - **15s**: ~35 words across 3–4 scenes.
+  - **30s**: ~70 words across 5–7 scenes.
+  - **60s**: ~135 words across 10–11 scenes (~13–15 words per scene).
+- Includes strict 30-second request timeouts and fast backoff to eliminate indefinite API hangs.
 
-### 2. `[VALIDATION]` — Pre-Flight Validation Gate (`engine/validation/`)
-- Centralized validation before speech or video rendering triggers.
-- **Python AST Syntax Checking**: Verifies all code snippets in `code_reveal`, `code_transform`, and `comparison` scenes via `ast.parse`.
-- **Schema & Bounds Enforcement**: Verifies scene count (2–35), 5–11 words per beat, 1–3 diagram nodes, and schema version contracts.
+### 2. `[VALIDATION]` — Polymorphic Validation Gate (`engine/validation/`)
+- Pre-flight validation gate before audio synthesis or Remotion rendering runs.
+- **Polymorphic Code & Formula Validation**:
+  - Python AST syntax checking (`ast.parse`) is strictly restricted to `code` subjects and explicit Python scene types.
+  - STEM formula strings (`problem_code`, `solution_code`, math derivations) are validated as formatted equation blocks rather than Python source.
+- **Resilient Fallback Synthesis**: Missing optional graph curves, derivation steps, or simulation parameters are auto-synthesized during timeline choreography rather than halting pipeline execution.
+- Validates pacing (minimum 4 words per beat), schema version contracts, and scene count bounds (2–35).
 
-### 3. `[AUDIO]` — Voice Synthesis (`engine/audio/`)
-- Generates natural narration via Microsoft Edge-TTS with exponential backoff (up to 3 retries).
-- Inspects audio integrity via `ffprobe` to verify valid headers, supported codecs (`mp3`, `aac`), and duration $> 0$s before downstream stages.
-- Removes partial files on error to prevent corrupted assets from lingering.
+### 3. `[AUDIO]` — Voice Synthesis & GPU Whisper Alignment (`engine/audio/`)
+- Generates natural, clear voiceover narration via Microsoft Edge-TTS with exponential backoff retry handling.
+- Verifies audio container integrity via `ffprobe` (valid headers, codec `mp3`/`aac`, duration $> 0$s).
+- Whisper forced word-level timestamp alignment with automatic CUDA GPU acceleration (`torch.cuda.is_available()`) and graceful CPU fallback.
+- Sanitizes timestamps: strictly non-negative, monotonically increasing, and bounded by scene durations.
 
-### 4. `[TIMELINE]` — Whisper Alignment & Timeline Assembly (`engine/timeline/`)
-- Dynamic hardware acceleration detection (`cuda` if available, falling back to `cpu`).
-- In-process Whisper model caching to avoid reloading weights across repeated operations.
-- Word timestamp sanitization: strictly non-negative, `end > start`, and monotonic progression.
-- Timeline beat mapping protected against zero-duration stalls or collapsed scenes (`MIN_SCENE_DURATION = 0.3s`).
+### 4. `[TIMELINE]` — Domain Choreographer & Beat Enhancer (`engine/timeline/`)
+- Injects domain-specific color palettes (`electrical_neon`, `mechanics_amber`, `quantum_violet`, `chemistry_emerald`, `ml_amber`, `cyber_matrix`).
+- **Anti-Repetition & Pacing Engine**:
+  - Rotates simulation sub-modes across middle scenes so no two consecutive beats render identical visual layouts.
+  - Enforces the **Single Bento Guarantee**: `bento_grid` overview matrices appear at most once per video, strictly at the final scene for multi-beat shorts.
+  - Enforces clean 1-sentence comparison takeaways (`KEY TAKEAWAY: ...`) without duplicate pipe suffixes.
+- Assembles run-isolated `data.json` for Remotion compositing.
 
 ### 5. `[RENDER]` — Remotion React Compositing (`video/`)
-- Renders 1080x1920 (9:16) vertical video shorts using React components and Remotion CLI.
-- Reads dynamic run properties per run via `--props video/public/runs/<run_id>/data.json`.
-- Dynamic rolling subtitle window with word-level highlight punch.
+- Renders 1080x1920 (9:16) vertical video shorts using React 18 components and Remotion v4 CLI.
+- **Optimized Rendering Engine**:
+  - Clean Remotion configuration (`video/remotion.config.ts`) with high-speed JPEG sequence rendering and overwrite protection.
+  - Zero heavy CSS `backdrop-filter: blur(...)` or per-frame SVG filter bottlenecks to ensure rapid rendering on headless Linux / WSL2 environments.
+  - Dynamic `CameraRig` for smooth, non-jittering framing, kinetic callouts, dynamic badges, and word-level rolling captions.
 
-### 6. `[OUTPUT_VALIDATION]` — Post-Render Output Validation (`engine/validation/output.py`)
-- Automated `ffprobe` inspection of final rendered video:
-  - File exists and size $\ge$ 100KB.
-  - Container is a valid MP4 (`mov,mp4,m4a,3gp,3g2,mj2`).
+### 6. `[OUTPUT_VALIDATION]` — Post-Render Verification (`engine/validation/output.py`)
+- Automated `ffprobe` stream and container verification:
+  - File exists and size $\ge 100$ KB.
+  - Valid MP4 container (`mov,mp4,m4a,3gp,3g2,mj2`).
   - Exactly 1 video stream: codec `h264`, dimensions `1080x1920` (9:16 vertical), ~30 fps.
-  - Exactly 1 audio stream: codec `aac` or `mp3`, sample rate $\ge 24,000$Hz.
+  - Exactly 1 audio stream: codec `aac` or `mp3`, sample rate $\ge 24,000$ Hz.
   - Video duration matches audio narration duration within $\pm 1.5$s tolerance.
 - Automatically quarantines corrupt or non-compliant videos (`<name>.corrupt.mp4`) and exits non-zero.
 
 ---
 
+## Visual Primitives
+
+| Visual Primitive | Domain / Mode | Key Capabilities |
+|---|---|---|
+| `fullscreen_text` / `concept` | All Domains | Impactful hook cards, hero concept resets, takeaway highlights. |
+| `code_reveal` | `code`, `systems` | Typewriter syntax mounting, line highlights, focus phrase tracking. |
+| `code_transform` | `code` | In-place code mutation with before/after diff markers. |
+| `terminal` | `code`, `systems` | Command line execution and formatted traceback output. |
+| `diagram` / `flowchart` | All Domains | Animated node-link flows and state-machine transitions. |
+| `comparison` | All Domains | Dual-card split with clean, domain-specific `KEY TAKEAWAY` footers. |
+| `function_graph` | `math`, `physics`, STEM | 2D coordinate calculus, shear-moment diagrams, quantum wavepackets, reaction energy profiles. |
+| `math_equation` | `math`, STEM | Multi-step LaTeX derivation studio with domain-specific formulas. |
+| `physics_sim` | `physics` | 2D Newtonian projectile kinematics, vector decomposition, and force balance. |
+| `bento_grid` | All Domains | 4-card overview matrices with 4 distinct animated mini-SVG diagrams. |
+| `algorithm_explorer` | `ml`, `code` | 3-tier deep dive (K-Means, DBSCAN, PCA, t-SNE) with parameter HUDs. |
+| `neural_code_split` | `ml`, `code` | Side-by-side live neural network simulation and PyTorch tensor code. |
+| `chemistry_reaction` | `chemistry` | $S_N2$ backside attack, steric shields, $S_N1$ carbocation ionization, and racemic products. |
+| `quantum_sim` | `quantum_physics` | Dirac atomic orbitals ($1s, 2p, 3d$), Schrödinger tunneling, Heisenberg phase space. |
+| `mechanics_fbd` | `mechanics` | Beam reaction forces, inclined plane decomposition, chassis load transfer. |
+| `electrical_grid` | `electrical` | KVL/KCL mesh loops, Thévenin equivalent reduction, multi-bus OPF dispatch. |
+
+---
+
 ## Run Isolation & Artifacts
 
-Every run generates a unique timestamped identifier:
+Each pipeline run generates a unique timestamped identifier:
 ```text
 run_YYYYMMDD_HHMMSS_<shortid>
 ```
@@ -90,27 +138,16 @@ run_YYYYMMDD_HHMMSS_<shortid>
   ```text
   video/out/<run_id>.mp4
   ```
-- **Fail-Fast & Zero Stale Artifacts**: If any stage fails mid-flight, partial files in `video/public/runs/<run_id>/` are immediately wiped so no half-baked assets contaminate future runs.
-
----
-
-## Visual Primitives Supported
-
-- `fullscreen_text`: High-impact curiosity hooks and concept resets.
-- `code_reveal`: Progressive syntax-highlighted code block mounting with optional focus phrase highlight.
-- `code_transform`: In-place modification of existing functions and logic.
-- `terminal`: Interactive command runs and traceback demonstrations.
-- `diagram`: Dynamic node graphs for algorithmic flow (1–3 nodes).
-- `comparison`: Side-by-side / top-bottom bug-vs-fix comparisons (`problem_code` vs `solution_code`).
+- **Zero Stale Artifacts**: If any stage fails mid-flight, temporary files in `video/public/runs/<run_id>/` are immediately wiped so no half-baked assets contaminate future runs.
 
 ---
 
 ## Prerequisites
 
-- **Python**: 3.10+ (tested on Python 3.11 / Linux)
+- **Python**: 3.10+ (tested on Python 3.11 / Linux & WSL2)
 - **Node.js**: v20+ LTS
 - **FFmpeg / FFprobe**: System-level binaries installed
-- **Gemini API Key**: From Google AI Studio
+- **Gemini API Key**: From [Google AI Studio](https://aistudio.google.com/)
 
 ---
 
@@ -124,7 +161,7 @@ cd video_pipeline
 
 python3 -m venv engine/.venv
 source engine/.venv/bin/activate
-pip install -r engine/requirements.txt
+pip install -r requirements.txt
 
 cd video
 npm install
@@ -146,32 +183,56 @@ export EDGE_TTS_VOICE="en-US-ChristopherNeural"
 Run the full end-to-end pipeline with a single CLI command:
 
 ```bash
-python3 generate_and_render.py --topic "Python Dictionary Keys Trick" --length 60
+# Electrical Power Grid Short (60 seconds)
+python3 generate_and_render.py --topic "Smart Grid Optimal Power Flow and Thevenin Equivalence" --subject electrical --length 60
+
+# Quantum Physics Short (60 seconds)
+python3 generate_and_render.py --topic "Quantum Tunneling and Dirac Atomic Orbitals" --subject quantum_physics --length 60
+
+# Chemistry Short (30 seconds)
+python3 generate_and_render.py --topic "SN1 vs SN2 Reaction Mechanisms" --subject chemistry --length 30
+
+# Python Coding Short (60 seconds)
+python3 generate_and_render.py --topic "Python Dictionary Keys Trick" --subject code --length 60
 ```
 
 #### CLI Options:
 | Flag | Type | Description |
 |---|---|---|
-| `--topic` | `str` | **Required**. Topic for the educational coding short. |
+| `--topic` | `str` | **Required**. Topic for the educational short. |
+| `--subject` | `str` | Target domain (`code`, `math`, `physics`, `quantum_physics`, `mechanics`, `electrical`, `chemistry`, `ml`, `systems`). Auto-detected if omitted. |
 | `--length` | `int` | Target duration in seconds: `15`, `30`, or `60` (default: `60`). |
+| `--frames` | `str` | Optional Remotion frame range for fast benchmarks (e.g. `--frames 0-89`). |
+| `--fast-test` | `flag` | Fast 3-second render mode for quick visual checks. |
 | `--no-cache` | `flag` | Force fresh AI Director generation (bypasses script cache). |
 | `--run-id` | `str` | Explicit run ID (auto-generated if omitted). |
 | `--output` | `str` | Custom path for the rendered MP4 output. |
 
 ---
 
-## Running the Automated Test Suite
+## Automated Test Suites
 
-The test suite contains 51 unit and integration tests across all pipeline milestones:
+The codebase includes comprehensive unit and integration tests across all pipeline stages and frontend components:
 
+### Python Engine & Pipeline Tests
 ```bash
-# Run all tests with discovery:
+# Run all Python tests:
 engine/.venv/bin/python -m unittest discover -s tests -p "test_*.py" -v
 
-# Or run individual milestone test suites:
-engine/.venv/bin/python -m unittest tests/test_milestone1.py -v   # Run Isolation & Observability
-engine/.venv/bin/python -m unittest tests/test_milestone2.py -v   # Validation Gate & AST Syntax
-engine/.venv/bin/python -m unittest tests/test_milestone3.py -v   # Audio Guarantees & Whisper Alignment
-engine/.venv/bin/python -m unittest tests/test_milestone4.py -v   # Post-Render Output Validation
-engine/.venv/bin/python -m unittest tests/test_milestone5.py -v   # Integration & Reliability
+# Run targeted milestone & phase suites:
+engine/.venv/bin/python -m unittest tests/test_phase13_production_lock.py -v   # Phase 13: Production Lock
+engine/.venv/bin/python -m unittest tests/test_phase12_duration_and_bento.py -v # Phase 12: Duration Scaling & Bento
+engine/.venv/bin/python -m unittest tests/test_phase10_stem_and_gpu.py -v      # Phase 10: STEM Engines & GPU
+engine/.venv/bin/python -m unittest tests/test_validation.py -v                # Polymorphic AST & Formula Gate
+engine/.venv/bin/python -m unittest tests/test_stem_pipeline.py -v             # Full Multi-Subject Pipeline
+```
+
+### Node Remotion Component Tests
+```bash
+# Run frontend JSX & render tests:
+node video/test_phase13_production_lock.mjs
+node video/test_phase12_duration_and_fallbacks.mjs
+node video/test_phase10_stem_and_gpu.mjs
+node video/test_phase9_breathing.mjs
+node video/test_phase7_chemistry.mjs
 ```
