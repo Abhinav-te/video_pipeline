@@ -1,5 +1,5 @@
 import React from 'react';
-import { useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
+import { OffthreadVideo, staticFile, useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
 import { SceneBadge } from './SceneBadge';
 import { GraphIcon, SparklesIcon } from './SvgIcons';
 
@@ -428,12 +428,39 @@ export const GraphScene = ({
           position: 'relative',
         }}
       >
-        <svg
-          width={canvasWidth}
-          height={canvasHeight}
-          viewBox={`0 0 ${canvasWidth} ${canvasHeight}`}
-          style={{ width: '100%', height: '100%' }}
-        >
+        {scene?.manim_video_src ? (
+          <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+            <OffthreadVideo
+              src={staticFile(scene.manim_video_src)}
+              muted
+              style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '20px' }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                backgroundColor: 'rgba(10, 16, 27, 0.85)',
+                border: '1px solid #00f2fe',
+                color: '#00f2fe',
+                borderRadius: '6px',
+                padding: '4px 12px',
+                fontSize: '13px',
+                fontFamily: 'monospace',
+                fontWeight: 800,
+                zIndex: 10,
+              }}
+            >
+              MANIM CAIRO ENGINE • 30 FPS
+            </div>
+          </div>
+        ) : (
+          <svg
+            width={canvasWidth}
+            height={canvasHeight}
+            viewBox={`0 0 ${canvasWidth} ${canvasHeight}`}
+            style={{ width: '100%', height: '100%' }}
+          >
           {/* Subtle Grid Lines */}
           {[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5].map((u) => {
             const sx = toScreenX(u);
@@ -800,6 +827,7 @@ export const GraphScene = ({
             </g>
           )}
         </svg>
+        )}
       </div>
 
       {/* 3. BOTTOM DOMAIN BREAKDOWN CARD / BOTTOM CALCULUS BREAKDOWN CARD (420px) - Hidden in canvas_spotlight mode */}

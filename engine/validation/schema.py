@@ -77,6 +77,7 @@ VALID_SCENE_TYPES = {
     "quantum_sim",
     "mechanics_fbd",
     "electrical_grid",
+    "manim_scene",
 }
 
 STEM_SCENE_TYPES = {
@@ -86,6 +87,7 @@ STEM_SCENE_TYPES = {
     "quantum_sim",
     "mechanics_fbd",
     "electrical_grid",
+    "manim_scene",
 }
 
 ML_SCENE_TYPES = {

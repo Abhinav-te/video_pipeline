@@ -1,64 +1,60 @@
-# Agent Instructions: Video Pipeline Engine — Phase 13 Final Production Lock (Zero Hardcoded Math/Bento Artifacts & Clean Graph Layout)
+# Agent Instructions: Video Pipeline Engine — Phase 14 Hybrid Manim Community (`manimce`) Sub-Renderer Integration
 
 You are an expert systems and audio/video pipeline software engineer.
-Your objective is to eliminate the final 4 visual artifacts identified in our 60-second production review so the pipeline can reliably batch-produce ready-to-post videos across all subjects over the coming weeks.
+Your objective is to integrate **Manim Community (`manim`)** as a deterministic pre-render stage (`Stage 4.5`) that generates 3Blue1Brown-style mathematical animations (`TransformMatchingTex`, animated calculus curves, Riemann areas, vector fields, and quantum wavepackets) and embeds them seamlessly inside Remotion via `<OffthreadVideo>`.
 
 ---
 
-## 1. Four Final Production Fixes (Must Execute Together)
+## 1. System Architecture: Stage 4.5 Manim Bridge (`engine/renderer/manim_bridge.py`)
 
-### Fix 1: Purge Hardcoded `"Euler's Identity"` & Imaginary Unit Text from `MathScene.jsx` & `choreographer.py`
-- **Bug Observed (`00:48–00:50`)**: When `MathScene.jsx` rendered during an Electrical Engineering scene (*"Automated optimal dispatch protects transmission lines..."*), it displayed a hardcoded title `"Euler's identity"`, generic steps `"f(x) = y"`, and a hardcoded footer `"Multiplication by imaginary unit i represents a pure 90° rotation... Constants Linked: e, i, π, 1, 0"`.
-- **Mandatory Fix**:
-  1. Never fall back to `"Euler's identity"`, `"EULER DERIVATION STUDIO"`, or the imaginary unit $i$ paragraph in `MathScene.jsx` or `choreographer.py`!
-  2. Use `scene.title` as the card title, use the domain eyebrow (`subject.upper() + " • MATHEMATICAL FORMULATION"`), and populate domain-specific derivation steps & intuition footers when `scene.steps` are generic or missing:
-     - **`electrical`**:
-       - Step 1: $\sum_{i} P_{Gi} = P_{\text{load}} + P_{\text{loss}}$ (Active Power Balance Constraint)
-       - Step 2: $\frac{\partial C_i}{\partial P_{Gi}} = \lambda \quad \text{subject to } |S_{ij}| \le S_{ij,\max}$ (Thermal Line Limit & Economic Dispatch)
-       - Intuition Footer: `Lagrangian optimization dispatches lowest-cost generators while clamping branch currents below thermal sag thresholds.`
-     - **`mechanics`**:
-       - Step 1: $\sum F_x = 0, \quad \sum F_y = R_A + R_B - \sum W_i = 0$ (Translational Static Equilibrium)
-       - Step 2: $\sum \tau_A = R_B \cdot L - \sum (W_i \cdot x_i) = 0 \implies M(x) = \int V(x)\,dx$ (Rotational Moment Balance)
-       - Intuition Footer: `Internal shear and bending moments peak where reaction forces balance concentrated structural loads.`
-     - **`quantum_physics`**:
-       - Step 1: $\hat{H}\Psi = E\Psi \implies \kappa = \frac{\sqrt{2m(V_0 - E)}}{\hbar}$ (Wavefunction Attenuation Constant)
-       - Step 2: $T \approx e^{-2\kappa L}, \quad \sigma_x \sigma_p \ge \frac{\hbar}{2}$ (Barrier Transmission & Phase-Space Bound)
-       - Intuition Footer: `Non-zero probability amplitude inside classically forbidden barriers enables quantum tunneling.`
-     - **`chemistry`**:
-       - Step 1: $\text{Rate}_{S_N2} = k[\text{R-X}][\text{Nu}^-], \quad \text{Rate}_{S_N1} = k[\text{R-X}]$ (Kinetic Order Law)
-       - Step 2: $k = A e^{-E_a / RT}, \quad \Delta G^\ddagger = \Delta H^\ddagger - T\Delta S^\ddagger$ (Eyring-Arrhenius Activation Barrier)
-       - Intuition Footer: `Activation energy height dictates reaction rate; steric hindrance raises the concerted transition state barrier.`
-     - **`math` / `physics` / `code` / `ml`**: Derive steps and intuition directly from `scene.narration` and `scene.title`.
+Do NOT replace Remotion as the master 1080x1920 compositor. Remotion remains the master frame controller (headers, kinetic subtitles, progress tabs, audio sync, and layout breathing). Manim renders high-precision animated canvases that slot directly into the center container.
 
-### Fix 2: Distinct Mini-SVGs Inside `BentoGridScene.jsx` & Stop Holding `bento_grid` for the Last 3 Scenes (`00:51–01:07`)
-- **Bug Observed (`00:51–01:07`)**:
-  1. The last 2–3 scenes of the video (`00:51–01:07`, 16 seconds straight) still rendered `BentoGridScene` back-to-back.
-  2. Inside `BentoGridScene.jsx`, all 4 cards (`KVL & KCL`, `Thévenin / Norton`, `Max Power`, `Smart Grid OPF`) rendered the **exact same 3 dotted circles (`t-SNE` fallback graphic)**!
-- **Mandatory Fix**:
-  1. In `choreographer.py`, verify why scenes after index 8 routed to `bento_grid`: strictly enforce that **ONLY the final scene (`i == len(scenes) - 1`)** can have `visual_type == "bento_grid"`. If `len(scenes)` is 10 or 11, scenes `7, 8, 9` MUST route to distinct visual types (e.g., `electrical_grid` sub-modes, `comparison`, `function_graph`, `math_equation`) and NEVER `bento_grid`!
-  2. In `BentoGridScene.jsx`, render **4 visually distinct mini-SVG graphics** based on card index (`0, 1, 2, 3`) or card type when custom mini-SVGs aren't ML clustering:
-     - Card 0: Animated Node/Network Loop or Vector Diagram SVG.
-     - Card 1: Animated Dual-Terminal / Wave / Equilibrium Balance SVG.
-     - Card 2: Animated Rising Peak Curve / Energy Barrier SVG.
-     - Card 3: Animated 4-Node Grid / Matrix Topology SVG.
-     - Never render the 3 `t-SNE` dotted rings in all 4 boxes!
+### 1. Parameterized Manim Templates (`engine/renderer/manim_templates.py`)
+Never ask the LLM to write raw arbitrary Python Manim code (which risks syntax/LaTeX crashes). Instead, build 4 rock-solid, parameterized Manim `Scene` classes configured with:
+- `config.pixel_width = 920`
+- `config.pixel_height = 920`
+- `config.frame_rate = 30`
+- `config.background_color = "#0b0f19"` (matching the Remotion card interior)
 
-### Fix 3: Fix Legend Overlapping Y-Axis Title in `GraphScene.jsx` (`00:29–00:34`)
-- **Bug Observed (`00:29`)**: In `GraphScene.jsx`, the top-right legend box overlaps the centered Y-axis header text `Power P_L (W) / Cost ($/MWh)`.
-- **Mandatory Fix**:
-  - Left-align the Y-axis label at `x = 90, y = 55` (`textAnchor="start"`) OR move the legend box down/right (`x = 560, y = 80`) and keep the Y-axis title at `x = 100, y = 48` so the legend box NEVER collides with the axis title text.
+Implement these 4 Manim template classes:
+1. **`ManimEquationMorphScene` (`sub_mode: "equation_morph"`)**:
+   - Takes `steps: list[dict]` (`[{"latex": "...", "label": "..."}]`) and `duration: float`.
+   - Renders clean `MathTex` equations (with a safe `Text` fallback if LaTeX compilation fails on unusual symbols), smoothly morphing step-by-step using `ReplacementTransform` / `TransformMatchingShapes`, highlighting key variables in cyan (`#00f2fe`), emerald (`#10b981`), and amber (`#f59e0b`), with a glowing bounding box around the final result.
+2. **`ManimCalculusGraphScene` (`sub_mode: "calculus_graph"`)**:
+   - Uses Manim `Axes` to plot smooth continuous curves (`f(x)`), animated secant-to-tangent derivative slopes (`ValueTracker`), and glowing Riemann sum rectangles (`get_riemann_rectangles`) smoothly converging into the exact integral area under the curve.
+3. **`ManimLinearVectorScene` (`sub_mode: "vector_field"`)**:
+   - Uses `NumberPlane` / `ComplexPlane` to animate 2D linear matrix transformations (`apply_matrix`), eigenvectors, or electromagnetic/fluid phase-space vector fields (`ArrowVectorField` / `StreamLines`).
+4. **`ManimQuantumWaveScene` (`sub_mode: "quantum_wave"`)**:
+   - Uses `Axes` + `ValueTracker(t)` with `always_redraw` to animate a real-time oscillating complex Gaussian wavepacket ($\text{Re}[\Psi]$, $\text{Im}[\Psi]$, and probability envelope $\vert{}\Psi(x,t)\vert{}^2$) colliding with and tunneling through a potential barrier $V(x)$.
 
-### Fix 4: Clean Up Bottom Takeaway Box in `comparison` Cards (`CodingShort.jsx` & `choreographer.py`)
-- **Bug Observed (`00:00–00:04`)**: The bottom green box in Scene 1 displays: `NETWORK EQUIVALENCE: Linear network reduction simplifies multi-bus OPF solver complexity by 100x | NETWORK EQUIVALENCE: V_th = V_oc, R_th = V_oc / I_sc | POWER FLOW: ΣP_gen = ΣP_load + P_loss` (repeating the exact strings already shown in the two boxes directly above it)!
-- **Mandatory Fix**:
-  - In `CodingShort.jsx` (and `choreographer.py`), strip any `| NETWORK EQUIVALENCE:...` suffix from the bottom green summary bar so it ONLY displays the clean 1-sentence takeaway (`KEY TAKEAWAY: Linear network reduction simplifies multi-bus OPF solver complexity by 100x`).
+### 2. Manim Execution & Fallback Logic (`engine/renderer/manim_bridge.py`)
+- Create `render_manim_clips_for_timeline(timeline_data: dict, run_dir: Path, enable_manim: bool = True) -> dict`:
+  - Check if `manim` is available (`shutil.which("manim")` or `import manim`). If Manim is not installed or `--no-manim` is passed, log `[MANIM:INFO] Manim unavailable or disabled; using native Remotion SVG renderers` and return `timeline_data` unchanged.
+  - For scenes where `visual_type in ("math_equation", "function_graph", "quantum_sim")` (or `visual_type == "manim_scene"`), select at most **2 key scenes per video** to pre-render with Manim (so total pre-render overhead stays under ~10–15 seconds).
+  - Render each selected scene into `run_dir / f"manim_scene_{scene_id}.mp4"` at `920x920 @ 30fps`.
+  - Set `scene["manim_video_src"] = f"runs/{run_dir.name}/manim_scene_{scene_id}.mp4"` in `data.json`.
+  - **Bulletproof Fallback**: Wrap every Manim subprocess call in a `try/except` with a `45s` timeout. If Manim or `latex` fails on any scene, log a warning and leave `manim_video_src` unset so Remotion automatically renders its native SVG component without failing the pipeline!
 
 ---
 
-## 2. Verification & Testing
-- Add unit tests in Python and Node verifying:
-  - `MathScene.jsx` and `choreographer.py` never output `"Euler's identity"` or `"Multiplication by imaginary unit"` unless the topic explicitly mentions Euler.
-  - On an 11-scene script, `choreographer.py` assigns `bento_grid` to **at most 1 scene** (`scenes[-1]`), and `scenes[-2]` / `scenes[-3]` are NOT `bento_grid`.
-  - `BentoGridScene.jsx` renders 4 distinct SVG graphic types across its 4 cards rather than repeating the `t-SNE` rings 4 times.
-  - `GraphScene.jsx` Y-axis title and legend bounding boxes do not overlap.
-- Run all Python and Node unit tests and confirm 100% pass rate.
+## 2. Remotion Integration (`video/src/components/ManimScene.jsx` & Scene Wrappers)
+
+1. **Create `video/src/components/ManimScene.jsx`**:
+   - Renders the standard top domain header badge, title, and subtitle.
+   - Inside the center `920px x 920px` (`canvas_spotlight`) or `920px x 760px` (`full_dashboard`) container, if `scene.manim_video_src` is present, render:
+     ```jsx
+     <OffthreadVideo '100%', 'contain', 16 borderRadius: height: muted objectFit: src="{staticFile(scene.manim_video_src)}" style="{{" width: }}/>
+     ```
+   - Overlay subtle corner HUD telemetry badges (e.g., `MANIM OPENGL/CAIRO ENGINE • 30 FPS`, active equation/phase badge) so the Manim canvas blends seamlessly with the rest of the Remotion UI.
+2. **Automatic Upgrade in `MathScene.jsx`, `GraphScene.jsx`, and `QuantumScene.jsx`**:
+   - Inside `MathScene.jsx`, `GraphScene.jsx`, and `QuantumScene.jsx`, check `if (scene.manim_video_src)` — when present, render the `<OffthreadVideo src={staticFile(scene.manim_video_src)} />` inside the simulation canvas box while preserving the surrounding header and telemetry cards!
+
+---
+
+## 3. CLI Flags & Verification (`generate_and_render.py` & `engine/generate.py`)
+1. Add `--no-manim` flag to `generate_and_render.py` and `engine/generate.py` (Manim enabled by default when installed).
+2. Add unit tests in `tests/test_manim_bridge.py` and Node verifying:
+   - Parameterized payload generation for all 4 Manim templates (`equation_morph`, `calculus_graph`, `vector_field`, `quantum_wave`).
+   - Graceful fallback when Manim subprocess errors or is disabled (`--no-manim`).
+   - `ManimScene.jsx` / `MathScene.jsx` / `GraphScene.jsx` rendering `<OffthreadVideo>` when `manim_video_src` is populated and falling back to SVG when absent.
+3. Run all Python and Node unit tests and confirm 100% pass rate.

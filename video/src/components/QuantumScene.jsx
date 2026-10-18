@@ -1,5 +1,5 @@
 import React from 'react';
-import { useCurrentFrame, useVideoConfig, interpolate, spring } from 'remotion';
+import { OffthreadVideo, staticFile, useCurrentFrame, useVideoConfig, interpolate, spring } from 'remotion';
 import { SceneBadge } from './SceneBadge';
 import { QuantumIcon, SparklesIcon, LightningIcon, ScaleIcon } from './SvgIcons';
 
@@ -273,12 +273,39 @@ export const QuantumScene = ({
           transform: 'none',
         }}
       >
-        <svg
-          width={canvasWidth}
-          height={canvasHeight}
-          viewBox={`0 0 ${canvasWidth} ${canvasHeight}`}
-          style={{ width: '100%', height: '100%' }}
-        >
+        {scene?.manim_video_src ? (
+          <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+            <OffthreadVideo
+              src={staticFile(scene.manim_video_src)}
+              muted
+              style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '20px' }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                backgroundColor: 'rgba(10, 5, 24, 0.85)',
+                border: '1px solid #c084fc',
+                color: '#c084fc',
+                borderRadius: '6px',
+                padding: '4px 12px',
+                fontSize: '13px',
+                fontFamily: 'monospace',
+                fontWeight: 800,
+                zIndex: 10,
+              }}
+            >
+              MANIM CAIRO ENGINE • 30 FPS
+            </div>
+          </div>
+        ) : (
+          <svg
+            width={canvasWidth}
+            height={canvasHeight}
+            viewBox={`0 0 ${canvasWidth} ${canvasHeight}`}
+            style={{ width: '100%', height: '100%' }}
+          >
           <defs>
             {/* Barrier Hatch Pattern */}
             <pattern id="barrierHatch" width="12" height="12" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
@@ -500,6 +527,7 @@ export const QuantumScene = ({
             </g>
           )}
         </svg>
+        )}
       </div>
 
       {/* 3. BOTTOM TELEMETRY & EQUATION SOLVER (Hides in spotlight mode) */}

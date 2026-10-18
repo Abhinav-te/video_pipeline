@@ -1702,7 +1702,7 @@ def choreograph_scenes(
                 layout_density = "compact_punch"
             elif scene_type in {"bento_grid", "algorithm_explorer", "neural_code_split"}:
                 layout_density = "full_dashboard"
-            elif scene_type in {"function_graph", "physics_sim"}:
+            elif scene_type in {"function_graph", "physics_sim", "manim_scene"}:
                 layout_density = "canvas_spotlight"
             elif scene_type in {"chemistry_reaction", "chemistry"}:
                 layout_density = "full_dashboard" if sub_mode == "sn1_ionization" else "canvas_spotlight"

@@ -14,8 +14,11 @@ import uuid
 from pathlib import Path
 
 ENGINE_DIR = Path(__file__).resolve().parent
+REPO_DIR = ENGINE_DIR.parent
 if str(ENGINE_DIR) not in sys.path:
     sys.path.insert(0, str(ENGINE_DIR))
+if str(REPO_DIR) not in sys.path:
+    sys.path.insert(0, str(REPO_DIR))
 
 from director.script import generate_script
 from validation import validate_script_plan
@@ -541,6 +544,12 @@ def main():
     )
 
     parser.add_argument(
+        "--no-manim",
+        action="store_true",
+        help="Disable Stage 4.5 Manim Community pre-rendering.",
+    )
+
+    parser.add_argument(
         "--index",
         type=int,
         default=None,
@@ -628,6 +637,25 @@ def main():
         # ---------------------------------------------------------------
 
         timed_scenes, words = generate_timeline(script, audio_file)
+
+        # ---------------------------------------------------------------
+        # Step 4.5 — Stage 4.5 Manim Sub-Renderer Bridge
+        # ---------------------------------------------------------------
+
+        enable_manim = not getattr(args, "no_manim", False)
+        try:
+            try:
+                from engine.renderer.manim_bridge import render_manim_clips_for_timeline
+            except ModuleNotFoundError:
+                from renderer.manim_bridge import render_manim_clips_for_timeline
+            timed_scenes = render_manim_clips_for_timeline(
+                timed_scenes,
+                run_dir=run_dir,
+                enable_manim=enable_manim,
+                max_clips=2,
+            )
+        except Exception as exc:
+            log(f"[MANIM:WARN] Manim sub-renderer encountered an unexpected error: {exc}. Continuing with Remotion SVG fallbacks.")
 
         # ---------------------------------------------------------------
         # Step 5 — Final JSON Payload & Atomic Write

@@ -34,9 +34,12 @@ generate_and_render.py (CLI / Orchestrator)
        │ (Playable Audio + Word Timestamps)
        ▼
 [Stage 4: Timeline Assembly] --> engine/timeline/ (Whisper Beats & Domain Choreographer)
-       │ (Remotion-Ready Data: video/public/runs/<run_id>/)
+       │
        ▼
-[Stage 5: Video Renderer]    --> Remotion / React 18 (GPU Accelerated / Headless Linux)
+[Stage 4.5: Manim Bridge]   --> engine/renderer/ (Manim Community 920x920 Sub-Renderer)
+       │ (Pre-rendered MP4 clips: video/public/runs/<run_id>/manim_scene_<id>.mp4)
+       ▼
+[Stage 5: Video Renderer]    --> Remotion / React 18 (<OffthreadVideo> Compositing)
        │ (Raw Video File: video/out/<run_id>.mp4)
        ▼
 [Stage 6: Output Validation] --> engine/validation/output.py (ffprobe Verification)
@@ -80,8 +83,21 @@ Final Production Video (1080x1920, H.264/AAC, 30fps)
   - Enforces clean 1-sentence comparison takeaways (`KEY TAKEAWAY: ...`) without duplicate pipe suffixes.
 - Assembles run-isolated `data.json` for Remotion compositing.
 
+### 4.5. `[MANIM]` — Hybrid Manim Community Sub-Renderer (`engine/renderer/`)
+- Pre-renders high-precision 3Blue1Brown-style mathematical animations as deterministic 920x920 @ 30fps MP4 clips (`video/public/runs/<run_id>/manim_scene_<id>.mp4`).
+- **4 Parameterized Scene Templates**:
+  - `ManimEquationMorphScene` (`equation_morph`): Step-by-step LaTeX formula morphing (`MathTex`/`TransformMatchingShapes`) with color-highlighted variables and glowing bounding boxes.
+  - `ManimCalculusGraphScene` (`calculus_graph`): Dynamic Cartesian axes plotting continuous functions, secant-to-tangent slope convergence, and shaded Riemann integral approximations.
+  - `ManimLinearVectorScene` (`vector_field`): Matrix linear transformations (`apply_matrix`), eigenvector transformations, and electromagnetic/fluid vector fields (`ArrowVectorField`).
+  - `ManimQuantumWaveScene` (`quantum_wave`): Time-dependent complex Gaussian wavepacket ($\text{Re}[\Psi]$, $\text{Im}[\Psi]$, $\vert\Psi\vert^2$) colliding with and tunneling through a finite potential barrier $V(x)$.
+- **Strict Performance & Bulletproof Fallback**:
+  - Pre-renders at most 2 key scenes per video (~8–10s pre-render overhead).
+  - Isolated subprocess execution with a 45-second timeout and LaTeX error fallback (`safe_math_tex`).
+  - Graceful fallback: If Manim is disabled or errors, the pipeline falls back seamlessly to native Remotion SVG components with zero pipeline crashes.
+
 ### 5. `[RENDER]` — Remotion React Compositing (`video/`)
-- Renders 1080x1920 (9:16) vertical video shorts using React 18 components and Remotion v4 CLI.
+- Master 1080x1920 (9:16) vertical compositor controlling headers, progress tabs, word-synced subtitles, and layout framing.
+- Seamlessly integrates pre-rendered Manim clips via `<OffthreadVideo>` inside `ManimScene.jsx`, `MathScene.jsx`, `GraphScene.jsx`, and `QuantumScene.jsx`.
 - **Optimized Rendering Engine**:
   - Clean Remotion configuration (`video/remotion.config.ts`) with high-speed JPEG sequence rendering and overwrite protection.
   - Zero heavy CSS `backdrop-filter: blur(...)` or per-frame SVG filter bottlenecks to ensure rapid rendering on headless Linux / WSL2 environments.
@@ -118,6 +134,7 @@ Final Production Video (1080x1920, H.264/AAC, 30fps)
 | `quantum_sim` | `quantum_physics` | Dirac atomic orbitals ($1s, 2p, 3d$), Schrödinger tunneling, Heisenberg phase space. |
 | `mechanics_fbd` | `mechanics` | Beam reaction forces, inclined plane decomposition, chassis load transfer. |
 | `electrical_grid` | `electrical` | KVL/KCL mesh loops, Thévenin equivalent reduction, multi-bus OPF dispatch. |
+| `manim_scene` | `math`, `physics`, STEM | 3Blue1Brown-style animations: equation morphs, calculus curves, vector fields, and wavepackets. |
 
 ---
 
@@ -131,8 +148,10 @@ run_YYYYMMDD_HHMMSS_<shortid>
 - Intermediate assets are isolated in dedicated directories:
   ```text
   video/public/runs/<run_id>/
-  ├── audio.mp3   # Narrated voiceover
-  └── data.json   # Validated scene plan and Whisper timings
+  ├── audio.mp3               # Narrated voiceover
+  ├── data.json               # Validated scene plan and Whisper timings
+  ├── manim_scene_1.mp4       # Pre-rendered Manim 920x920 animation (optional)
+  └── manim_scene_2.mp4       # Pre-rendered Manim 920x920 animation (optional)
   ```
 - Rendered video outputs are stored at:
   ```text
@@ -147,6 +166,7 @@ run_YYYYMMDD_HHMMSS_<shortid>
 - **Python**: 3.10+ (tested on Python 3.11 / Linux & WSL2)
 - **Node.js**: v20+ LTS
 - **FFmpeg / FFprobe**: System-level binaries installed
+- **Manim Community & LaTeX** (optional): `manim`, `latex`, and `dvisvgm` for mathematical animation sub-rendering
 - **Gemini API Key**: From [Google AI Studio](https://aistudio.google.com/)
 
 ---
@@ -194,6 +214,9 @@ python3 generate_and_render.py --topic "SN1 vs SN2 Reaction Mechanisms" --subjec
 
 # Python Coding Short (60 seconds)
 python3 generate_and_render.py --topic "Python Dictionary Keys Trick" --subject code --length 60
+
+# Math Short with Manim Sub-Renderer (15 seconds test)
+python3 generate_and_render.py --topic "Euler Identity and Complex Exponential Morph" --subject math --length 15 --fast-test
 ```
 
 #### CLI Options:
@@ -204,6 +227,7 @@ python3 generate_and_render.py --topic "Python Dictionary Keys Trick" --subject 
 | `--length` | `int` | Target duration in seconds: `15`, `30`, or `60` (default: `60`). |
 | `--frames` | `str` | Optional Remotion frame range for fast benchmarks (e.g. `--frames 0-89`). |
 | `--fast-test` | `flag` | Fast 3-second render mode for quick visual checks. |
+| `--no-manim` | `flag` | Disable Stage 4.5 Manim Community pre-rendering (forces native Remotion SVGs). |
 | `--no-cache` | `flag` | Force fresh AI Director generation (bypasses script cache). |
 | `--run-id` | `str` | Explicit run ID (auto-generated if omitted). |
 | `--output` | `str` | Custom path for the rendered MP4 output. |
@@ -220,6 +244,7 @@ The codebase includes comprehensive unit and integration tests across all pipeli
 engine/.venv/bin/python -m unittest discover -s tests -p "test_*.py" -v
 
 # Run targeted milestone & phase suites:
+engine/.venv/bin/python -m unittest tests/test_manim_bridge.py -v               # Phase 14: Manim Community Sub-Renderer Bridge
 engine/.venv/bin/python -m unittest tests/test_phase13_production_lock.py -v   # Phase 13: Production Lock
 engine/.venv/bin/python -m unittest tests/test_phase12_duration_and_bento.py -v # Phase 12: Duration Scaling & Bento
 engine/.venv/bin/python -m unittest tests/test_phase10_stem_and_gpu.py -v      # Phase 10: STEM Engines & GPU
@@ -230,6 +255,7 @@ engine/.venv/bin/python -m unittest tests/test_stem_pipeline.py -v             #
 ### Node Remotion Component Tests
 ```bash
 # Run frontend JSX & render tests:
+node video/test_phase14_manim.mjs
 node video/test_phase13_production_lock.mjs
 node video/test_phase12_duration_and_fallbacks.mjs
 node video/test_phase10_stem_and_gpu.mjs

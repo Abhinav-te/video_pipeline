@@ -1,5 +1,5 @@
 import React from 'react';
-import { useCurrentFrame, useVideoConfig } from 'remotion';
+import { OffthreadVideo, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
 import { SceneBadge } from './SceneBadge';
 import { MathIcon, SparklesIcon } from './SvgIcons';
 
@@ -301,9 +301,47 @@ export const MathScene = ({
           justifyContent: 'space-around',
           gap: '18px',
           boxSizing: 'border-box',
+          position: 'relative',
         }}
       >
-        {normalizedSteps.map((step, idx) => {
+        {scene?.manim_video_src ? (
+          <div
+            style={{
+              position: 'relative',
+              width: '100%',
+              height: '100%',
+              backgroundColor: '#0b0f19',
+              borderRadius: '20px',
+              overflow: 'hidden',
+              border: `1.5px solid ${palette.border}`,
+            }}
+          >
+            <OffthreadVideo
+              src={staticFile(scene.manim_video_src)}
+              muted
+              style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '18px' }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                backgroundColor: 'rgba(11, 15, 25, 0.85)',
+                border: '1px solid #00f2fe',
+                color: '#00f2fe',
+                borderRadius: '6px',
+                padding: '4px 12px',
+                fontSize: '13px',
+                fontFamily: 'monospace',
+                fontWeight: 800,
+                zIndex: 10,
+              }}
+            >
+              MANIM CAIRO ENGINE • 30 FPS
+            </div>
+          </div>
+        ) : (
+          normalizedSteps.map((step, idx) => {
           const isRevealed = frame >= step.reveal_frame;
           const isHighlighted = frame >= step.highlight_frame;
 
@@ -394,7 +432,8 @@ export const MathScene = ({
               ) : null}
             </div>
           );
-        })}
+        })
+      )}
       </div>
 
       {/* 3. BOTTOM THEOREM INTUITION CARD (380px) */}

@@ -26,6 +26,7 @@ import { ChemistryScene } from './components/ChemistryScene';
 import { QuantumScene } from './components/QuantumScene';
 import { MechanicsScene } from './components/MechanicsScene';
 import { ElectricalScene } from './components/ElectricalScene';
+import { ManimScene } from './components/ManimScene';
 import { splitCodeByToken, resolveCalloutTiming } from './calloutUtils';
 
 export {
@@ -40,6 +41,7 @@ export {
   QuantumScene,
   MechanicsScene,
   ElectricalScene,
+  ManimScene,
 };
 
 // Merges split hyphenated tokens (e.g. 'K', '-means' -> 'K-MEANS')
@@ -615,6 +617,16 @@ export const CodingShort = ({ data }) => {
           {(sceneType === 'electrical_grid' || sceneType === 'electrical') && (
             <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
               <ElectricalScene
+                scene={activeScene}
+                sceneStartFrame={sceneStartFrame}
+              />
+            </CameraRig>
+          )}
+
+          {/* SCENE TYPE 16: MANIM MATHEMATICAL / VECTOR / QUANTUM CANVAS */}
+          {(sceneType === 'manim_scene' || sceneType === 'manim') && (
+            <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
+              <ManimScene
                 scene={activeScene}
                 sceneStartFrame={sceneStartFrame}
               />

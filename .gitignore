@@ -82,3 +82,4 @@ video/public/*.wav
 video/public/*.aac
 video/public/*.json
 video/public/runs/
+media/

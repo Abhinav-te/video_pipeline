@@ -28,6 +28,8 @@ const mockRemotionPlugin = {
         export const useVideoConfig = () => ({ fps: 30, width: 1080, height: 1920 });
         export const interpolate = (f, [a, b], [c, d]) => c + ((f - a) / (b - a)) * (d - c);
         export const spring = () => 1;
+        export const staticFile = (path) => path;
+        export const OffthreadVideo = (props) => null;
       `,
       loader: 'js',
     }));

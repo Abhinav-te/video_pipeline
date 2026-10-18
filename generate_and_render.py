@@ -70,6 +70,7 @@ def main():
     parser.add_argument("--output", type=str, default=None, help="Explicit output MP4 path")
     parser.add_argument("--frames", type=str, default=None, help="Frame range to render (e.g. '0-89') for benchmarks")
     parser.add_argument("--fast-test", action="store_true", help="Quick 90-frame (3s) benchmark render (equivalent to --frames 0-89)")
+    parser.add_argument("--no-manim", action="store_true", help="Disable Stage 4.5 Manim Community pre-rendering")
     args = parser.parse_args()
 
     if args.fast_test and not args.frames:
@@ -104,9 +105,14 @@ def main():
     ]
     if args.no_cache:
         cmd.append("--no-cache")
+    if args.no_manim:
+        cmd.append("--no-manim")
+
+    gen_env = os.environ.copy()
+    gen_env["PYTHONPATH"] = f"{REPO_DIR}:{ENGINE_DIR}:{gen_env.get('PYTHONPATH', '')}"
 
     try:
-        res = subprocess.run(cmd, cwd=str(ENGINE_DIR))
+        res = subprocess.run(cmd, cwd=str(ENGINE_DIR), env=gen_env)
         if res.returncode != 0:
             if run_dir.exists():
                 shutil.rmtree(run_dir, ignore_errors=True)
