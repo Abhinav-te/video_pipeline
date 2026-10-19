@@ -34,7 +34,7 @@ console.log('✓ All STEM components strictly enforce transform: "none" (Zero sc
 
 // 3. Verify MathScene properties and derivation logic
 const mathContent = fs.readFileSync(path.join(componentsDir, 'MathScene.jsx'), 'utf8');
-assert.ok(mathContent.includes('EULER DERIVATION'), 'MathScene contains derivation studio tag');
+assert.ok(mathContent.includes('MATHEMATICAL FORMULATION'), 'MathScene contains derivation studio tag');
 assert.ok(mathContent.includes('normalizedSteps.map'), 'MathScene renders sequential derivation steps');
 assert.ok(mathContent.includes('ACTIVE FOCUS'), 'MathScene includes active focus term highlight');
 console.log('✓ MathScene implements multi-step derivations with active term highlights');

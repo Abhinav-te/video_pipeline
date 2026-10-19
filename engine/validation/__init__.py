@@ -32,6 +32,12 @@ from .output import (
     REQUIRED_HEIGHT,
     TARGET_FPS,
 )
+from .reflection import (
+    write_reflection_error,
+    read_reflection_error,
+    clear_reflection_error,
+    auto_heal_timeline_payload,
+)
 
 __all__ = [
     "validate_script_plan",
@@ -58,4 +64,8 @@ __all__ = [
     "REQUIRED_WIDTH",
     "REQUIRED_HEIGHT",
     "TARGET_FPS",
+    "write_reflection_error",
+    "read_reflection_error",
+    "clear_reflection_error",
+    "auto_heal_timeline_payload",
 ]

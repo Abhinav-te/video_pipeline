@@ -1,19 +1,20 @@
 import React from 'react';
-import { OffthreadVideo, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
+import { Sequence, OffthreadVideo, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
 import { SceneBadge } from './SceneBadge';
 import { MathIcon, SparklesIcon } from './SvgIcons';
 
 /**
- * MathScene (Phase 5 - 1540px Vertical Stage Layout)
- * Full-height 1540px layout filling 85% of the 1080x1920 canvas:
- *   - Top Editorial Header (220px): 52px bold title, MathIcon, category eyebrow, active badge.
- *   - Center Derivation Steps (860px): Sequential formula reveals with 38px monospace font and 24px explanation.
- *   - Bottom Theorem Intuition Card (380px): Key mathematical takeaway with 24px font and glowing accents.
+ * MathScene (Phase 14.5 - Subtitle Safe-Zone 1360px Stage Layout)
+ * Full-height 1360px layout fitting cleanly in safe zone above subtitles:
+ *   - Top Editorial Header (170px): 44px bold title, MathIcon, category eyebrow, active badge.
+ *   - Center Derivation Steps (800px): Sequential formula reveals or Manim Cairo canvas.
+ *   - Bottom Theorem Intuition Card (320px): Key mathematical takeaway with glowing accents.
  */
 export const MathScene = ({
   scene,
   words = [],
   sceneStartFrame = 0,
+  sceneDurationFrames = 150,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -213,26 +214,26 @@ export const MathScene = ({
         border: `1.5px solid ${palette.border}`,
         boxShadow: `0 32px 64px -16px rgba(0, 0, 0, 0.95), 0 0 40px ${palette.glow}`,
         width: '960px',
-        height: '1540px',
-        minHeight: '1540px',
+        height: '1360px',
+        maxHeight: '1380px',
         overflow: 'hidden',
         boxSizing: 'border-box',
         transform: 'none',
         backfaceVisibility: 'hidden',
         position: 'relative',
-        padding: '32px 32px',
+        padding: '24px 28px',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
       }}
     >
-      {/* 1. TOP EDITORIAL HEADER (220px) */}
+      {/* 1. TOP EDITORIAL HEADER (170px) */}
       <div
         style={{
           display: 'flex',
           flexDirection: 'column',
-          gap: '12px',
-          height: '200px',
+          gap: '10px',
+          height: '170px',
           borderBottom: '1.5px solid rgba(255, 255, 255, 0.08)',
           boxSizing: 'border-box',
         }}
@@ -276,7 +277,7 @@ export const MathScene = ({
         <div>
           <div
             style={{
-              fontSize: '50px',
+              fontSize: '44px',
               fontWeight: 900,
               color: '#ffffff',
               fontFamily: 'sans-serif',
@@ -286,20 +287,20 @@ export const MathScene = ({
           >
             {title}
           </div>
-          <div style={{ fontSize: '24px', color: '#94a3b8', marginTop: '4px', fontStyle: 'italic' }}>
+          <div style={{ fontSize: '22px', color: '#94a3b8', marginTop: '4px', fontStyle: 'italic' }}>
             {scene?.spoken_text || 'Step-by-step rigorous algebraic transition.'}
           </div>
         </div>
       </div>
 
-      {/* 2. CENTER DERIVATION STEPS (860px) */}
+      {/* 2. CENTER DERIVATION STEPS (780px) */}
       <div
         style={{
-          height: '860px',
+          height: '780px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-around',
-          gap: '18px',
+          gap: '14px',
           boxSizing: 'border-box',
           position: 'relative',
         }}
@@ -316,11 +317,13 @@ export const MathScene = ({
               border: `1.5px solid ${palette.border}`,
             }}
           >
-            <OffthreadVideo
-              src={staticFile(scene.manim_video_src)}
-              muted
-              style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '18px' }}
-            />
+            <Sequence from={sceneStartFrame} durationInFrames={sceneDurationFrames} layout="none">
+              <OffthreadVideo
+                src={staticFile(scene.manim_video_src)}
+                muted
+                style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '18px' }}
+              />
+            </Sequence>
             <div
               style={{
                 position: 'absolute',
@@ -436,15 +439,15 @@ export const MathScene = ({
       )}
       </div>
 
-      {/* 3. BOTTOM THEOREM INTUITION CARD (380px) */}
+      {/* 3. BOTTOM THEOREM INTUITION CARD (330px) */}
       <div
         style={{
-          height: '380px',
+          height: '330px',
           backgroundColor: '#0b121e',
           borderRadius: '22px',
           border: '1.5px solid rgba(121, 192, 255, 0.3)',
           boxShadow: '0 16px 32px rgba(0, 0, 0, 0.6)',
-          padding: '28px 30px',
+          padding: '20px 24px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',

@@ -1203,14 +1203,15 @@ def synthesize_electrical_payload(scene: Dict[str, Any], sub_mode: str) -> Dict[
 
 
 
-def synthesize_concept_card(scene: Dict[str, Any]) -> Dict[str, Any]:
+def synthesize_concept_card(scene: Dict[str, Any], domain: str = "auto") -> Dict[str, Any]:
     """
     Synthesizes a 100% data-driven concept card from the scene's actual title,
-    spoken text, narration, and keywords.
-    Never injects Autoencoder or 784 dims unless explicitly mentioned in the script.
+    spoken text, narration, and domain.
+    Never leaks Autoencoder, K-Means, or ML strings into pure math, physics, or electrical subjects.
     """
     title = scene.get("title") or scene.get("display_text") or "Core Architectural Principle"
     spoken_text = str(scene.get("spoken_text") or scene.get("narration") or "").strip()
+    dom = (domain or scene.get("domain") or scene.get("subject") or "auto").lower()
 
     # 1. Dynamic Takeaways / Points
     existing_points = scene.get("points") or scene.get("bullets") or scene.get("takeaways")
@@ -1219,13 +1220,12 @@ def synthesize_concept_card(scene: Dict[str, Any]) -> Dict[str, Any]:
     else:
         # Extract meaningful sentences or clauses from spoken_text
         raw_sentences = [s.strip() for s in re.split(r"[.!?]+", spoken_text) if len(s.strip()) > 10]
-        # Filter out anything with autoencoder if not in title or spoken text
         has_ae = "autoencoder" in title.lower() or "autoencoder" in spoken_text.lower()
         sentences = [s for s in raw_sentences if has_ae or "autoencoder" not in s.lower()]
         if len(sentences) >= 3:
             points = sentences[:3]
         elif len(sentences) == 2:
-            points = [sentences[0], sentences[1], f"Key takeaway: {title} ensures optimal architectural guarantees"]
+            points = [sentences[0], sentences[1], f"Key takeaway: {title} ensures optimal structural guarantees"]
         elif len(sentences) == 1:
             points = [
                 sentences[0],
@@ -1233,28 +1233,83 @@ def synthesize_concept_card(scene: Dict[str, Any]) -> Dict[str, Any]:
                 "Eliminates latency overhead while maintaining maximum correctness",
             ]
         else:
-            points = [
-                f"Core mechanism: {title} establishes deterministic invariant execution",
-                "Reduces algorithmic complexity and prevents edge-case regressions",
-                "Proven mathematical and architectural foundation in production environments",
-            ]
+            if "math" in dom:
+                points = [
+                    f"Core duality: {title} links instantaneous change to continuous accumulation",
+                    "Inverse operator identities resolve complex continuous bounds",
+                    "Proven mathematical foundation for analysis and geometry",
+                ]
+            elif "quantum" in dom:
+                points = [
+                    f"Quantum state evolution governed by {title}",
+                    "Unitary operators preserve total probability density across time",
+                    "Observable bounds follow canonical Heisenberg commutation limits",
+                ]
+            elif "electr" in dom:
+                points = [
+                    f"Network conservation: {title} guarantees active and reactive balance",
+                    "Node voltage and loop current solutions eliminate thermal overloads",
+                    "Optimal power dispatch stabilizes transmission bus stability",
+                ]
+            elif "mechanic" in dom:
+                points = [
+                    f"Structural balance: {title} maintains static equilibrium",
+                    "Linear force and rotational moment sums resolve to zero",
+                    "Maximum internal bending and shear stresses remain strictly bounded",
+                ]
+            else:
+                points = [
+                    f"Core mechanism: {title} establishes deterministic invariant execution",
+                    "Reduces algorithmic complexity and prevents edge-case regressions",
+                    "Proven mathematical and architectural foundation in production environments",
+                ]
 
-    # 2. Dynamic Concept Nodes
+    # 2. Dynamic Concept Nodes (100% domain-aware)
     existing_nodes = scene.get("concept_nodes")
     if existing_nodes and isinstance(existing_nodes, list) and len(existing_nodes) >= 2:
         concept_nodes = existing_nodes
     else:
-        # Synthesize 3-stage concept pipeline: Input/Premise -> Kernel/Transformation -> Output/Guaranteed Result
         words = [w for w in re.findall(r"\b[A-Za-z]{3,}\b", spoken_text) if w.lower() not in {"this", "that", "with", "from", "then", "have", "they", "will", "does", "been", "when"}]
         kw1 = words[0].title() if len(words) > 0 else "Signal"
         kw2 = words[len(words) // 2].title() if len(words) > 2 else "Transformation"
         kw3 = words[-1].title() if len(words) > 1 else "Convergence"
 
-        concept_nodes = [
-            {"id": "node_input", "tag": "INPUT", "label": scene.get("input_label") or f"{kw1} Vector", "detail": "High-dimensional raw feature distribution"},
-            {"id": "node_kernel", "tag": "KERNEL", "label": scene.get("kernel_label") or title, "detail": "Invariant manifold transformation & density mapping"},
-            {"id": "node_output", "tag": "OUTPUT", "label": scene.get("output_label") or f"{kw3} State", "detail": "Cluster separation & deterministic boundary"},
-        ]
+        if "math" in dom:
+            concept_nodes = [
+                {"id": "node_input", "tag": "DOMAIN", "label": scene.get("input_label") or f"{kw1} Space", "detail": "Continuous interval [a, b] & partition grid"},
+                {"id": "node_kernel", "tag": "TRANSFORM", "label": scene.get("kernel_label") or title, "detail": "Instantaneous rate f'(x) vs Riemann accumulation ∫f(x)dx"},
+                {"id": "node_output", "tag": "CLOSURE", "label": scene.get("output_label") or f"{kw3} Limit", "detail": "Fundamental theorem evaluation F(b) - F(a)"},
+            ]
+        elif "quantum" in dom:
+            concept_nodes = [
+                {"id": "node_input", "tag": "STATE", "label": scene.get("input_label") or "Wavefunction Ψ", "detail": "Complex Hilbert space state probability distribution"},
+                {"id": "node_kernel", "tag": "OPERATOR", "label": scene.get("kernel_label") or title, "detail": "Unitary Hamiltonian evolution iℏ∂Ψ/∂t = ĤΨ"},
+                {"id": "node_output", "tag": "COLLAPSE", "label": scene.get("output_label") or "Eigenstate", "detail": "Deterministic observable expectation & quantum boundary"},
+            ]
+        elif "electr" in dom:
+            concept_nodes = [
+                {"id": "node_input", "tag": "TOPOLOGY", "label": scene.get("input_label") or "Bus Network", "detail": "Multi-node transmission topology & impedance matrix"},
+                {"id": "node_kernel", "tag": "EQUILIBRIUM", "label": scene.get("kernel_label") or title, "detail": "KVL loop voltages and KCL nodal conservation ΣI = 0"},
+                {"id": "node_output", "tag": "DISPATCH", "label": scene.get("output_label") or "Optimal Power", "detail": "Equal incremental cost λ dispatch & stable power flow"},
+            ]
+        elif "mechanic" in dom:
+            concept_nodes = [
+                {"id": "node_input", "tag": "LOAD", "label": scene.get("input_label") or "External Forces", "detail": "Applied load distribution and support boundary reactions"},
+                {"id": "node_kernel", "tag": "STATICS", "label": scene.get("kernel_label") or title, "detail": "Static force equilibrium ΣF = 0 and moment balance Στ = 0"},
+                {"id": "node_output", "tag": "STRESS", "label": scene.get("output_label") or "Peak Deflection", "detail": "Bending moment peak and structural safety margin"},
+            ]
+        elif "chem" in dom:
+            concept_nodes = [
+                {"id": "node_input", "tag": "REAGENTS", "label": scene.get("input_label") or "Substrate & Nu⁻", "detail": "Reactant stoichiometry and steric bulkiness"},
+                {"id": "node_kernel", "tag": "KINETICS", "label": scene.get("kernel_label") or title, "detail": "Activation energy barrier and transition state geometry"},
+                {"id": "node_output", "tag": "YIELD", "label": scene.get("output_label") or "Stereo Product", "detail": "Thermodynamic product yield and inversion outcome"},
+            ]
+        else:
+            concept_nodes = [
+                {"id": "node_input", "tag": "INPUT", "label": scene.get("input_label") or f"{kw1} Vector", "detail": "Input feature distribution & parameter state"},
+                {"id": "node_kernel", "tag": "KERNEL", "label": scene.get("kernel_label") or title, "detail": "Invariant algorithmic transform & execution pipeline"},
+                {"id": "node_output", "tag": "OUTPUT", "label": scene.get("output_label") or f"{kw3} State", "detail": "Deterministic convergence & verified correctness"},
+            ]
 
     return {
         "concept_nodes": concept_nodes,
@@ -1716,7 +1771,12 @@ def choreograph_scenes(
                 layout_density = "canvas_spotlight"
 
         if scene_type == "comparison":
-            comp_footer = scene.get("comparison_footer") or COMPARISON_FOOTERS.get(active_domain, COMPARISON_FOOTERS["code"])
+            comp_footer = scene.get("comparison_footer")
+            # If domain is not code, purge any CS algorithm / asymptotic complexity text
+            if active_domain != "code" and comp_footer and any(x in comp_footer for x in ["ASYMPTOTIC", "O(n²)", "O(n)", "Complexity"]):
+                comp_footer = None
+            if not comp_footer:
+                comp_footer = COMPARISON_FOOTERS.get(active_domain, "KEY TAKEAWAY: Evaluating trade-offs across both analytical regimes")
             if "|" in comp_footer:
                 comp_footer = comp_footer.split("|")[0].strip()
             if not comp_footer.startswith("KEY TAKEAWAY:"):
@@ -1956,7 +2016,7 @@ def choreograph_scenes(
             choreography["layout_mode"] = "split"
             choreography["split_transition_frame"] = emphasis_frame
             if scene_type == "comparison":
-                choreography["comparison_footer"] = scene.get("comparison_footer") or COMPARISON_FOOTERS.get(active_domain, COMPARISON_FOOTERS["code"])
+                choreography["comparison_footer"] = scene.get("comparison_footer") or COMPARISON_FOOTERS.get(active_domain, "KEY TAKEAWAY: Evaluating trade-offs across both analytical regimes")
 
         # 9. Diagram
         elif scene_type == "diagram":
@@ -2056,23 +2116,25 @@ def choreograph_scenes(
             title_lower = str(scene.get("title") or scene.get("display_text", "")).lower()
             corpus = f"{spoken_lower} {title_lower}"
 
-            if any(k in corpus for k in ["autoencoder", "auto-encoder", "latent space", "bottleneck layer", "reconstruction loss"]):
+            is_non_ml = active_domain in ("math", "quantum_physics", "physics", "electrical", "mechanics", "chemistry")
+
+            if not is_non_ml and any(k in corpus for k in ["autoencoder", "auto-encoder", "latent space", "bottleneck layer", "reconstruction loss"]):
                 diagram_mode = "autoencoder"
                 default_pts = [
                     "Compresses high-dimensional noise into low-dimensional manifold",
                     "Bottleneck layer forces network to extract semantic invariant features",
                     "Reconstruction loss guarantees zero information loss on key signals",
                 ]
-            elif any(k in corpus for k in ["non-convex", "non convex", "break", "moon", "linear cut", "curved", "arena", "voronoi"]) or (
+            elif not is_non_ml and (any(k in corpus for k in ["non-convex", "non convex", "break", "moon", "linear cut", "curved", "arena", "voronoi"]) or (
                 "k-means" in corpus and "fail" in corpus
-            ):
+            )):
                 diagram_mode = "arena"
                 default_pts = [
                     "K-Means assumes spherical clusters and Euclidean convex geometry",
                     "Density-based clustering links contiguous points regardless of curvature",
                     "Non-linear manifolds require geodesic or density connectivity",
                 ]
-            elif any(k in corpus for k in ["compute", "waste", "gpu", "vram", "latency", "hardware", "cost", "hours"]):
+            elif not is_non_ml and any(k in corpus for k in ["compute", "waste", "gpu", "vram", "latency", "hardware", "cost", "hours"]):
                 diagram_mode = "benchmark"
                 default_pts = [
                     "Avoid burning GPU hours where classical algorithms converge in milliseconds",
@@ -2081,7 +2143,7 @@ def choreograph_scenes(
                 ]
             else:
                 diagram_mode = "concept_card"
-                card_payload = synthesize_concept_card(scene)
+                card_payload = synthesize_concept_card(scene, domain=active_domain)
                 default_pts = card_payload["points"]
                 scene["concept_nodes"] = card_payload["concept_nodes"]
                 choreography["concept_nodes"] = card_payload["concept_nodes"]
@@ -2167,5 +2229,19 @@ def choreograph_scenes(
                 enriched_scenes[idx]["sub_mode"] = modes[nxt_idx]
             elif curr_v not in {"electrical_grid", "mechanics_fbd", "quantum_sim", "chemistry_reaction"} and idx < num_enriched - 1:
                 enriched_scenes[idx]["visual_type"] = "function_graph" if curr_v != "function_graph" else "math_equation"
+
+    # Step 4: For STEM domains, ensure at least 50% of body scenes (3 to 5 scenes)
+    # are assigned to use compiled Manim video layers
+    if active_domain in ("math", "quantum_physics", "physics", "mechanics", "electrical"):
+        body_indices = [
+            i for i in range(1, num_enriched - (1 if num_enriched >= 5 else 0))
+            if enriched_scenes[i].get("visual_type") in ("math_equation", "function_graph", "quantum_sim", "physics_sim", "electrical_grid", "mechanics_fbd", "manim_scene", "comparison")
+        ]
+        if not body_indices:
+            body_indices = list(range(1, max(1, num_enriched - 1)))
+
+        target_count = min(len(body_indices), max(3, int(round(len(body_indices) * 0.5))))
+        for idx in body_indices[:target_count]:
+            enriched_scenes[idx]["needs_manim"] = True
 
     return enriched_scenes

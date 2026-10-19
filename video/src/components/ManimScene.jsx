@@ -1,16 +1,17 @@
 import React from 'react';
-import { OffthreadVideo, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
+import { Sequence, OffthreadVideo, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
 import { SceneBadge } from './SceneBadge';
 import { MathIcon, SparklesIcon } from './SvgIcons';
 
 /**
- * ManimScene (Phase 14 - Hybrid Manim Community Sub-Renderer Component)
+ * ManimScene (Phase 14 & 14.5 - Hybrid Manim Community Sub-Renderer Component)
  * Embeds high-precision 3Blue1Brown-style Manim .mp4 clips via <OffthreadVideo>
- * inside the 920x920 canvas while preserving Remotion domain headers and HUD cards.
+ * wrapped inside <Sequence> so it plays from 0s at the start of its scene.
  */
 export const ManimScene = ({
   scene,
   sceneStartFrame = 0,
+  sceneDurationFrames: customDurationFrames,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -18,6 +19,9 @@ export const ManimScene = ({
   const title = scene?.title || 'MATHEMATICAL VISUALIZATION';
   const subtitle = scene?.spoken_text || 'Deterministic mathematical simulation rendered via Manim Community.';
   const subMode = scene?.sub_mode || 'equation_morph';
+
+  const sceneDuration = scene?.duration || ((scene?.end_time || 0) - (scene?.start_time || 0)) || 5;
+  const sceneDurationFrames = customDurationFrames || Math.max(1, Math.round(sceneDuration * fps));
 
   const domain = (
     scene?.domain ||
@@ -37,10 +41,10 @@ export const ManimScene = ({
 
   const layoutDensity = scene?.choreography?.layout_density || scene?.layout_density || 'canvas_spotlight';
   const isSpotlight = layoutDensity === 'canvas_spotlight';
-  const stageHeight = isSpotlight ? '1260px' : '1540px';
-  const canvasHeight = isSpotlight ? 920 : 800;
+  const stageHeight = isSpotlight ? '1260px' : '1360px';
+  const canvasHeight = isSpotlight ? 920 : 880;
 
-  const manimVideoSrc = scene?.manim_video_src;
+  const manimVideoSrc = scene?.manim_asset_url || scene?.manim_video_src;
 
   const subModeLabel =
     subMode === 'equation_morph'
@@ -159,16 +163,18 @@ export const ManimScene = ({
       >
         {manimVideoSrc ? (
           <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-            <OffthreadVideo
-              src={staticFile(manimVideoSrc)}
-              muted
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'contain',
-                borderRadius: '16px',
-              }}
-            />
+            <Sequence from={sceneStartFrame} durationInFrames={sceneDurationFrames} layout="none">
+              <OffthreadVideo
+                src={staticFile(manimVideoSrc)}
+                muted
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  borderRadius: '16px',
+                }}
+              />
+            </Sequence>
             {/* Top-Right Telemetry HUD Badge */}
             <div
               style={{

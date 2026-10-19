@@ -1,0 +1,1238 @@
+"""
+engine/director/mock_library.py
+Definitive Local Mock Director Library.
+
+Provides pre-validated, high-quality multi-scene JSON scripts covering:
+- math (35s, 60s)
+- quantum_physics (35s, 60s)
+- electrical (35s, 60s)
+- mechanics (35s, 60s)
+- chemistry (35s, 60s)
+- code (35s, 60s)
+
+Each STEM script defines rich manim_spec configurations on 3 to 5 body scenes
+so offline compilation and Remotion compositing can be tested in sub-second time.
+"""
+
+from typing import Dict, Any
+
+
+MOCK_SCRIPTS: Dict[str, Dict[int, Dict[str, Any]]] = {
+    "math": {
+        35: {
+            "title": "Fundamental Theorem of Calculus",
+            "subject": "math",
+            "duration": 35,
+            "scenes": [
+                {
+                    "scene_id": 1,
+                    "title": "Differential vs Integral Duality",
+                    "visual_type": "fullscreen_text",
+                    "spoken_text": "Differentiation and integration are inverse operations of each other.",
+                    "display_text": "THE FUNDAMENTAL THEOREM OF CALCULUS",
+                    "emphasis_word": "inverse",
+                },
+                {
+                    "scene_id": 2,
+                    "title": "Slopes vs Continuous Area",
+                    "visual_type": "comparison",
+                    "spoken_text": "Derivatives track instant slopes while integrals accumulate continuous area.",
+                    "problem_label": "Differentiation",
+                    "problem_code": "f'(x) = lim_{h->0} [f(x+h) - f(x)] / h",
+                    "solution_label": "Integration",
+                    "solution_code": "\\int_a^b f(x)dx = F(b) - F(a)",
+                },
+                {
+                    "scene_id": 3,
+                    "visual_type": "function_graph",
+                    "title": "Area Accumulation Function",
+                    "spoken_text": "Sweeping forward, tiny Riemann rectangles accumulate total net area.",
+                    "functions": [{"fn": "0.5 * x^2 + 1", "label": "f(x) = 0.5x^2 + 1"}],
+                    "x_domain": [0, 4],
+                    "y_domain": [0, 10],
+                    "manim_spec": {
+                        "template": "calculus_graph",
+                        "function_expr": "0.5 * x**2 + 1",
+                        "x_range": [0, 4, 1],
+                        "y_range": [0, 10, 2],
+                        "riemann_rectangles": True,
+                        "tangent_line": True,
+                    },
+                },
+                {
+                    "scene_id": 4,
+                    "visual_type": "math_equation",
+                    "title": "Derivative of Accumulation",
+                    "spoken_text": "The rate accumulated area grows equals the current curve height.",
+                    "steps": [
+                        {"step": 1, "formula": "A(x) = \\int_a^x f(t) dt", "label": "Accumulation Function"},
+                        {"step": 2, "formula": "A'(x) = \\frac{d}{dx} \\int_a^x f(t) dt = f(x)", "label": "Rate of Growth"},
+                    ],
+                    "manim_spec": {
+                        "template": "equation_morph",
+                        "equations": [
+                            "A(x) = \\int_a^x f(t) dt",
+                            "\\frac{dA}{dx} = f(x)",
+                        ],
+                    },
+                },
+                {
+                    "scene_id": 5,
+                    "visual_type": "function_graph",
+                    "title": "Evaluation Theorem Integral",
+                    "spoken_text": "Total accumulation equals antiderivative values evaluated at the bounds.",
+                    "functions": [{"fn": "x^2", "label": "f(x) = x^2"}],
+                    "x_domain": [0, 3],
+                    "y_domain": [0, 9],
+                    "manim_spec": {
+                        "template": "riemann_refinement",
+                        "function_expr": "1.2 + sin(1.5*x)",
+                        "x_range": [0, 3, 1],
+                        "y_range": [0, 9, 3],
+                        "riemann_rectangles": True,
+                        "tangent_line": False,
+                    },
+                },
+                {
+                    "scene_id": 6,
+                    "title": "Calculus Unified",
+                    "visual_type": "concept",
+                    "spoken_text": "Integration and differentiation reveal two sides of one truth.",
+                    "display_text": "CALCULUS UNIFIED",
+                    "emphasis_word": "unified",
+                },
+            ],
+        },
+        60: {
+            "title": "Fundamental Theorem of Calculus Masterclass",
+            "subject": "math",
+            "duration": 60,
+            "scenes": [
+                {
+                    "scene_id": 1,
+                    "visual_type": "fullscreen_text",
+                    "spoken_text": "Calculus bridges the infinite gap between microscopic slopes and massive accumulated geometry.",
+                    "display_text": "THE HEART OF CALCULUS",
+                    "emphasis_word": "bridges",
+                },
+                {
+                    "scene_id": 2,
+                    "visual_type": "comparison",
+                    "spoken_text": "Where differentiation dissects instantaneous change, integration accumulates an infinite continuum of slices.",
+                    "problem_label": "Slope Operator",
+                    "problem_code": "d/dx [F(x)] = f(x)",
+                    "solution_label": "Area Operator",
+                    "solution_code": "\\int_a^b f(x) dx = F(b) - F(a)",
+                },
+                {
+                    "scene_id": 3,
+                    "visual_type": "function_graph",
+                    "title": "Riemann Sum Convergence",
+                    "spoken_text": "When rectangle widths collapse toward zero, finite Riemann sums converge into exact definite integrals.",
+                    "functions": [{"fn": "0.3 * x^3 - x + 2", "label": "f(x)"}],
+                    "x_domain": [0, 4],
+                    "y_domain": [0, 18],
+                    "manim_spec": {
+                        "template": "calculus_graph",
+                        "function_expr": "0.3 * x**3 - x + 2",
+                        "x_range": [0, 4, 1],
+                        "y_range": [0, 18, 4],
+                        "riemann_rectangles": True,
+                    },
+                },
+                {
+                    "scene_id": 4,
+                    "visual_type": "math_equation",
+                    "title": "First Fundamental Theorem",
+                    "spoken_text": "Differentiating an integral accumulator function unlocks the exact original curve height dynamically.",
+                    "steps": [
+                        {"step": 1, "formula": "G(x) = \\int_0^x f(t) dt", "label": "Area Function"},
+                        {"step": 2, "formula": "G'(x) = \\lim_{h \\to 0} \\frac{1}{h} \\int_x^{x+h} f(t) dt", "label": "Difference Quotient"},
+                        {"step": 3, "formula": "G'(x) = f(x)", "label": "Instantaneous Rate"},
+                    ],
+                    "manim_spec": {
+                        "template": "equation_morph",
+                        "equations": [
+                            "G(x) = \\int_0^x f(t) dt",
+                            "G'(x) = f(x)",
+                        ],
+                    },
+                },
+                {
+                    "scene_id": 5,
+                    "visual_type": "function_graph",
+                    "title": "Moving Tangent Vector",
+                    "spoken_text": "The derivative creates a dynamic local velocity vector along every point of the smooth curve.",
+                    "functions": [{"fn": "sin(x) + 2", "label": "f(x) = sin(x) + 2"}],
+                    "x_domain": [0, 6],
+                    "y_domain": [0, 4],
+                    "manim_spec": {
+                        "template": "calculus_graph",
+                        "function_expr": "np.sin(x) + 2",
+                        "x_range": [0, 6, 1],
+                        "y_range": [0, 4, 1],
+                        "tangent_line": True,
+                    },
+                },
+                {
+                    "scene_id": 6,
+                    "visual_type": "math_equation",
+                    "title": "Second Fundamental Theorem",
+                    "spoken_text": "To find any definite area, we simply compute the net change of its antiderivative function.",
+                    "steps": [
+                        {"step": 1, "formula": "\\int_a^b f(x) dx = F(b) - F(a)", "label": "Evaluation Theorem"},
+                        {"step": 2, "formula": "F'(x) = f(x)", "label": "Antiderivative Definition"},
+                    ],
+                    "manim_spec": {
+                        "template": "equation_morph",
+                        "equations": [
+                            "\\int_a^b f(x) dx = [F(x)]_a^b",
+                            "\\int_a^b f(x) dx = F(b) - F(a)",
+                        ],
+                    },
+                },
+                {
+                    "scene_id": 7,
+                    "visual_type": "function_graph",
+                    "title": "Nonlinear Area Sweep",
+                    "spoken_text": "Parabolic curves sweep out exactly one third the volume of their enclosing coordinate bounding boxes.",
+                    "functions": [{"fn": "x^2", "label": "y = x^2"}],
+                    "x_domain": [0, 3],
+                    "y_domain": [0, 9],
+                    "manim_spec": {
+                        "template": "calculus_graph",
+                        "function_expr": "x**2",
+                        "x_range": [0, 3, 1],
+                        "y_range": [0, 9, 3],
+                        "riemann_rectangles": True,
+                    },
+                },
+                {
+                    "scene_id": 8,
+                    "visual_type": "math_equation",
+                    "title": "Euler Identity Connection",
+                    "spoken_text": "Exponential growth and trigonometric rotation join seamlessly through the magic of complex Taylor series expansions.",
+                    "steps": [
+                        {"step": 1, "formula": "e^{ix} = \\cos(x) + i \\sin(x)", "label": "Euler Formula"},
+                        {"step": 2, "formula": "e^{i\\pi} + 1 = 0", "label": "Euler Identity"},
+                    ],
+                    "manim_spec": {
+                        "template": "equation_morph",
+                        "equations": [
+                            "e^{ix} = \\cos(x) + i \\sin(x)",
+                            "e^{i\\pi} + 1 = 0",
+                        ],
+                    },
+                },
+                {
+                    "scene_id": 9,
+                    "visual_type": "concept",
+                    "spoken_text": "Differential equations govern physics because nature computes rates and areas simultaneously in real time.",
+                    "display_text": "CALCULUS POWERS REALITY",
+                    "emphasis_word": "powers",
+                },
+                {
+                    "scene_id": 10,
+                    "visual_type": "bento_grid",
+                    "title": "Calculus Core Pillars",
+                    "spoken_text": "Master limits, derivatives, integrals, and series to unlock every physical law in the universe.",
+                    "cards": [
+                        {"title": "Limits", "description": "Foundation of Continuity"},
+                        {"title": "Derivatives", "description": "Instantaneous Slopes"},
+                        {"title": "Integrals", "description": "Accumulated Area"},
+                        {"title": "Series", "description": "Infinite Polynomials"},
+                    ],
+                },
+            ],
+        },
+    },
+    "quantum_physics": {
+        35: {
+            "title": "Schrödinger Wavepacket Barrier Tunneling",
+            "subject": "quantum_physics",
+            "duration": 35,
+            "scenes": [
+                {
+                    "scene_id": 1,
+                    "visual_type": "fullscreen_text",
+                    "spoken_text": "In quantum mechanics, particles can penetrate energetic barriers.",
+                    "display_text": "QUANTUM TUNNELING",
+                    "emphasis_word": "particles",
+                },
+                {
+                    "scene_id": 2,
+                    "visual_type": "comparison",
+                    "spoken_text": "Classical mechanics predicts reflection, but wavefunctions penetrate barriers.",
+                    "problem_label": "Classical Mechanics",
+                    "problem_code": "E < V_0  =>  Transmission = 0",
+                    "solution_label": "Quantum Mechanics",
+                    "solution_code": "T \\approx e^{-2 \\kappa L} > 0",
+                },
+                {
+                    "scene_id": 3,
+                    "visual_type": "quantum_sim",
+                    "title": "Wavepacket Collision",
+                    "spoken_text": "A Gaussian probability wavepacket propagates toward potential barriers.",
+                    "sub_mode": "schrodinger_tunneling",
+                    "manim_spec": {
+                        "template": "quantum_wave",
+                        "wave_speed": 1.5,
+                        "barrier_x": 0.0,
+                        "barrier_height": 3.0,
+                    },
+                },
+                {
+                    "scene_id": 4,
+                    "visual_type": "math_equation",
+                    "title": "Evanescent Wave Decay",
+                    "spoken_text": "Inside the barrier, the wavefunction decays exponentially fast.",
+                    "steps": [
+                        {"step": 1, "formula": "\\psi(x) = \\psi_0 e^{-\\kappa x}", "label": "Decay Law"},
+                        {"step": 2, "formula": "\\kappa = \\sqrt{2m(V_0 - E)} / \\hbar", "label": "Decay Constant"},
+                    ],
+                    "manim_spec": {
+                        "template": "equation_morph",
+                        "equations": [
+                            "\\psi(x) = \\psi_0 e^{-\\kappa x}",
+                            "T = e^{-2\\kappa L}",
+                        ],
+                    },
+                },
+                {
+                    "scene_id": 5,
+                    "visual_type": "quantum_sim",
+                    "title": "Transmitted Probability Packet",
+                    "spoken_text": "An attenuated probability packet emerges on the other side.",
+                    "sub_mode": "schrodinger_tunneling",
+                    "manim_spec": {
+                        "template": "quantum_wave",
+                        "wave_speed": 1.2,
+                        "barrier_x": 0.0,
+                        "barrier_height": 2.5,
+                    },
+                },
+                {
+                    "scene_id": 6,
+                    "visual_type": "concept",
+                    "spoken_text": "Tunneling powers stellar nuclear fusion and modern electronics.",
+                    "display_text": "TUNNELING CREATES LIGHT",
+                    "emphasis_word": "powers",
+                },
+            ],
+        },
+        60: {
+            "title": "Quantum Wavepacket Dynamics Masterclass",
+            "subject": "quantum_physics",
+            "duration": 60,
+            "scenes": [
+                {
+                    "scene_id": 1,
+                    "visual_type": "fullscreen_text",
+                    "spoken_text": "Matter is fundamentally composed of oscillating probability waves rather than solid rigid spheres.",
+                    "display_text": "PROBABILITY WAVE REALITY",
+                    "emphasis_word": "waves",
+                },
+                {
+                    "scene_id": 2,
+                    "visual_type": "comparison",
+                    "spoken_text": "Newtonian physics assumes deterministic point trajectories, while Schrödinger equations evolve complex probability clouds.",
+                    "problem_label": "Deterministic Orbit",
+                    "problem_code": "F = m \\cdot a(t)",
+                    "solution_label": "Wavefunction State",
+                    "solution_code": "i\\hbar \\frac{\\partial \\psi}{\\partial t} = \\hat{H} \\psi",
+                },
+                {
+                    "scene_id": 3,
+                    "visual_type": "quantum_sim",
+                    "title": "Incident Gaussian Wavepacket",
+                    "spoken_text": "A cohesive quantum wavepacket accelerates through coordinate space with constant envelope velocity.",
+                    "sub_mode": "schrodinger_tunneling",
+                    "manim_spec": {
+                        "template": "quantum_wave",
+                        "wave_speed": 1.8,
+                        "barrier_x": 1.0,
+                        "barrier_height": 3.0,
+                    },
+                },
+                {
+                    "scene_id": 4,
+                    "visual_type": "math_equation",
+                    "title": "Time-Dependent Schrödinger Equation",
+                    "spoken_text": "The Hamiltonian operator maps spatial curvature directly into instantaneous temporal phase rotation.",
+                    "steps": [
+                        {"step": 1, "formula": "\\hat{H} = -\\frac{\\hbar^2}{2m} \\nabla^2 + V(x)", "label": "Hamiltonian"},
+                        {"step": 2, "formula": "i\\hbar \\dot{\\psi} = \\hat{H} \\psi", "label": "Time Evolution"},
+                    ],
+                    "manim_spec": {
+                        "template": "equation_morph",
+                        "equations": [
+                            "i\\hbar \\frac{\\partial \\psi}{\\partial t} = \\hat{H} \\psi",
+                            "\\hat{H} = -\\frac{\\hbar^2}{2m} \\nabla^2 + V(x)",
+                        ],
+                    },
+                },
+                {
+                    "scene_id": 5,
+                    "visual_type": "quantum_sim",
+                    "title": "Evanescent Barrier Penetration",
+                    "spoken_text": "Upon reaching the barrier, the phase locks and amplitude decays exponentially within the forbidden region.",
+                    "sub_mode": "schrodinger_tunneling",
+                    "manim_spec": {
+                        "template": "quantum_wave",
+                        "wave_speed": 1.0,
+                        "barrier_x": 0.0,
+                        "barrier_height": 4.0,
+                    },
+                },
+                {
+                    "scene_id": 6,
+                    "visual_type": "math_equation",
+                    "title": "Heisenberg Uncertainty Limit",
+                    "spoken_text": "Confining a particle in spatial coordinates inherently disperses its conjugate momentum distribution outward.",
+                    "steps": [
+                        {"step": 1, "formula": "\\Delta x \\cdot \\Delta p \\ge \\frac{\\hbar}{2}", "label": "Uncertainty Principle"},
+                        {"step": 2, "formula": "[\\hat{x}, \\hat{p}] = i\\hbar", "label": "Canonical Commutator"},
+                    ],
+                    "manim_spec": {
+                        "template": "equation_morph",
+                        "equations": [
+                            "\\Delta x \\cdot \\Delta p \\ge \\frac{\\hbar}{2}",
+                            "[\\hat{x}, \\hat{p}] = i\\hbar",
+                        ],
+                    },
+                },
+                {
+                    "scene_id": 7,
+                    "visual_type": "quantum_sim",
+                    "title": "Transmitted & Reflected Packets",
+                    "spoken_text": "The original packet bifurcates cleanly into a reflected pulse and an attenuated forward wave.",
+                    "sub_mode": "schrodinger_tunneling",
+                    "manim_spec": {
+                        "template": "quantum_wave",
+                        "wave_speed": 1.4,
+                        "barrier_x": -0.5,
+                        "barrier_height": 2.5,
+                    },
+                },
+                {
+                    "scene_id": 8,
+                    "visual_type": "math_equation",
+                    "title": "Probability Density Conservation",
+                    "spoken_text": "The integral of probability density over all spatial coordinates remains strictly normalized to unity.",
+                    "steps": [
+                        {"step": 1, "formula": "P(x) = |\\psi(x)|^2", "label": "Born Rule"},
+                        {"step": 2, "formula": "\\int_{-\\infty}^{\\infty} |\\psi(x)|^2 dx = 1", "label": "Unit Normalization"},
+                    ],
+                    "manim_spec": {
+                        "template": "equation_morph",
+                        "equations": [
+                            "P(x) = |\\psi(x)|^2",
+                            "\\int |\\psi|^2 dx = 1",
+                        ],
+                    },
+                },
+                {
+                    "scene_id": 9,
+                    "visual_type": "concept",
+                    "spoken_text": "Quantum mechanics reveals that nature operates on probabilities rather than classical clockwork certainty.",
+                    "display_text": "PROBABILITY REIGNS",
+                    "emphasis_word": "probabilities",
+                },
+                {
+                    "scene_id": 10,
+                    "visual_type": "bento_grid",
+                    "title": "Quantum Foundations",
+                    "spoken_text": "Wave-particle duality, uncertainty, superposition, and tunneling form the cornerstones of modern quantum computing.",
+                    "cards": [
+                        {"title": "Duality", "description": "Wave and Particle"},
+                        {"title": "Uncertainty", "description": "Delta x * Delta p >= hbar/2"},
+                        {"title": "Superposition", "description": "Linear State Vector"},
+                        {"title": "Tunneling", "description": "Barrier Penetration"},
+                    ],
+                },
+            ],
+        },
+    },
+    "electrical": {
+        35: {
+            "title": "Thévenin Equivalent Circuit Theorems",
+            "subject": "electrical",
+            "duration": 35,
+            "scenes": [
+                {
+                    "scene_id": 1,
+                    "visual_type": "fullscreen_text",
+                    "spoken_text": "Complex circuits reduce to one voltage and resistance.",
+                    "display_text": "THEVENIN THEOREM",
+                    "emphasis_word": "reduce",
+                },
+                {
+                    "scene_id": 2,
+                    "visual_type": "comparison",
+                    "spoken_text": "Massive loops collapse cleanly into a simple equivalent.",
+                    "problem_label": "Complex Network",
+                    "problem_code": "V_in = \\sum (I_k R_k)  [12 Loops]",
+                    "solution_label": "Thévenin Equivalent",
+                    "solution_code": "V_{th} = V_{oc},  R_{th} = R_{eq}",
+                },
+                {
+                    "scene_id": 3,
+                    "visual_type": "electrical_grid",
+                    "title": "Linear Network Reduction",
+                    "spoken_text": "Zeroing sources reveals the equivalent driving point resistance.",
+                    "sub_mode": "thevenin_equivalence",
+                    "manim_spec": {
+                        "template": "vector_field",
+                        "vector_field_expr": "[-y, x]",
+                    },
+                },
+                {
+                    "scene_id": 4,
+                    "visual_type": "math_equation",
+                    "title": "Maximum Power Transfer Condition",
+                    "spoken_text": "Maximum power transfers when load resistance matches the source.",
+                    "steps": [
+                        {"step": 1, "formula": "P_L = I^2 R_L = \\frac{V_{th}^2 R_L}{(R_{th} + R_L)^2}", "label": "Power Expression"},
+                        {"step": 2, "formula": "\\frac{dP_L}{dR_L} = 0 \\implies R_L = R_{th}", "label": "Impedance Match"},
+                    ],
+                    "manim_spec": {
+                        "template": "equation_morph",
+                        "equations": [
+                            "P_L = \\frac{V_{th}^2 R_L}{(R_{th} + R_L)^2}",
+                            "R_L = R_{th} \\implies P_{max}",
+                        ],
+                    },
+                },
+                {
+                    "scene_id": 5,
+                    "visual_type": "function_graph",
+                    "title": "Power vs Resistance Bell Curve",
+                    "spoken_text": "The curve peaks sharply at the match point.",
+                    "functions": [{"fn": "4 * x / ((1 + x)^2)", "label": "P(R_L)"}],
+                    "x_domain": [0, 4],
+                    "y_domain": [0, 1.2],
+                    "manim_spec": {
+                        "template": "calculus_graph",
+                        "function_expr": "4 * x / ((1 + x)**2)",
+                        "x_range": [0, 4, 1],
+                        "y_range": [0, 1.5, 0.5],
+                        "tangent_line": True,
+                    },
+                },
+                {
+                    "scene_id": 6,
+                    "visual_type": "concept",
+                    "spoken_text": "Matching enables high-speed communications and efficient electrical grids.",
+                    "display_text": "PERFECT IMPEDANCE MATCH",
+                    "emphasis_word": "matching",
+                },
+            ],
+        },
+        60: {
+            "title": "Electrical Power Systems and Circuit Theorems",
+            "subject": "electrical",
+            "duration": 60,
+            "scenes": [
+                {
+                    "scene_id": 1,
+                    "visual_type": "fullscreen_text",
+                    "spoken_text": "Modern electrical power systems rely on fundamental circuit laws to balance terawatts of energy.",
+                    "display_text": "CIRCUIT LAWS & POWER GRIDS",
+                    "emphasis_word": "balance",
+                },
+                {
+                    "scene_id": 2,
+                    "visual_type": "comparison",
+                    "spoken_text": "Kirchhoff Current Law balances node charges, while Voltage Law conserves electric potential across closed loops.",
+                    "problem_label": "KCL (Nodes)",
+                    "problem_code": "\\sum I_{in} = \\sum I_{out} = 0",
+                    "solution_label": "KVL (Loops)",
+                    "solution_code": "\\sum \\Delta V_{loop} = 0",
+                },
+                {
+                    "scene_id": 3,
+                    "visual_type": "electrical_grid",
+                    "title": "Mesh Current Analysis",
+                    "spoken_text": "Matrix impedance formulations allow computers to calculate currents across thousands of grid substations simultaneously.",
+                    "sub_mode": "kvl_kcl_mesh",
+                    "manim_spec": {
+                        "template": "vector_field",
+                        "vector_field_expr": "[-y, x]",
+                    },
+                },
+                {
+                    "scene_id": 4,
+                    "visual_type": "math_equation",
+                    "title": "Complex AC Power Equation",
+                    "spoken_text": "Apparent power splits vectorially into active real work and oscillating reactive magnetic fields.",
+                    "steps": [
+                        {"step": 1, "formula": "S = P + jQ = V_{rms} I_{rms}^*", "label": "Complex Power"},
+                        {"step": 2, "formula": "|S| = \\sqrt{P^2 + Q^2}", "label": "Power Triangle"},
+                    ],
+                    "manim_spec": {
+                        "template": "equation_morph",
+                        "equations": [
+                            "S = P + jQ",
+                            "|S| = \\sqrt{P^2 + Q^2}",
+                        ],
+                    },
+                },
+                {
+                    "scene_id": 5,
+                    "visual_type": "electrical_grid",
+                    "title": "Thévenin Source Reduction",
+                    "spoken_text": "Every regional generator substation reduces mathematically to an open-circuit voltage and internal series impedance.",
+                    "sub_mode": "thevenin_equivalence",
+                    "manim_spec": {
+                        "template": "vector_field",
+                        "vector_field_expr": "[x, y]",
+                    },
+                },
+                {
+                    "scene_id": 6,
+                    "visual_type": "function_graph",
+                    "title": "Maximum Power Transfer Curve",
+                    "spoken_text": "Load power delivery reaches its theoretical maximum when load impedance matches the conjugate source impedance.",
+                    "functions": [{"fn": "4 * x / ((1 + x)^2)", "label": "P(R)"}],
+                    "x_domain": [0, 4],
+                    "y_domain": [0, 1.2],
+                    "manim_spec": {
+                        "template": "calculus_graph",
+                        "function_expr": "4 * x / ((1 + x)**2)",
+                        "x_range": [0, 4, 1],
+                        "y_range": [0, 1.5, 0.5],
+                        "tangent_line": True,
+                    },
+                },
+                {
+                    "scene_id": 7,
+                    "visual_type": "math_equation",
+                    "title": "Power Factor Correction",
+                    "spoken_text": "Installing shunt capacitors counteracts inductive motor lag, restoring unity power factor efficiency.",
+                    "steps": [
+                        {"step": 1, "formula": "\\cos(\\phi) = \\frac{P}{|S|}", "label": "Power Factor"},
+                        {"step": 2, "formula": "Q_C = P(\\tan\\phi_1 - \\tan\\phi_2)", "label": "Correction Var"},
+                    ],
+                    "manim_spec": {
+                        "template": "equation_morph",
+                        "equations": [
+                            "\\cos(\\phi) = \\frac{P}{|S|}",
+                            "Q_C = P(\\tan\\phi_1 - \\tan\\phi_2)",
+                        ],
+                    },
+                },
+                {
+                    "scene_id": 8,
+                    "visual_type": "electrical_grid",
+                    "title": "Smart Grid Optimal Flow",
+                    "spoken_text": "Automated dispatchers dynamically optimize bus voltage angles to prevent blackout transmission overloads.",
+                    "sub_mode": "smart_grid_opf",
+                    "manim_spec": {
+                        "template": "vector_field",
+                        "vector_field_expr": "[-y, x]",
+                    },
+                },
+                {
+                    "scene_id": 9,
+                    "visual_type": "concept",
+                    "spoken_text": "Rigorous circuit analysis transforms chaotic electromagnetic fields into reliable civilization-scale power.",
+                    "display_text": "RELIABLE ENERGY GRIDS",
+                    "emphasis_word": "transforms",
+                },
+                {
+                    "scene_id": 10,
+                    "visual_type": "bento_grid",
+                    "title": "Power Engineering Matrix",
+                    "spoken_text": "Master KVL, Thévenin equivalents, AC phasors, and power factor to engineer modern electrical infrastructure.",
+                    "cards": [
+                        {"title": "KVL / KCL", "description": "Conservation Laws"},
+                        {"title": "Thévenin", "description": "Linear Network Reduction"},
+                        {"title": "AC Phasors", "description": "Complex Power Vector"},
+                        {"title": "Grid OPF", "description": "Optimal Power Flow"},
+                    ],
+                },
+            ],
+        },
+    },
+    "mechanics": {
+        35: {
+            "title": "Statics and Beam Reaction Forces",
+            "subject": "mechanics",
+            "duration": 35,
+            "scenes": [
+                {
+                    "scene_id": 1,
+                    "visual_type": "fullscreen_text",
+                    "spoken_text": "Every structure stands because reactions balance gravity.",
+                    "display_text": "STRUCTURAL STATICS",
+                    "emphasis_word": "balance",
+                },
+                {
+                    "scene_id": 2,
+                    "visual_type": "comparison",
+                    "spoken_text": "Translational forces and rotational moments must sum zero.",
+                    "problem_label": "Translational Equilibrium",
+                    "problem_code": "\\sum F_x = 0,  \\sum F_y = 0",
+                    "solution_label": "Rotational Equilibrium",
+                    "solution_code": "\\sum M_O = \\sum (r \\times F) = 0",
+                },
+                {
+                    "scene_id": 3,
+                    "visual_type": "mechanics_fbd",
+                    "title": "Simply Supported Beam FBD",
+                    "spoken_text": "Loads distribute reaction forces into both pin supports.",
+                    "sub_mode": "beam_weight_distribution",
+                    "manim_spec": {
+                        "template": "vector_field",
+                        "vector_field_expr": "[0, -y]",
+                    },
+                },
+                {
+                    "scene_id": 4,
+                    "visual_type": "math_equation",
+                    "title": "Moment Equilibrium Derivation",
+                    "spoken_text": "Moments around pin A resolve vertical reaction B.",
+                    "steps": [
+                        {"step": 1, "formula": "\\sum M_A = R_B \\cdot L - P \\cdot a = 0", "label": "Moment Balance"},
+                        {"step": 2, "formula": "R_B = P \\cdot \\frac{a}{L}", "label": "Reaction at B"},
+                    ],
+                    "manim_spec": {
+                        "template": "equation_morph",
+                        "equations": [
+                            "\\sum M_A = R_B L - P a = 0",
+                            "R_B = P \\frac{a}{L}",
+                        ],
+                    },
+                },
+                {
+                    "scene_id": 5,
+                    "visual_type": "function_graph",
+                    "title": "Bending Moment Diagram",
+                    "spoken_text": "Bending moment peaks beneath the concentrated load.",
+                    "functions": [{"fn": "x * (4 - x)", "label": "M(x)"}],
+                    "x_domain": [0, 4],
+                    "y_domain": [0, 5],
+                    "manim_spec": {
+                        "template": "calculus_graph",
+                        "function_expr": "x * (4 - x)",
+                        "x_range": [0, 4, 1],
+                        "y_range": [0, 5, 1],
+                        "tangent_line": True,
+                    },
+                },
+                {
+                    "scene_id": 6,
+                    "visual_type": "concept",
+                    "spoken_text": "Equilibrium ensures civil structures withstand heavy dynamic loads.",
+                    "display_text": "EQUILIBRIUM STANDS TALL",
+                    "emphasis_word": "equilibrium",
+                },
+            ],
+        },
+        60: {
+            "title": "Mechanics and Structural Statics Masterclass",
+            "subject": "mechanics",
+            "duration": 60,
+            "scenes": [
+                {
+                    "scene_id": 1,
+                    "visual_type": "fullscreen_text",
+                    "spoken_text": "Structural integrity begins with Newton's laws applied to static equilibrium and stress distribution.",
+                    "display_text": "MECHANICS & EQUILIBRIUM",
+                    "emphasis_word": "integrity",
+                },
+                {
+                    "scene_id": 2,
+                    "visual_type": "comparison",
+                    "spoken_text": "External forces induce internal shear and bending moments that must not exceed material yield strengths.",
+                    "problem_label": "Internal Shear",
+                    "problem_code": "V(x) = \\frac{dM}{dx}",
+                    "solution_label": "Bending Stress",
+                    "solution_code": "\\sigma = \\frac{M \\cdot y}{I}",
+                },
+                {
+                    "scene_id": 3,
+                    "visual_type": "mechanics_fbd",
+                    "title": "Beam Weight Distribution",
+                    "spoken_text": "Distributed dead loads combine with point live loads to determine multi-axis pin reactions.",
+                    "sub_mode": "beam_weight_distribution",
+                    "manim_spec": {
+                        "template": "vector_field",
+                        "vector_field_expr": "[0, -y]",
+                    },
+                },
+                {
+                    "scene_id": 4,
+                    "visual_type": "math_equation",
+                    "title": "Shear Force Derivative",
+                    "spoken_text": "The derivative of bending moment along the beam's axis equals the internal shear force.",
+                    "steps": [
+                        {"step": 1, "formula": "\\frac{dV}{dx} = -w(x)", "label": "Distributed Load"},
+                        {"step": 2, "formula": "\\frac{dM}{dx} = V(x)", "label": "Moment Derivative"},
+                    ],
+                    "manim_spec": {
+                        "template": "equation_morph",
+                        "equations": [
+                            "\\frac{dM}{dx} = V(x)",
+                            "\\sigma_{max} = \\frac{M c}{I}",
+                        ],
+                    },
+                },
+                {
+                    "scene_id": 5,
+                    "visual_type": "mechanics_fbd",
+                    "title": "Inclined Plane Vector Resolution",
+                    "spoken_text": "Gravity decomposes into normal compression and tangential sliding force vectors along inclined ramps.",
+                    "sub_mode": "inclined_plane_fbd",
+                    "manim_spec": {
+                        "template": "vector_field",
+                        "vector_field_expr": "[x, -y]",
+                    },
+                },
+                {
+                    "scene_id": 6,
+                    "visual_type": "function_graph",
+                    "title": "Deflection Curve Under Load",
+                    "spoken_text": "Euler-Bernoulli beam theory models elastic deflection as the fourth integral of the load profile.",
+                    "functions": [{"fn": "x * (3 - x)", "label": "Deflection w(x)"}],
+                    "x_domain": [0, 3],
+                    "y_domain": [0, 3],
+                    "manim_spec": {
+                        "template": "calculus_graph",
+                        "function_expr": "x * (3 - x)",
+                        "x_range": [0, 3, 1],
+                        "y_range": [0, 3, 1],
+                        "tangent_line": True,
+                    },
+                },
+                {
+                    "scene_id": 7,
+                    "visual_type": "math_equation",
+                    "title": "Euler-Bernoulli Elastic Equation",
+                    "spoken_text": "The second derivative of elastic deflection curve relates directly to bending stiffness EI.",
+                    "steps": [
+                        {"step": 1, "formula": "EI \\frac{d^2 w}{dx^2} = -M(x)", "label": "Curvature Equation"},
+                        {"step": 2, "formula": "w_{max} = \\frac{5 w L^4}{384 EI}", "label": "Uniform Load Deflection"},
+                    ],
+                    "manim_spec": {
+                        "template": "equation_morph",
+                        "equations": [
+                            "EI \\frac{d^2 w}{dx^2} = -M(x)",
+                            "w_{max} = \\frac{5 w L^4}{384 EI}",
+                        ],
+                    },
+                },
+                {
+                    "scene_id": 8,
+                    "visual_type": "mechanics_fbd",
+                    "title": "Chassis Dynamic Load Transfer",
+                    "spoken_text": "Acceleration shifts normal tire contact patches during aggressive braking and turning maneuvers.",
+                    "sub_mode": "axle_center_of_mass",
+                    "manim_spec": {
+                        "template": "vector_field",
+                        "vector_field_expr": "[-x, y]",
+                    },
+                },
+                {
+                    "scene_id": 9,
+                    "visual_type": "concept",
+                    "spoken_text": "Statics and dynamics provide the exact mathematical blueprint for all aerospace and civil engineering.",
+                    "display_text": "MECHANICS SHAPES THE WORLD",
+                    "emphasis_word": "blueprint",
+                },
+                {
+                    "scene_id": 10,
+                    "visual_type": "bento_grid",
+                    "title": "Structural Engineering Toolkit",
+                    "spoken_text": "Equilibrium, free-body diagrams, shear diagrams, and elasticity define the mechanics master toolkit.",
+                    "cards": [
+                        {"title": "Equilibrium", "description": "Sum F = 0, Sum M = 0"},
+                        {"title": "FBD", "description": "Vector Isolation"},
+                        {"title": "Shear & Moment", "description": "V(x) and M(x) Profiles"},
+                        {"title": "Elasticity", "description": "Stress, Strain, Deflection"},
+                    ],
+                },
+            ],
+        },
+    },
+    "chemistry": {
+        35: {
+            "title": "SN2 Nucleophilic Substitution Mechanism",
+            "subject": "chemistry",
+            "duration": 35,
+            "scenes": [
+                {
+                    "scene_id": 1,
+                    "visual_type": "fullscreen_text",
+                    "spoken_text": "Nucleophiles attack backside in one concerted step.",
+                    "display_text": "SN2 REACTION MECHANISM",
+                    "emphasis_word": "concerted",
+                },
+                {
+                    "scene_id": 2,
+                    "visual_type": "comparison",
+                    "spoken_text": "Concerted SN2 inverts stereocenters, whereas SN1 racemizes.",
+                    "problem_label": "SN1 Mechanism",
+                    "problem_code": "Rate = k[R-X]  (Racemization)",
+                    "solution_label": "SN2 Mechanism",
+                    "solution_code": "Rate = k[Nu:][R-X]  (Walden Inversion)",
+                },
+                {
+                    "scene_id": 3,
+                    "visual_type": "chemistry_reaction",
+                    "title": "Backside Attack & Inversion",
+                    "spoken_text": "The nucleophile donates electrons into the carbon antibonding orbital.",
+                    "mode": "sn2_concerted",
+                    "reaction_name": "Backside Nucleophilic Inversion",
+                    "manim_spec": {
+                        "template": "vector_field",
+                        "vector_field_expr": "[-x, 0]",
+                    },
+                },
+                {
+                    "scene_id": 4,
+                    "visual_type": "math_equation",
+                    "title": "Bimolecular Rate Law",
+                    "spoken_text": "Kinetics depend on both substrate and nucleophile concentrations.",
+                    "steps": [
+                        {"step": 1, "formula": "Rate = k [Nu^-] [R-X]", "label": "Bimolecular Kinetics"},
+                        {"step": 2, "formula": "\\Delta G^\\ddagger = -RT \\ln(k / A)", "label": "Arrhenius Barrier"},
+                    ],
+                    "manim_spec": {
+                        "template": "equation_morph",
+                        "equations": [
+                            "\\text{Rate} = k [\\text{Nu}^-] [\\text{R-X}]",
+                            "k = A e^{-\\frac{E_a}{RT}}",
+                        ],
+                    },
+                },
+                {
+                    "scene_id": 5,
+                    "visual_type": "function_graph",
+                    "title": "Reaction Coordinate Free Energy Profile",
+                    "spoken_text": "A single transition state peak separates product stereocenters.",
+                    "functions": [{"fn": "4 * x * (1 - x)", "label": "\\Delta G(x)"}],
+                    "x_domain": [0, 1],
+                    "y_domain": [0, 1.5],
+                    "manim_spec": {
+                        "template": "calculus_graph",
+                        "function_expr": "4 * x * (1 - x)",
+                        "x_range": [0, 1, 0.25],
+                        "y_range": [0, 1.5, 0.5],
+                        "tangent_line": True,
+                    },
+                },
+                {
+                    "scene_id": 6,
+                    "visual_type": "concept",
+                    "spoken_text": "Walden inversion enables synthesis of chiral enantiomer drugs.",
+                    "display_text": "CHIRAL SYNTHESIS MASTERY",
+                    "emphasis_word": "enables",
+                },
+            ],
+        },
+        60: {
+            "title": "Organic Reaction Mechanisms Masterclass",
+            "subject": "chemistry",
+            "duration": 60,
+            "scenes": [
+                {
+                    "scene_id": 1,
+                    "visual_type": "fullscreen_text",
+                    "spoken_text": "Organic synthesis relies on curved arrow electron flow and molecular orbital interactions.",
+                    "display_text": "ORGANIC MECHANISMS",
+                    "emphasis_word": "interactions",
+                },
+                {
+                    "scene_id": 2,
+                    "visual_type": "comparison",
+                    "spoken_text": "Nucleophiles donate electron density to electrophiles, displacing leaving groups across transition states.",
+                    "problem_label": "Nucleophile (Nu:)",
+                    "problem_code": "HOMO \\text{ Electron Rich}",
+                    "solution_label": "Electrophile (E+)",
+                    "solution_code": "LUMO \\text{ Electron Deficient}",
+                },
+                {
+                    "scene_id": 3,
+                    "visual_type": "chemistry_reaction",
+                    "title": "Concerted Backside Attack",
+                    "spoken_text": "In SN2, nucleophile approach opposite the carbon-halogen bond triggers complete umbrella inversion.",
+                    "mode": "sn2_concerted",
+                    "reaction_name": "SN2 Backside Attack",
+                    "manim_spec": {
+                        "template": "vector_field",
+                        "vector_field_expr": "[-x, 0]",
+                    },
+                },
+                {
+                    "scene_id": 4,
+                    "visual_type": "math_equation",
+                    "title": "Transition State Kinetics",
+                    "spoken_text": "The rate constant scales exponentially with the inverse of thermal energy times activation barrier.",
+                    "steps": [
+                        {"step": 1, "formula": "k = \\frac{k_B T}{h} e^{-\\Delta G^\\ddagger / RT}", "label": "Eyring Equation"},
+                        {"step": 2, "formula": "\\Delta G^\\ddagger = \\Delta H^\\ddagger - T\\Delta S^\\ddagger", "label": "Free Energy"},
+                    ],
+                    "manim_spec": {
+                        "template": "equation_morph",
+                        "equations": [
+                            "k = \\frac{k_B T}{h} e^{-\\frac{\\Delta G^\\ddagger}{RT}}",
+                            "\\text{Rate} = k [\\text{Nu}] [\\text{Substrate}]",
+                        ],
+                    },
+                },
+                {
+                    "scene_id": 5,
+                    "visual_type": "function_graph",
+                    "title": "Double-Well SN1 Energy Landscape",
+                    "spoken_text": "In SN1 pathways, an intermediate carbocation creates a shallow local minimum between two peaks.",
+                    "functions": [{"fn": "x^4 - 2 * x^2 + 1", "label": "G(x)"}],
+                    "x_domain": [-1.5, 1.5],
+                    "y_domain": [0, 2],
+                    "manim_spec": {
+                        "template": "calculus_graph",
+                        "function_expr": "x**4 - 2 * x**2 + 1",
+                        "x_range": [-1.5, 1.5, 0.5],
+                        "y_range": [0, 2, 0.5],
+                        "tangent_line": True,
+                    },
+                },
+                {
+                    "scene_id": 6,
+                    "visual_type": "chemistry_reaction",
+                    "title": "Carbocation Intermediate Trapping",
+                    "spoken_text": "The planar sp2 carbocation accepts nucleophilic attack with equal probability from either side.",
+                    "mode": "sn1_carbocation",
+                    "reaction_name": "Carbocation Trapping",
+                    "manim_spec": {
+                        "template": "vector_field",
+                        "vector_field_expr": "[x, -y]",
+                    },
+                },
+                {
+                    "scene_id": 7,
+                    "visual_type": "math_equation",
+                    "title": "Hammett Linear Free Energy Relation",
+                    "spoken_text": "Substituent electronics alter reaction rates systematically via resonance and inductive dipole moments.",
+                    "steps": [
+                        {"step": 1, "formula": "\\log(k / k_0) = \\rho \\cdot \\sigma", "label": "Hammett Equation"},
+                        {"step": 2, "formula": "\\sigma = \\sigma_I + \\sigma_R", "label": "Inductive + Resonance"},
+                    ],
+                    "manim_spec": {
+                        "template": "equation_morph",
+                        "equations": [
+                            "\\log(k / k_0) = \\rho \\sigma",
+                            "\\Delta \\Delta G^\\ddagger = -2.303 RT \\rho \\sigma",
+                        ],
+                    },
+                },
+                {
+                    "scene_id": 8,
+                    "visual_type": "chemistry_reaction",
+                    "title": "E2 Elimination Competition",
+                    "spoken_text": "Strong bulky bases favor anti-periplanar beta elimination, yielding thermodynamic alkenes.",
+                    "mode": "e2_elimination",
+                    "reaction_name": "Anti-Periplanar E2 Elimination",
+                    "manim_spec": {
+                        "template": "vector_field",
+                        "vector_field_expr": "[0, -y]",
+                    },
+                },
+                {
+                    "scene_id": 9,
+                    "visual_type": "concept",
+                    "spoken_text": "Controlling reaction coordinates allows chemical synthesis of life-saving medicines and advanced polymers.",
+                    "display_text": "CHEMISTRY CREATES MOLECULES",
+                    "emphasis_word": "synthesis",
+                },
+                {
+                    "scene_id": 10,
+                    "visual_type": "bento_grid",
+                    "title": "Reaction Mechanisms Grid",
+                    "spoken_text": "SN1, SN2, E1, and E2 mechanisms determine every nucleophile and electrophile reaction outcome.",
+                    "cards": [
+                        {"title": "SN2", "description": "Concerted Backside Attack"},
+                        {"title": "SN1", "description": "Carbocation Intermediate"},
+                        {"title": "E2", "description": "Anti-Periplanar Elimination"},
+                        {"title": "E1", "description": "Carbocation Elimination"},
+                    ],
+                },
+            ],
+        },
+    },
+    "code": {
+        35: {
+            "title": "Python Dictionary Hash Table Optimization",
+            "subject": "code",
+            "duration": 35,
+            "scenes": [
+                {
+                    "scene_id": 1,
+                    "visual_type": "fullscreen_text",
+                    "spoken_text": "Python dictionaries deliver constant time lookups using compact hash tables.",
+                    "display_text": "PYTHON HASH TABLES",
+                    "emphasis_word": "constant",
+                },
+                {
+                    "scene_id": 2,
+                    "visual_type": "comparison",
+                    "spoken_text": "Linear list scanning takes O(N), but hash lookups take O(1).",
+                    "problem_label": "Linear Search O(N)",
+                    "problem_code": "for item in data:\n    if item == target:\n        return True",
+                    "solution_label": "Hash Lookup O(1)",
+                    "solution_code": "return target in hash_table",
+                },
+                {
+                    "scene_id": 3,
+                    "visual_type": "code_reveal",
+                    "title": "Compact Hash Table Architecture",
+                    "spoken_text": "Python separates sparse indices from dense key-value arrays.",
+                    "code_snippet": "class CompactDict:\n    def __init__(self):\n        self.indices = [-1] * 8\n        self.entries = []",
+                },
+                {
+                    "scene_id": 4,
+                    "visual_type": "terminal",
+                    "title": "Collision Resolution Benchmark",
+                    "spoken_text": "Perturbation indexing minimizes collisions and maintains fast insertions.",
+                    "code_snippet": "$ python -m bench_dict\nHash index lookup: 14.2 ns\nStatus: OPTIMAL",
+                    "terminal_output": "$ python -m bench_dict\nHash index lookup: 14.2 ns\nCollision resolution: 0 probe overhead\nStatus: OPTIMAL [O(1)]",
+                },
+                {
+                    "scene_id": 5,
+                    "visual_type": "diagram",
+                    "title": "Hash Table Index Mapping",
+                    "spoken_text": "Keys hash directly into sparse buckets pointing to entries.",
+                    "nodes": ["Hash Key", "Sparse Index", "Dense Slot"],
+                },
+                {
+                    "scene_id": 6,
+                    "visual_type": "concept",
+                    "spoken_text": "Compact hash tables save memory and power high-performance software globally.",
+                    "display_text": "O(1) RUNTIME MASTERY",
+                    "emphasis_word": "memory",
+                },
+            ],
+        },
+        60: {
+            "title": "Python Hash Tables and Algorithm Engineering",
+            "subject": "code",
+            "duration": 60,
+            "scenes": [
+                {
+                    "scene_id": 1,
+                    "visual_type": "fullscreen_text",
+                    "spoken_text": "Modern programming languages achieve blistering speed by engineering cache-friendly algorithmic data structures.",
+                    "display_text": "ALGORITHM ENGINEERING",
+                    "emphasis_word": "speed",
+                },
+                {
+                    "scene_id": 2,
+                    "visual_type": "comparison",
+                    "spoken_text": "Traditional sparse hash tables waste massive memory, while compact arrays preserve insertion order naturally.",
+                    "problem_label": "Sparse Array Table",
+                    "problem_code": "table = [None, (k1, v1), None, None, (k2, v2)]",
+                    "solution_label": "Compact Dense Table",
+                    "solution_code": "indices = [1, 0, -1]\nentries = [(k2, v2), (k1, v1)]",
+                },
+                {
+                    "scene_id": 3,
+                    "visual_type": "code_reveal",
+                    "title": "Hash Value Computation",
+                    "spoken_text": "Every immutable object implements a fast uniform hashing function with avalanche properties.",
+                    "code_snippet": "def hash_key(key: str) -> int:\n    h = 0x811c9dc5\n    for char in key.encode('utf-8'):\n        h = ((h ^ char) * 0x01000193) & 0xFFFFFFFF\n    return h",
+                },
+                {
+                    "scene_id": 4,
+                    "visual_type": "code_transform",
+                    "title": "Open Addressing Probe Function",
+                    "spoken_text": "Perturbation probing guarantees every hash slot in the table is visited without clustering.",
+                    "code_snippet": "def probe(h, mask):\n    return ((5 * h) + 1) & mask",
+                    "code_before": "def probe(h, mask):\n    return (h + 1) & mask",
+                    "code_after": "def probe(h, perturb, mask):\n    return ((5 * h) + 1 + perturb) & mask",
+                },
+                {
+                    "scene_id": 5,
+                    "visual_type": "diagram",
+                    "title": "Memory Indirection Flow",
+                    "spoken_text": "The sparse index array maps directly into dense contiguous entry vectors in memory.",
+                    "nodes": ["Hash Key", "Sparse Slot", "Dense Storage"],
+                },
+                {
+                    "scene_id": 6,
+                    "visual_type": "terminal",
+                    "title": "Memory Footprint Reduction",
+                    "spoken_text": "Compact storage cuts dictionary memory overhead by thirty percent across modern Python applications.",
+                    "code_snippet": "$ python memory_audit.py\nLegacy: 288B\nCompact: 184B",
+                    "terminal_output": "$ python memory_audit.py\nLegacy dict size: 288 bytes\nCompact dict size: 184 bytes\nNet savings: 36.1% reduced RAM",
+                },
+                {
+                    "scene_id": 7,
+                    "visual_type": "code_reveal",
+                    "title": "Dynamic Resizing amortized O(1)",
+                    "spoken_text": "When table fullness exceeds sixty-six percent, the array quadruples to preserve constant lookup guarantees.",
+                    "code_snippet": "def maybe_resize(self):\n    if len(self.entries) * 3 >= len(self.indices) * 2:\n        self._resize(len(self.indices) * 4)",
+                },
+                {
+                    "scene_id": 8,
+                    "visual_type": "comparison",
+                    "spoken_text": "Amortized constant insertion cost ensures rare doubling operations never degrade overall application throughput.",
+                    "problem_label": "Worst Case Resize",
+                    "problem_code": "resize_cost = O(N)",
+                    "solution_label": "Amortized Runtime",
+                    "solution_code": "average_cost = O(1)",
+                },
+                {
+                    "scene_id": 9,
+                    "visual_type": "concept",
+                    "spoken_text": "Mastering low-level data structure layout turns ordinary code into blazing high-performance infrastructure.",
+                    "display_text": "CACHE CONSCIOUS ARCHITECTURE",
+                    "emphasis_word": "layout",
+                },
+                {
+                    "scene_id": 10,
+                    "visual_type": "bento_grid",
+                    "title": "Data Structure Engineering",
+                    "spoken_text": "Hash functions, collision resolution, cache locality, and resize policies comprise the performance pillars.",
+                    "cards": [
+                        {"title": "Uniform Hashing", "description": "Avalanche Distribution"},
+                        {"title": "Open Addressing", "description": "Perturbation Probe"},
+                        {"title": "Dense Packing", "description": "CPU Cache Locality"},
+                        {"title": "Amortized O(1)", "description": "Dynamic Array Doubling"},
+                    ],
+                },
+            ],
+        },
+    },
+}
+
+
+def get_mock_script(topic: str, duration: int, subject: str = "auto") -> Dict[str, Any]:
+    """
+    Returns a rich, pre-validated mock script from the library for offline testing.
+    Falls back gracefully across subjects and durations.
+    """
+    subj = (subject or "math").lower()
+    if subj not in MOCK_SCRIPTS:
+        t = (topic or "").lower()
+        if any(w in t for w in ("quantum", "tunnel", "wave", "schrodinger")):
+            subj = "quantum_physics"
+        elif any(w in t for w in ("circuit", "voltage", "grid", "electrical", "thevenin")):
+            subj = "electrical"
+        elif any(w in t for w in ("beam", "statics", "mechanics", "stress", "force")):
+            subj = "mechanics"
+        elif any(w in t for w in ("sn2", "chemistry", "reaction", "molecule", "chiral")):
+            subj = "chemistry"
+        elif any(w in t for w in ("python", "code", "algorithm", "dict", "hash")):
+            subj = "code"
+        else:
+            subj = "math"
+
+    dur = 60 if duration >= 50 else 35
+    if dur not in MOCK_SCRIPTS[subj]:
+        dur = 35
+
+    import copy
+    script = copy.deepcopy(MOCK_SCRIPTS[subj][dur])
+    if topic:
+        script["title"] = topic.strip()
+    return script

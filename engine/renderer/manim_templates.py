@@ -31,6 +31,7 @@ try:
         SurroundingRectangle,
         ValueTracker,
         always_redraw,
+        VGroup,
         Create,
         Write,
         FadeIn,
@@ -106,6 +107,7 @@ def safe_math_tex(expr: str, **kwargs):
 class ManimEquationMorphScene(Scene):
     """
     Step-by-step formula morphing with smooth variable highlighting and glowing bounding box.
+    Continuously animates across the entire duration with zero frozen frames.
     """
 
     def __init__(
@@ -115,20 +117,22 @@ class ManimEquationMorphScene(Scene):
         title: Optional[str] = None,
         **kwargs,
     ):
-        self.steps = steps or [
-            {"latex": r"\sum_{i} P_{Gi} = P_{\text{load}} + P_{\text{loss}}", "label": "Active Power Balance"},
-            {"latex": r"\frac{\partial C_i}{\partial P_{Gi}} = \lambda", "label": "Optimal Economic Dispatch"},
-        ]
-        self.duration = float(duration)
-        self.title_text = title or "MATHEMATICAL FORMULATION"
         if MANIM_AVAILABLE:
             super().__init__()
+        self.steps = steps or [
+            {"latex": r"\int_{a}^{b} f(x)\,dx = F(b) - F(a)", "label": "Fundamental Theorem of Calculus"},
+            {"latex": r"\frac{d}{dx}\left[ \int_{a}^{x} f(t)\,dt \right] = f(x)", "label": "Inverse Operator Duality"},
+        ]
+        self.scene_duration = max(2.5, float(duration)) + 0.5
+        self.title_text = title or "MATHEMATICAL FORMULATION"
 
     def construct(self):
         curr_mob = None
         curr_label = None
-        n = len(self.steps)
-        time_per_step = max(0.8, (self.duration - 0.6) / max(n, 1))
+        n = max(1, len(self.steps))
+
+        intro_time = min(0.9, self.scene_duration * 0.25)
+        step_time = max(0.8, (self.scene_duration * 0.55) / n)
 
         for idx, step in enumerate(self.steps):
             raw_latex = step.get("latex") or step.get("formula") or ""
@@ -139,31 +143,33 @@ class ManimEquationMorphScene(Scene):
             new_label = Text(label_text, font_size=24, color="#94a3b8").next_to(new_mob, UP, buff=0.55)
 
             if curr_mob is None:
-                self.play(Write(new_mob), FadeIn(new_label), run_time=0.8)
+                self.play(Write(new_mob), FadeIn(new_label), run_time=intro_time)
                 curr_mob = new_mob
                 curr_label = new_label
             else:
                 self.play(
                     ReplacementTransform(curr_mob, new_mob),
                     ReplacementTransform(curr_label, new_label),
-                    run_time=0.8,
+                    run_time=step_time,
                 )
                 curr_mob = new_mob
                 curr_label = new_label
 
-            hold = max(0.1, time_per_step - 0.8)
-            self.wait(hold)
-
-        # Final glowing bounding box
+        # Step 3: Glowing bounding box animation and pulsing highlight sweep across equation
         if curr_mob is not None:
             box = SurroundingRectangle(curr_mob, color="#00f2fe", buff=0.25, corner_radius=0.15)
-            self.play(Create(box), run_time=0.5)
-            self.wait(0.5)
+            pulse_time = max(0.5, self.scene_duration * 0.12)
+            self.play(Create(box), run_time=pulse_time)
+            self.play(box.animate.set_color("#10b981").set_stroke(width=4.5), run_time=pulse_time)
+            remaining = max(0.2, self.scene_duration - (intro_time + step_time * (n - 1) + 2 * pulse_time))
+            self.wait(remaining)
 
 
 class ManimCalculusGraphScene(Scene):
     """
-    Continuous curve with secant-to-tangent slope group and glowing Riemann sum integral convergence.
+    Continuous curve with ValueTracker sweeping x from -2.0 to +2.2.
+    Green Riemann rectangles dynamically accumulate across the curve left-to-right
+    while the orange tangent line + point slide smoothly along the curve across the full duration.
     """
 
     def __init__(
@@ -173,56 +179,217 @@ class ManimCalculusGraphScene(Scene):
         title: str = "CALCULUS • DERIVATIVE & INTEGRAL",
         **kwargs,
     ):
-        self.fn_str = fn_str
-        self.duration = float(duration)
-        self.title_text = title
         if MANIM_AVAILABLE:
             super().__init__()
+        self.fn_str = fn_str or "0.4 * x**2 + 0.2"
+        self.scene_duration = max(2.5, float(duration)) + 0.5
+        self.title_text = title
 
     def construct(self):
         axes = Axes(
             x_range=[-3, 3, 1],
             y_range=[-0.5, 4.5, 1],
             x_length=7.0,
-            y_length=5.8,
+            y_length=5.6,
             axis_config={"color": "#475569"},
         ).to_edge(DOWN, buff=0.7)
 
-        f = lambda x: 0.4 * x**2 + 0.2
+        f = lambda x: 0.4 * (x ** 2) + 0.2
         curve = axes.plot(f, color="#00f2fe", stroke_width=4)
 
         title_mob = Text(self.title_text, font_size=24, color="#94a3b8").to_edge(UP, buff=0.35)
-        curve_label = safe_math_tex(r"f(x) = 0.4x^2 + 0.2", color="#00f2fe", font_size=30).next_to(
+        curve_label = safe_math_tex(r"f(x) = 0.4x^2 + 0.2", color="#00f2fe", font_size=28).next_to(
             title_mob, DOWN, buff=0.2
         )
 
-        self.play(Create(axes), Write(title_mob), Write(curve_label), run_time=0.8)
-        self.play(Create(curve), run_time=0.8)
+        intro_time = min(0.8, self.scene_duration * 0.22)
+        self.play(Create(axes), Write(title_mob), Write(curve_label), Create(curve), run_time=intro_time)
 
-        # Riemann sum rectangles converging to exact integral area
-        rects = axes.get_riemann_rectangles(
-            curve,
-            x_range=[0, 2.5],
-            dx=0.5,
-            color="#10b981",
-            fill_opacity=0.45,
-            stroke_color="#00f2fe",
-            stroke_width=1.5,
+        t_tracker = ValueTracker(-2.0)
+
+        def get_rects():
+            val = t_tracker.get_value()
+            if val <= -1.8:
+                return VGroup()
+            dx = max(0.2, (val - (-2.0)) / 12)
+            return axes.get_riemann_rectangles(
+                curve,
+                x_range=[-2.0, val],
+                dx=dx,
+                color="#10b981",
+                fill_opacity=0.45,
+                stroke_color="#00f2fe",
+                stroke_width=1.5,
+            )
+
+        dynamic_rects = always_redraw(get_rects)
+        dynamic_dot = always_redraw(
+            lambda: Dot(axes.c2p(t_tracker.get_value(), f(t_tracker.get_value())), color="#f59e0b", radius=0.09)
         )
-        self.play(Create(rects), run_time=0.6)
-
-        area = axes.get_area(curve, x_range=[0, 2.5], color=["#10b981", "#00f2fe"], opacity=0.55)
-        self.play(ReplacementTransform(rects, area), run_time=0.6)
-
-        # Tangent slope point
-        t_dot = Dot(axes.c2p(1.5, f(1.5)), color="#f59e0b", radius=0.1)
-        slope_line = axes.get_secant_slope_group(
-            1.5, curve, dx=0.01, secant_line_length=3.0, secant_line_color="#f59e0b"
+        dynamic_tangent = always_redraw(
+            lambda: axes.get_secant_slope_group(
+                t_tracker.get_value(), curve, dx=0.001, secant_line_length=2.6, secant_line_color="#f59e0b"
+            )
         )
-        self.play(FadeIn(t_dot), Create(slope_line), run_time=0.6)
 
-        remaining_time = max(0.4, self.duration - 3.4)
-        self.wait(remaining_time)
+        self.add(dynamic_rects, dynamic_tangent, dynamic_dot)
+
+        sweep_time = max(1.2, self.scene_duration - intro_time - 0.4)
+        self.play(t_tracker.animate.set_value(2.2), run_time=sweep_time, rate_func=linear)
+        self.wait(0.4)
+
+
+class ManimRiemannRefinementScene(Scene):
+    """
+    Second distinct graph scene: Riemann rectangle refinement N = 4 -> N = 8 -> N = 16 -> N = 32
+    converging smoothly to exact definite integral area under f(x) = 1.2 + sin(1.5x).
+    Guarantees Scene 3 and Scene 5 never look identical!
+    """
+
+    def __init__(
+        self,
+        duration: float = 4.0,
+        title: str = "RIEMANN INTEGRAL REFINEMENT • LIMIT AS N → ∞",
+        **kwargs,
+    ):
+        if MANIM_AVAILABLE:
+            super().__init__()
+        self.scene_duration = max(2.5, float(duration)) + 0.5
+        self.title_text = title
+
+    def construct(self):
+        axes = Axes(
+            x_range=[0, 3.5, 1],
+            y_range=[-0.5, 4.5, 1],
+            x_length=7.2,
+            y_length=5.6,
+            axis_config={"color": "#475569"},
+        ).to_edge(DOWN, buff=0.7)
+
+        f = lambda x: 1.2 + np.sin(1.5 * x)
+        curve = axes.plot(f, x_range=[0, 3.2], color="#38bdf8", stroke_width=4)
+
+        title_mob = Text(self.title_text, font_size=23, color="#94a3b8").to_edge(UP, buff=0.35)
+        curve_label = safe_math_tex(
+            r"\lim_{N \to \infty} \sum_{i=1}^N f(x_i^*)\,\Delta x = \int_0^3 f(x)\,dx",
+            color="#38bdf8",
+            font_size=26,
+        ).next_to(title_mob, DOWN, buff=0.2)
+
+        intro_time = min(0.8, self.scene_duration * 0.18)
+        self.play(Create(axes), Write(title_mob), Write(curve_label), Create(curve), run_time=intro_time)
+
+        n_values = [4, 8, 16, 32]
+        step_time = max(0.45, (self.scene_duration - intro_time - 1.2) / len(n_values))
+
+        current_rects = None
+        current_n_label = None
+
+        for n in n_values:
+            dx = 3.0 / n
+            new_rects = axes.get_riemann_rectangles(
+                curve,
+                x_range=[0.0, 3.0],
+                dx=dx,
+                color="#10b981",
+                fill_opacity=0.45,
+                stroke_color="#38bdf8",
+                stroke_width=1.5,
+            )
+            new_label = safe_math_tex(f"N = {n}\\text{{ partitions}}", color="#10b981", font_size=24).to_corner(UP + RIGHT, buff=0.8)
+
+            if current_rects is None:
+                self.play(Create(new_rects), FadeIn(new_label), run_time=step_time)
+            else:
+                self.play(
+                    ReplacementTransform(current_rects, new_rects),
+                    ReplacementTransform(current_n_label, new_label),
+                    run_time=step_time,
+                )
+            current_rects = new_rects
+            current_n_label = new_label
+
+        exact_area = axes.get_area(curve, x_range=[0.0, 3.0], color=["#10b981", "#38bdf8"], opacity=0.6)
+        final_label = safe_math_tex(r"\text{Exact Definite Integral Area}", color="#00f2fe", font_size=22).to_corner(UP + RIGHT, buff=0.8)
+
+        if current_rects is not None:
+            self.play(
+                ReplacementTransform(current_rects, exact_area),
+                ReplacementTransform(current_n_label, final_label),
+                run_time=0.6,
+            )
+        elapsed = intro_time + step_time * len(n_values) + 0.6
+        remaining = max(0.4, self.scene_duration - elapsed)
+        self.wait(remaining)
+
+
+class ManimAntiderivativeBoundsScene(Scene):
+    """
+    Dual stacked curves: f(x) = cos(x) on top vs F(x) = sin(x) on bottom
+    with a synchronized vertical scanning bar connecting slope to accumulated height.
+    """
+
+    def __init__(
+        self,
+        duration: float = 4.0,
+        title: str = "FUNDAMENTAL THEOREM • DUAL STACKED CURVES",
+        **kwargs,
+    ):
+        if MANIM_AVAILABLE:
+            super().__init__()
+        self.scene_duration = max(2.5, float(duration)) + 0.5
+        self.title_text = title
+
+    def construct(self):
+        # Top axes: f(x) = cos(x)
+        top_axes = Axes(
+            x_range=[-0.5, 3.5, 1],
+            y_range=[-1.5, 1.5, 1],
+            x_length=7.0,
+            y_length=2.5,
+            axis_config={"color": "#475569"},
+        ).to_edge(UP, buff=1.0)
+
+        # Bottom axes: F(x) = sin(x)
+        bot_axes = Axes(
+            x_range=[-0.5, 3.5, 1],
+            y_range=[-0.5, 1.5, 1],
+            x_length=7.0,
+            y_length=2.5,
+            axis_config={"color": "#475569"},
+        ).to_edge(DOWN, buff=0.8)
+
+        f_curve = top_axes.plot(lambda x: np.cos(x), x_range=[0, 3.14], color="#00f2fe", stroke_width=3.5)
+        int_curve = bot_axes.plot(lambda x: np.sin(x), x_range=[0, 3.14], color="#10b981", stroke_width=3.5)
+
+        lbl_top = safe_math_tex(r"f(t) = \cos(t)\quad (\text{Rate / Slope})", color="#00f2fe", font_size=22).next_to(top_axes, UP, buff=0.15)
+        lbl_bot = safe_math_tex(r"F(x) = \int_0^x \cos(t)\,dt = \sin(x)\quad (\text{Accumulation})", color="#10b981", font_size=22).next_to(bot_axes, UP, buff=0.15)
+
+        intro_time = min(0.8, self.scene_duration * 0.22)
+        self.play(
+            Create(top_axes), Create(bot_axes),
+            Create(f_curve), Create(int_curve),
+            Write(lbl_top), Write(lbl_bot),
+            run_time=intro_time,
+        )
+
+        scan_tracker = ValueTracker(0.1)
+
+        scanner_top = always_redraw(
+            lambda: Dot(top_axes.c2p(scan_tracker.get_value(), np.cos(scan_tracker.get_value())), color="#f59e0b", radius=0.08)
+        )
+        scanner_bot = always_redraw(
+            lambda: Dot(bot_axes.c2p(scan_tracker.get_value(), np.sin(scan_tracker.get_value())), color="#f59e0b", radius=0.08)
+        )
+        scan_area = always_redraw(
+            lambda: bot_axes.get_area(int_curve, x_range=[0, scan_tracker.get_value()], color="#10b981", opacity=0.45)
+        )
+
+        self.add(scan_area, scanner_top, scanner_bot)
+
+        sweep_time = max(1.2, self.scene_duration - intro_time - 0.4)
+        self.play(scan_tracker.animate.set_value(3.14), run_time=sweep_time, rate_func=linear)
+        self.wait(0.4)
 
 
 class ManimLinearVectorScene(Scene):
@@ -237,11 +404,11 @@ class ManimLinearVectorScene(Scene):
         title: str = "LINEAR TRANSFORMATION & VECTOR FLOW",
         **kwargs,
     ):
-        self.matrix = matrix or [[1.5, 0.5], [0.5, 1.2]]
-        self.duration = float(duration)
-        self.title_text = title
         if MANIM_AVAILABLE:
             super().__init__()
+        self.matrix = matrix or [[1.5, 0.5], [0.5, 1.2]]
+        self.scene_duration = max(2.5, float(duration)) + 0.5
+        self.title_text = title
 
     def construct(self):
         plane = NumberPlane(
@@ -286,7 +453,7 @@ class ManimLinearVectorScene(Scene):
             run_time=1.0,
         )
 
-        remaining_time = max(0.4, self.duration - 3.2)
+        remaining_time = max(0.4, self.scene_duration - 3.2)
         self.wait(remaining_time)
 
 
@@ -302,11 +469,11 @@ class ManimQuantumWaveScene(Scene):
         title: str = "QUANTUM TUNNELING: Ψ(x,t)",
         **kwargs,
     ):
-        self.barrier_x = barrier_x
-        self.duration = float(duration)
-        self.title_text = title
         if MANIM_AVAILABLE:
             super().__init__()
+        self.barrier_x = barrier_x
+        self.scene_duration = max(2.5, float(duration)) + 0.5
+        self.title_text = title
 
     def construct(self):
         axes = Axes(
@@ -365,6 +532,6 @@ class ManimQuantumWaveScene(Scene):
         )
 
         self.add(curve_re, curve_prob)
-        sim_time = max(1.0, self.duration - 1.2)
+        sim_time = max(1.0, self.scene_duration - 1.2)
         self.play(t_track.animate.set_value(2.5), run_time=sim_time, rate_func=linear)
         self.wait(0.4)

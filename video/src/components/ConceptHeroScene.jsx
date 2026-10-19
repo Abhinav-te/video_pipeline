@@ -4,6 +4,12 @@ import { SceneBadge } from './SceneBadge';
 import { DynamicBadgeIcon, SparklesIcon, WarningIcon, LightningIcon, ScaleIcon } from './SvgIcons';
 
 export const resolveConceptMode = (scene) => {
+  const domain = (scene?.domain || scene?.subject || scene?.choreography?.domain || '').toLowerCase();
+  const isNonML = ['math', 'quantum', 'physics', 'electrical', 'mechanic', 'chem'].some((d) => domain.includes(d));
+  if (isNonML) {
+    return 'concept_card';
+  }
+
   const spokenLower = (scene?.spoken_text || scene?.narration || '').toLowerCase();
   const titleLower = (scene?.title || scene?.display_text || '').toLowerCase();
   const textContext = `${spokenLower} ${titleLower}`;
@@ -121,7 +127,8 @@ export const ConceptHeroScene = ({
     <div
       style={{
         width: '960px',
-        height: '1540px',
+        height: '1360px',
+        maxHeight: '1380px',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
@@ -132,18 +139,18 @@ export const ConceptHeroScene = ({
         margin: '0 auto',
       }}
     >
-      {/* 1. TOP HERO TITLE CARD (260px tall) */}
+      {/* 1. TOP HERO TITLE CARD (200px tall - Subtitle Safe-Zone) */}
       <div
         style={{
-          height: '260px',
+          height: '200px',
           backgroundColor: '#111724',
           borderRadius: '24px',
           border: '1.5px solid rgba(245, 158, 11, 0.3)',
           boxShadow: '0 24px 48px -12px rgba(0, 0, 0, 0.8), 0 0 24px rgba(245, 158, 11, 0.14)',
-          padding: '24px 36px',
+          padding: '18px 28px',
           display: 'flex',
           alignItems: 'center',
-          gap: '28px',
+          gap: '24px',
           boxSizing: 'border-box',
           transform: 'none',
         }}
@@ -151,8 +158,8 @@ export const ConceptHeroScene = ({
         {/* Animated Hero SVG Icon Badge */}
         <div
           style={{
-            width: '90px',
-            height: '90px',
+            width: '76px',
+            height: '76px',
             borderRadius: '50%',
             backgroundColor: 'rgba(245, 158, 11, 0.16)',
             border: '2px solid rgba(245, 158, 11, 0.6)',
@@ -163,17 +170,17 @@ export const ConceptHeroScene = ({
             flexShrink: 0,
           }}
         >
-          <DynamicBadgeIcon icon={icon} size={48} color="#f59e0b" />
+          <DynamicBadgeIcon icon={icon} size={42} color="#f59e0b" />
         </div>
 
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span
               style={{
-                fontSize: '22px',
+                fontSize: '20px',
                 fontWeight: 900,
                 color: '#f59e0b',
-                letterSpacing: '3px',
+                letterSpacing: '2.5px',
                 textTransform: 'uppercase',
                 fontFamily: 'monospace',
               }}
@@ -185,7 +192,7 @@ export const ConceptHeroScene = ({
 
           <h1
             style={{
-              fontSize: '48px',
+              fontSize: '40px',
               fontWeight: 900,
               color: '#f8fafc',
               lineHeight: 1.15,
@@ -198,10 +205,10 @@ export const ConceptHeroScene = ({
         </div>
       </div>
 
-      {/* 2. CENTER ANIMATED VISUAL DIAGRAM (780px tall) */}
+      {/* 2. CENTER ANIMATED VISUAL DIAGRAM (680px tall - Subtitle Safe-Zone) */}
       <div
         style={{
-          height: '780px',
+          height: '680px',
           backgroundColor: '#0a0e17',
           borderRadius: '24px',
           border: '1.5px solid rgba(255, 255, 255, 0.12)',
@@ -263,7 +270,6 @@ export const ConceptHeroScene = ({
         </div>
 
         {/* MODE A: HEAD-TO-HEAD SPLIT ARENA (Non-Convex Failure vs Density Victory) */}
-        // Contract: Left: ❌ Fails on Non-Convex: 54% Acc | Right: ✅ Captures Geometry: 99% Acc
         {conceptMode === 'arena' && (
           <div
             style={{
@@ -903,14 +909,14 @@ export const ConceptHeroScene = ({
         )}
       </div>
 
-      {/* 3. BOTTOM 3 KEY TAKEAWAY PILLS (420px tall) */}
+      {/* 3. BOTTOM 3 KEY TAKEAWAY PILLS (380px tall - Subtitle Safe-Zone) */}
       <div
         style={{
-          height: '420px',
+          height: '380px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
-          gap: '14px',
+          gap: '10px',
           boxSizing: 'border-box',
         }}
       >
@@ -924,15 +930,15 @@ export const ConceptHeroScene = ({
             <div
               key={idx}
               style={{
-                height: '124px',
+                height: '112px',
                 backgroundColor: isRevealed ? '#141824' : '#0d1117',
                 border: isRevealed ? `1.5px solid ${activeColor}` : '1px solid rgba(255, 255, 255, 0.1)',
                 boxShadow: isRevealed ? `0 8px 24px rgba(0, 0, 0, 0.6), 0 0 16px ${activeColor}33` : 'none',
-                borderRadius: '18px',
-                padding: '20px 28px',
+                borderRadius: '16px',
+                padding: '14px 22px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '20px',
+                gap: '18px',
                 boxSizing: 'border-box',
                 opacity: isRevealed ? 1 : 0.4,
                 transition: 'all 0.2s ease',

@@ -58,6 +58,7 @@ const ComparisonSnippet = ({
  */
 export const ComparisonScene = ({
   scene,
+  subject,
   words = [],
   sceneStartFrame = 0,
   nextSceneStartTime = null,
@@ -114,25 +115,26 @@ export const ComparisonScene = ({
         border: '1.5px solid rgba(255, 255, 255, 0.12)',
         boxShadow: '0 32px 64px -16px rgba(0, 0, 0, 0.95)',
         width: '960px',
-        height: '1540px',
+        height: '1360px',
+        maxHeight: '1360px',
         overflow: 'hidden',
         boxSizing: 'border-box',
         transform: 'none',
         backfaceVisibility: 'hidden',
         position: 'relative',
-        padding: '32px 32px',
+        padding: '24px 28px',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
       }}
     >
-      {/* 1. TOP EDITORIAL HEADER (160px) */}
+      {/* 1. TOP EDITORIAL HEADER (140px) */}
       <div
         style={{
           display: 'flex',
           flexDirection: 'column',
-          gap: '10px',
-          height: '140px',
+          gap: '8px',
+          height: '130px',
           borderBottom: '1.5px solid rgba(255, 255, 255, 0.08)',
           boxSizing: 'border-box',
         }}
@@ -161,7 +163,7 @@ export const ComparisonScene = ({
 
         <div
           style={{
-            fontSize: '48px',
+            fontSize: '44px',
             fontWeight: 900,
             color: '#ffffff',
             fontFamily: 'sans-serif',
@@ -173,14 +175,14 @@ export const ComparisonScene = ({
         </div>
       </div>
 
-      {/* 2. STAGGERED PROBLEM VS SOLUTION CARDS (920px) */}
+      {/* 2. STAGGERED PROBLEM VS SOLUTION CARDS (760px) */}
       <div
         style={{
-          height: '920px',
+          height: '760px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
-          gap: '24px',
+          gap: '18px',
           boxSizing: 'border-box',
         }}
       >
@@ -302,6 +304,7 @@ export const ComparisonScene = ({
       {/* 3. BOTTOM BENCHMARK / DOMAIN SUMMARY CARD (380px) */}
       {(() => {
         const domain = (
+          subject ||
           scene?.subject ||
           scene?.domain ||
           scene?.choreography?.domain ||
@@ -311,51 +314,82 @@ export const ComparisonScene = ({
 
         const textLower = `${scene?.title || ''} ${scene?.display_text || ''} ${scene?.spoken_text || ''} ${problemLabel} ${solutionLabel}`.toLowerCase();
 
+        const isCode = domain.includes('code') || domain.includes('algo') || domain.includes('soft') || textLower.includes('complexity') || textLower.includes('hash table');
+        const isMath = domain.includes('math') || domain.includes('calc') || textLower.includes('calculus') || textLower.includes('integral') || textLower.includes('derivative') || textLower.includes('riemann') || textLower.includes('euler') || textLower.includes('partition');
         const isChemistry = domain.includes('chem') || textLower.includes('sn1') || textLower.includes('sn2') || textLower.includes('reaction');
         const isQuantum = domain.includes('quantum') || textLower.includes('schrodinger') || textLower.includes('tunneling') || textLower.includes('heisenberg') || textLower.includes('wavepacket');
         const isPhysicsOrMechanics = domain.includes('mechanic') || domain.includes('physics') || textLower.includes('beam') || textLower.includes('equilibrium') || textLower.includes('inclined plane') || textLower.includes('axle') || textLower.includes('newton');
         const isElectrical = domain.includes('electr') || textLower.includes('thevenin') || textLower.includes('kvl') || textLower.includes('smart grid') || textLower.includes('circuit');
+        const isML = domain.includes('ml') || textLower.includes('cluster') || textLower.includes('centroid') || textLower.includes('dbscan') || textLower.includes('kmeans');
 
-        let footerTitle = 'ASYMPTOTIC COMPLEXITY ANALYSIS';
-        let defaultLeftLabel = leftSide?.tag ? 'BASELINE CHARACTERISTIC' : 'TIME COMPLEXITY';
-        let defaultLeftMetric = leftSide?.metric || 'O(n²) Quadratic';
-        let defaultRightLabel = rightSide?.tag ? 'OPTIMIZED CHARACTERISTIC' : 'OPTIMIZED RUNTIME';
-        let defaultRightMetric = rightSide?.metric || 'O(n) Linear';
-        let defaultSummary = scene?.speedup || (rightSide?.metric ? `Outcome: ${rightSide.metric}` : 'Speedup: 1,000x on 100,000 elements');
-        let defaultTag = leftSide?.tag && rightSide?.tag ? `${leftSide.tag} VS ${rightSide.tag}` : 'SPACE: O(n)';
+        // Derive labels dynamically from leftSide / rightSide cards if provided
+        const leftTag = leftSide?.tag ? `${leftSide.tag.toUpperCase()}` : '';
+        const rightTag = rightSide?.tag ? `${rightSide.tag.toUpperCase()}` : '';
 
-        if (isChemistry) {
+        let footerTitle = 'MATHEMATICAL DUALITY & BOUNDS';
+        let defaultLeftLabel = leftTag || 'DISCRETE FORMULATION';
+        let defaultLeftMetric = leftSide?.metric || 'Σ f(x_i) Δx (Partition)';
+        let defaultRightLabel = rightTag || 'CONTINUOUS LIMIT';
+        let defaultRightMetric = rightSide?.metric || '∫ f(x) dx (Antiderivative)';
+        let defaultSummary = 'KEY TAKEAWAY: Infinite refinement transforms discrete sums into exact continuous antiderivatives';
+        let defaultTag = leftTag && rightTag ? `${leftTag} VS ${rightTag}` : 'FUNDAMENTAL THEOREM';
+
+        if (isCode) {
+          footerTitle = 'ASYMPTOTIC COMPLEXITY ANALYSIS';
+          defaultLeftLabel = leftTag || 'TIME COMPLEXITY';
+          defaultLeftMetric = leftSide?.metric || 'O(n²) Quadratic';
+          defaultRightLabel = rightTag || 'OPTIMIZED RUNTIME';
+          defaultRightMetric = rightSide?.metric || 'O(n) Linear';
+          defaultSummary = scene?.speedup || (rightSide?.metric ? `Outcome: ${rightSide.metric}` : 'Speedup: 1,000x on 100,000 elements');
+          defaultTag = leftTag && rightTag ? `${leftTag} VS ${rightTag}` : 'SPACE: O(n)';
+        } else if (isChemistry) {
           footerTitle = 'RATE LAW CONTRAST & STEREOCHEMISTRY';
-          defaultLeftLabel = '2ND ORDER (CONCERTED)';
+          defaultLeftLabel = leftTag || '2ND ORDER (CONCERTED)';
           defaultLeftMetric = leftSide?.metric || 'Rate = k[R-X][Nu⁻]';
-          defaultRightLabel = '1ST ORDER (IONIZATION)';
+          defaultRightLabel = rightTag || '1ST ORDER (IONIZATION)';
           defaultRightMetric = rightSide?.metric || 'Rate = k[R-X]';
           defaultSummary = 'KEY TAKEAWAY: Substrate hindrance determines whether concerted SN2 or carbocation SN1 dominates';
-          defaultTag = 'STEREO: INVERSION VS RACEMIC';
+          defaultTag = leftTag && rightTag ? `${leftTag} VS ${rightTag}` : 'STEREO: INVERSION VS RACEMIC';
         } else if (isQuantum) {
           footerTitle = 'CANONICAL COMMUTATION & UNCERTAINTY';
-          defaultLeftLabel = 'COMMUTATION RELATION';
+          defaultLeftLabel = leftTag || 'COMMUTATION RELATION';
           defaultLeftMetric = leftSide?.metric || '[x̂, p̂] = iℏ';
-          defaultRightLabel = 'UNCERTAINTY BOUND';
+          defaultRightLabel = rightTag || 'UNCERTAINTY BOUND';
           defaultRightMetric = rightSide?.metric || 'Δx·Δp ≥ ℏ/2';
           defaultSummary = 'KEY TAKEAWAY: Wavefunction superposition enables quantum tunneling through classical barriers';
-          defaultTag = 'UNCERTAINTY BOUND: Δx·Δp ≥ ℏ/2';
+          defaultTag = leftTag && rightTag ? `${leftTag} VS ${rightTag}` : 'UNCERTAINTY BOUND: Δx·Δp ≥ ℏ/2';
         } else if (isPhysicsOrMechanics) {
           footerTitle = 'EQUILIBRIUM & CONSERVATION LAWS';
-          defaultLeftLabel = 'EQUILIBRIUM CONDITION';
+          defaultLeftLabel = leftTag || 'EQUILIBRIUM CONDITION';
           defaultLeftMetric = leftSide?.metric || 'ΣF_x = 0, ΣF_y = 0, Στ = 0';
-          defaultRightLabel = 'CONSERVATION PRINCIPLE';
+          defaultRightLabel = rightTag || 'CONSERVATION PRINCIPLE';
           defaultRightMetric = rightSide?.metric || 'E_mech = K + U = const';
           defaultSummary = 'KEY TAKEAWAY: Resolving equilibrium reactions eliminates structural collapse risks';
-          defaultTag = 'CONSERVATION: MECHANICAL ENERGY';
+          defaultTag = leftTag && rightTag ? `${leftTag} VS ${rightTag}` : 'CONSERVATION: MECHANICAL ENERGY';
         } else if (isElectrical) {
           footerTitle = 'NETWORK EQUIVALENCE & POWER FLOW';
-          defaultLeftLabel = 'THÉVENIN EQUIVALENCE';
+          defaultLeftLabel = leftTag || 'THÉVENIN EQUIVALENCE';
           defaultLeftMetric = leftSide?.metric || 'V_th = V_oc, R_th = V_oc / I_sc';
-          defaultRightLabel = 'POWER CONSERVATION';
+          defaultRightLabel = rightTag || 'POWER CONSERVATION';
           defaultRightMetric = rightSide?.metric || 'ΣP_gen = ΣP_load + P_loss';
           defaultSummary = 'KEY TAKEAWAY: Linear network reduction simplifies multi-bus OPF solver complexity by 100x';
-          defaultTag = 'POWER FLOW: ΣP_gen = ΣP_load + P_loss';
+          defaultTag = leftTag && rightTag ? `${leftTag} VS ${rightTag}` : 'POWER FLOW: ΣP_gen = ΣP_load + P_loss';
+        } else if (isML) {
+          footerTitle = 'LATENT MANIFOLD & GEOMETRY';
+          defaultLeftLabel = leftTag || 'HIGH-DIM RAW SPACE';
+          defaultLeftMetric = leftSide?.metric || 'd = 512 (Euclidean)';
+          defaultRightLabel = rightTag || 'LATENT EMBEDDING';
+          defaultRightMetric = rightSide?.metric || 'd = 2 (Non-linear)';
+          defaultSummary = 'KEY TAKEAWAY: Manifold learning preserves topological neighborhoods across complex distributions';
+          defaultTag = leftTag && rightTag ? `${leftTag} VS ${rightTag}` : 'TOPOLOGY: NEIGHBORHOOD';
+        } else if (!isMath) {
+          footerTitle = 'COMPARATIVE REGIME ANALYSIS';
+          defaultLeftLabel = leftTag || (leftSide?.title ? `${leftSide.title.toUpperCase()}` : 'BASELINE APPROACH');
+          defaultLeftMetric = leftSide?.metric || 'Standard Model';
+          defaultRightLabel = rightTag || (rightSide?.title ? `${rightSide.title.toUpperCase()}` : 'OPTIMIZED APPROACH');
+          defaultRightMetric = rightSide?.metric || 'Refined Model';
+          defaultSummary = `KEY TAKEAWAY: Evaluating trade-offs between ${leftSide?.tag || 'baseline'} and ${rightSide?.tag || 'optimized'}`;
+          defaultTag = leftTag && rightTag ? `${leftTag} VS ${rightTag}` : 'ANALYSIS';
         }
 
         let rawSummary = typeof scene?.comparison_footer === 'string'

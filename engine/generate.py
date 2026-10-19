@@ -9,6 +9,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import uuid
 from pathlib import Path
@@ -21,7 +22,7 @@ if str(REPO_DIR) not in sys.path:
     sys.path.insert(0, str(REPO_DIR))
 
 from director.script import generate_script
-from validation import validate_script_plan
+from validation import validate_script_plan, write_reflection_error, auto_heal_timeline_payload
 from audio.tts_whisper import generate_voice, extract_word_timings
 from timeline.beats import (
     align_timeline,
@@ -261,7 +262,19 @@ def build_spoken_text(script):
 # Stage Execution
 # ---------------------------------------------------------------------------
 
-def generate_or_load_script(topic, duration, no_cache=False, subject="auto"):
+def generate_or_load_script(topic, duration, no_cache=False, subject="auto", mock=False):
+    if mock:
+        stage_start("DIRECTOR", f"Loading pre-validated mock script for topic='{topic}', subject='{subject}', length={duration}s")
+        from director.mock_library import get_mock_script
+        script = get_mock_script(topic=topic, duration=duration, subject=subject)
+        stage_success("DIRECTOR", f"Loaded mock script ({len(script.get('scenes', []))} scenes)")
+        stage_start("VALIDATION", f"Validating mock script ({len(script.get('scenes', []))} scenes)")
+        is_valid, errors = validate_script_plan(script)
+        if not is_valid:
+            stage_error("VALIDATION", f"Mock script failed validation: {errors}")
+        stage_success("VALIDATION", f"Mock script validation passed ({len(script.get('scenes', []))} scenes)")
+        return script
+
     if not no_cache:
         cached = load_script_cache(topic, duration, subject=subject)
 
@@ -342,7 +355,7 @@ async def generate_audio(text, audio_file: Path):
     stage_start("AUDIO", f"Generating Edge-TTS narration ({len(text.split())} words)")
 
     try:
-        await generate_voice(text, str(audio_file))
+        await generate_voice(text, str(audio_file), allow_offline_fallback=True)
     except Exception as exc:
         stage_error("AUDIO", f"Edge-TTS generation failed:\n{exc}")
 
@@ -355,9 +368,24 @@ async def generate_audio(text, audio_file: Path):
     if audio_file.stat().st_size == 0:
         stage_error("AUDIO", "Generated audio file is empty.")
 
+    # ffprobe audio header and duration verification
+    try:
+        cmd = [
+            "ffprobe", "-v", "error",
+            "-show_entries", "format=duration:stream=codec_name",
+            "-of", "json", str(audio_file)
+        ]
+        probe_res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        probe_meta = json.loads(probe_res.stdout)
+        dur = float(probe_meta.get("format", {}).get("duration", 0.0))
+        if dur <= 0:
+            stage_error("AUDIO", f"ffprobe verified duration is non-positive ({dur}s).")
+    except Exception as exc:
+        stage_error("AUDIO", f"ffprobe audio header verification failed: {exc}")
+
     stage_success(
         "AUDIO",
-        f"Audio generated: {audio_file.name} ({audio_file.stat().st_size:,} bytes)"
+        f"Audio generated: {audio_file.name} ({dur:.2f}s, {audio_file.stat().st_size:,} bytes)"
     )
 
 
@@ -465,6 +493,11 @@ def build_final_payload(script, timed_scenes, words, run_id: str):
 def write_data_file(payload, data_file: Path):
     data_file.parent.mkdir(parents=True, exist_ok=True)
 
+    # Apply deterministic auto-healing on timing & monotonicity bounds
+    payload, was_healed = auto_heal_timeline_payload(payload)
+    if was_healed:
+        log("🩹 Applied deterministic auto-healing to timeline payload before write.")
+
     # Write atomically so Remotion never sees half-written JSON.
     temp_file = data_file.with_suffix(".tmp")
 
@@ -550,6 +583,12 @@ def main():
     )
 
     parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="Bypass Gemini API calls and load pre-validated mock script from mock library.",
+    )
+
+    parser.add_argument(
         "--index",
         type=int,
         default=None,
@@ -570,11 +609,11 @@ def main():
     # Environment check
     # ---------------------------------------------------------------
 
-    if not os.getenv("GEMINI_API_KEY") and not os.getenv("GEMINI_API_KEYS"):
+    if not args.mock and not os.getenv("GEMINI_API_KEY") and not os.getenv("GEMINI_API_KEYS"):
         stage_error(
             "DIRECTOR",
             "GEMINI_API_KEY environment variable is not set.\n\n"
-            "Set it before running the engine, for example:\n"
+            "Set it before running the engine, or pass --mock for offline mode.\n"
             "export GEMINI_API_KEY='YOUR_KEY'"
         )
 
@@ -595,6 +634,7 @@ def main():
     print(f"Topic:    {topic}")
     print(f"Subject:  {args.subject}")
     print(f"Length:   {args.length}s")
+    print(f"Mode:     {'MOCK (OFFLINE)' if args.mock else 'LIVE API'}")
     print(f"Cache:    {'DISABLED' if args.no_cache else 'ENABLED'}")
     print(f"Run Dir:  {run_dir}")
     print("=" * 70)
@@ -616,6 +656,7 @@ def main():
             duration=args.length,
             no_cache=args.no_cache,
             subject=args.subject,
+            mock=args.mock,
         )
 
         # ---------------------------------------------------------------
@@ -639,23 +680,23 @@ def main():
         timed_scenes, words = generate_timeline(script, audio_file)
 
         # ---------------------------------------------------------------
-        # Step 4.5 — Stage 4.5 Manim Sub-Renderer Bridge
+        # Step 4.5 — Stage 4.5 Headless Manim Pre-Compiler Bridge
         # ---------------------------------------------------------------
 
         enable_manim = not getattr(args, "no_manim", False)
         try:
             try:
-                from engine.renderer.manim_bridge import render_manim_clips_for_timeline
+                from engine.renderer.manim_compiler import compile_manim_scenes
             except ModuleNotFoundError:
-                from renderer.manim_bridge import render_manim_clips_for_timeline
-            timed_scenes = render_manim_clips_for_timeline(
+                from renderer.manim_compiler import compile_manim_scenes
+            timed_scenes = compile_manim_scenes(
                 timed_scenes,
                 run_dir=run_dir,
                 enable_manim=enable_manim,
-                max_clips=2,
+                max_clips=5,
             )
         except Exception as exc:
-            log(f"[MANIM:WARN] Manim sub-renderer encountered an unexpected error: {exc}. Continuing with Remotion SVG fallbacks.")
+            log(f"[MANIM:WARN] Manim compiler encountered an unexpected error: {exc}. Continuing with Remotion SVG fallbacks.")
 
         # ---------------------------------------------------------------
         # Step 5 — Final JSON Payload & Atomic Write
@@ -709,7 +750,8 @@ def main():
                 f"Expected: {expected_audio_rel!r}\n"
                 f"Got:      {verification_data.get('audio_file')!r}"
             )
-    except BaseException:
+    except BaseException as exc:
+        write_reflection_error(run_dir, stage="GENERATION", message=str(exc))
         cleanup_run_artifacts(run_dir)
         raise
 

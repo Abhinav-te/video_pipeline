@@ -1,5 +1,5 @@
 import React from 'react';
-import { OffthreadVideo, staticFile, useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
+import { Sequence, OffthreadVideo, staticFile, useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
 import { SceneBadge } from './SceneBadge';
 import { GraphIcon, SparklesIcon } from './SvgIcons';
 
@@ -164,6 +164,7 @@ function generateQuantumWavePath(toScreenX, toScreenY) {
 export const GraphScene = ({
   scene,
   sceneStartFrame = 0,
+  sceneDurationFrames = 150,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -333,26 +334,26 @@ export const GraphScene = ({
         border: `1.5px solid ${palette.border}`,
         boxShadow: `0 32px 64px -16px rgba(0, 0, 0, 0.95), 0 0 40px ${palette.glow}`,
         width: '960px',
-        height: isSpotlight ? '1260px' : '1540px',
-        minHeight: isSpotlight ? '1260px' : '1540px',
+        height: isSpotlight ? '1260px' : '1360px',
+        maxHeight: '1380px',
         overflow: 'hidden',
         boxSizing: 'border-box',
         transform: 'none',
         backfaceVisibility: 'hidden',
         position: 'relative',
-        padding: '32px 32px',
+        padding: '24px 28px',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
       }}
     >
-      {/* 1. TOP EDITORIAL HEADER (200px) */}
+      {/* 1. TOP EDITORIAL HEADER (170px) */}
       <div
         style={{
           display: 'flex',
           flexDirection: 'column',
-          gap: '12px',
-          height: '200px',
+          gap: '10px',
+          height: '170px',
           borderBottom: '1.5px solid rgba(255, 255, 255, 0.08)',
           boxSizing: 'border-box',
         }}
@@ -396,7 +397,7 @@ export const GraphScene = ({
         <div>
           <div
             style={{
-              fontSize: '48px',
+              fontSize: '44px',
               fontWeight: 900,
               color: '#ffffff',
               fontFamily: 'sans-serif',
@@ -406,16 +407,16 @@ export const GraphScene = ({
           >
             {title}
           </div>
-          <div style={{ fontSize: '23px', color: '#94a3b8', marginTop: '4px', fontStyle: 'italic' }}>
+          <div style={{ fontSize: '22px', color: '#94a3b8', marginTop: '4px', fontStyle: 'italic' }}>
             {subtitle}
           </div>
         </div>
       </div>
 
-      {/* 2. CENTER 2D CARTESIAN CANVAS (840px / 960px) */}
+      {/* 2. CENTER 2D CARTESIAN CANVAS (780px / 960px) */}
       <div
         style={{
-          height: isSpotlight ? '960px' : '840px',
+          height: isSpotlight ? '960px' : '780px',
           backgroundColor: '#0a101b',
           borderRadius: '22px',
           border: '1.5px solid rgba(255, 255, 255, 0.08)',
@@ -430,11 +431,13 @@ export const GraphScene = ({
       >
         {scene?.manim_video_src ? (
           <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-            <OffthreadVideo
-              src={staticFile(scene.manim_video_src)}
-              muted
-              style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '20px' }}
-            />
+            <Sequence from={sceneStartFrame} durationInFrames={sceneDurationFrames} layout="none">
+              <OffthreadVideo
+                src={staticFile(scene.manim_video_src)}
+                muted
+                style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '20px' }}
+              />
+            </Sequence>
             <div
               style={{
                 position: 'absolute',
@@ -830,16 +833,16 @@ export const GraphScene = ({
         )}
       </div>
 
-      {/* 3. BOTTOM DOMAIN BREAKDOWN CARD / BOTTOM CALCULUS BREAKDOWN CARD (420px) - Hidden in canvas_spotlight mode */}
+      {/* 3. BOTTOM DOMAIN BREAKDOWN CARD / BOTTOM CALCULUS BREAKDOWN CARD (350px) - Hidden in canvas_spotlight mode */}
       {!isSpotlight && (
         <div
           style={{
-            height: '420px',
+            height: '350px',
             backgroundColor: '#161b22',
             borderRadius: '22px',
             border: `1.5px solid ${palette.border}`,
             boxShadow: '0 16px 32px rgba(0, 0, 0, 0.6)',
-            padding: '28px 32px',
+            padding: '20px 24px',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',

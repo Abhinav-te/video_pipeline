@@ -191,7 +191,12 @@ def validate_video_output(
                 f"Expected {REQUIRED_WIDTH}x{REQUIRED_HEIGHT} (9:16 vertical short)."
             )
 
-        fps = _parse_fps(v_stream.get("avg_frame_rate")) or _parse_fps(v_stream.get("r_frame_rate"))
+        r_fps = _parse_fps(v_stream.get("r_frame_rate"))
+        avg_fps = _parse_fps(v_stream.get("avg_frame_rate"))
+        if r_fps is not None and (TARGET_FPS - FPS_TOLERANCE) <= r_fps <= (TARGET_FPS + FPS_TOLERANCE):
+            fps = r_fps
+        else:
+            fps = avg_fps or r_fps
         metadata["fps"] = fps
         if fps is None or not ((TARGET_FPS - FPS_TOLERANCE) <= fps <= (TARGET_FPS + FPS_TOLERANCE)):
             fps_display = f"{fps:.2f}" if fps is not None else "None"

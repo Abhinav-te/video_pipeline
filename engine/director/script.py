@@ -78,15 +78,49 @@ def _get_client(api_key):
     return _clients[api_key]
 
 
+import pydantic
+from typing import List, Optional, Dict, Any
+
+
+class ScenePlanModel(pydantic.BaseModel):
+    scene_id: int
+    title: str
+    spoken_text: str
+    visual_type: str
+    display_text: Optional[str] = None
+    emphasis_word: Optional[str] = None
+    sub_mode: Optional[str] = None
+    formula: Optional[str] = None
+    latex: Optional[str] = None
+    functions: Optional[List[str]] = None
+    curves: Optional[List[str]] = None
+    steps: Optional[List[Dict[str, Any]]] = None
+    equations: Optional[List[Dict[str, Any]]] = None
+    problem_code: Optional[str] = None
+    solution_code: Optional[str] = None
+    problem_label: Optional[str] = None
+    solution_label: Optional[str] = None
+    manim_spec: Optional[Dict[str, Any]] = None
+
+
+class DirectorScriptPlanModel(pydantic.BaseModel):
+    topic: str
+    title: str
+    subject: str
+    duration: float
+    scenes: List[ScenePlanModel]
+
+
 # GEMINI_MODEL can be a single model or a comma-separated fallback chain,
-# e.g. GEMINI_MODEL="gemini-3.8-flash,gemini-3.7-flash,gemini-3.5-flash"
+# e.g. GEMINI_MODEL="gemini-3.8-flash,gemini-3.7-flash,gemini-3.5-flash,gemini-2.5-flash,gemini-2.0-flash,gemini-2.5-pro"
 # Active verified v1beta models discovered via client.models.list()
 DEFAULT_MODEL_CHAIN = [
-    "gemini-3.8-flash",       # Primary: Latest 3.8 Flash model
-    "gemini-3.7-flash",       # Fallback 1: High-capacity 3.7 Flash
-    "gemini-3.5-flash",       # Fallback 2: Stable 3.5 Flash
-    "gemini-3.5-flash-lite",  # Fallback 3: Cost-effective 3.5 Flash Lite
-    "gemini-3.1-flash-lite",  # Fallback 4: Ultra-fast 3.1 Flash Lite
+    "gemini-3.8-flash",
+    "gemini-3.7-flash",
+    "gemini-3.5-flash",
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-2.5-pro",
 ]
 
 
@@ -183,15 +217,17 @@ def _is_404_error(exc: Exception) -> bool:
     code = getattr(exc, "code", None) or getattr(exc, "status_code", None)
     if code == 404:
         return True
-    msg = str(exc)
-    return "404" in msg or "not_found" in msg.lower() or "not found" in msg.lower()
+    msg = str(exc).lower()
+    return "404" in msg or "not_found" in msg or "not found" in msg
 
 
 def _is_invalid_key_error(exc: Exception) -> bool:
     """Detects invalid API key errors (e.g. API_KEY_INVALID, 400 Bad Request on key)."""
+    code = getattr(exc, "code", None) or getattr(exc, "status_code", None)
     msg = str(exc).lower()
     return (
-        "api_key_invalid" in msg
+        (code == 400 and any(k in msg for k in ["key", "api_key", "invalid", "credential"]))
+        or "api_key_invalid" in msg
         or "api key not valid" in msg
         or "invalid api key" in msg
         or "api key expired" in msg
@@ -315,7 +351,7 @@ def get_system_prompt(duration, subject="code"):
 
     elif subject == "mechanics":
         domain_desc = "educational short on Advanced Mechanics, Weight Distribution, and Structural Statics"
-        beat_types = """AVAILABLE BEAT TYPES:
+        beat_types = r"""AVAILABLE BEAT TYPES:
 - "fullscreen_text": High-impact engineering hook or equilibrium principle. Uses "display_text".
 - "mechanics_fbd": Step-by-step free-body diagram and equilibrium solver. Uses "sub_mode" ("beam_weight_distribution" | "inclined_plane_fbd" | "axle_center_of_mass"), "beam_length_m", "point_load_kn", "ramp_angle_deg", "friction_coeff", "wheelbase_m".
 - "math_equation": Statics and torque equilibrium derivations (e.g. \Sigma F = 0, \Sigma \tau = 0). Uses "steps" or "equations".
@@ -390,6 +426,7 @@ def _call_model(client, model, contents, prompt, max_retries=2):
                 config=types.GenerateContentConfig(
                     system_instruction=prompt,
                     response_mime_type="application/json",
+                    response_schema=DirectorScriptPlanModel,
                     http_options=types.HttpOptions(timeout=30000),
                 ),
             )

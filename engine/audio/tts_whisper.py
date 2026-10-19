@@ -129,10 +129,32 @@ def verify_audio_file(audio_path: str) -> Tuple[bool, Optional[str]]:
         return False, f"Audio verification error: {e}"
 
 
-async def generate_voice(text: str, output_file: str, max_retries: int = 3) -> None:
+os.environ.setdefault("TRITON_CACHE_DIR", "/tmp/.triton")
+
+
+def generate_voice_offline_fallback(text: str, output_file: str) -> None:
+    """Offline fallback voice synthesis using espeak-ng and ffmpeg when network is unavailable."""
+    out_path = Path(output_file)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    temp_wav = out_path.with_suffix(".temp.wav")
+    try:
+        # Run espeak-ng to generate wav
+        subprocess.run(["espeak-ng", "-s", "155", text, "-w", str(temp_wav)], check=True, capture_output=True)
+        # Convert wav to mp3 with ffmpeg (guarantee >= 24000Hz standard broadcast sample rate)
+        subprocess.run(["ffmpeg", "-y", "-i", str(temp_wav), "-ar", "44100", str(out_path)], check=True, capture_output=True)
+        valid, err = verify_audio_file(str(out_path))
+        if not valid:
+            raise RuntimeError(f"Offline audio verification failed: {err}")
+        print(f"[AUDIO:OFFLINE] 🎙️ Synthesized offline narration audio via espeak-ng -> {out_path.name}", flush=True)
+    finally:
+        if temp_wav.exists():
+            temp_wav.unlink(missing_ok=True)
+
+
+async def generate_voice(text: str, output_file: str, max_retries: int = 3, allow_offline_fallback: bool = False) -> None:
     """
     Generates the TTS MP3 using Microsoft Edge TTS with backoff retries and
-    immediate playability verification.
+    immediate playability verification, with seamless offline espeak-ng failover.
     """
     voice = os.getenv("EDGE_TTS_VOICE", "en-US-ChristopherNeural")
     out_path = Path(output_file)
@@ -158,6 +180,13 @@ async def generate_voice(text: str, output_file: str, max_retries: int = 3) -> N
                 except OSError:
                     pass
 
+            # If name resolution or network unreachable, immediately fallback to offline
+            msg = str(e).lower()
+            if allow_offline_fallback and any(k in msg for k in ("name resolution", "cannot connect", "network is unreachable", "connection refused")):
+                print(f"[AUDIO:OFFLINE] ⚠️ Network unavailable ({e}). Falling back to offline voice engine...", flush=True)
+                generate_voice_offline_fallback(text, output_file)
+                return
+
             if attempt + 1 < max_retries:
                 wait_time = 2 ** attempt  # 1s, 2s, 4s
                 print(
@@ -167,9 +196,19 @@ async def generate_voice(text: str, output_file: str, max_retries: int = 3) -> N
                 )
                 await asyncio.sleep(wait_time)
 
-    raise RuntimeError(
-        f"Edge-TTS synthesis failed after {max_retries} attempts. Last error: {last_err}"
-    )
+    # If all retries exhausted, attempt offline fallback before giving up
+    if allow_offline_fallback:
+        try:
+            print("[AUDIO:OFFLINE] ⚠️ Edge-TTS exhausted all retries. Falling back to offline voice engine...", flush=True)
+            generate_voice_offline_fallback(text, output_file)
+            return
+        except Exception as off_exc:
+            raise RuntimeError(
+                f"Edge-TTS synthesis failed after {max_retries} attempts ({last_err}), "
+                f"and offline fallback failed ({off_exc})."
+            )
+
+    raise RuntimeError(f"Edge-TTS synthesis failed after {max_retries} attempts ({last_err}).")
 
 
 def merge_hyphenated_tokens(words: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

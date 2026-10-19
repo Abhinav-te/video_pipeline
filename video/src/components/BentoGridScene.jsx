@@ -7,7 +7,7 @@ import { SparklesIcon, LayersIcon } from './SvgIcons';
  * Animated SVG Mini-Visualization for Bento Cards
  * Large 180px canvases with rich multi-stage animations.
  */
-const MiniCanvas = ({ algoType, cardIndex = 0, isHighlighted, frame }) => {
+const MiniCanvas = ({ algoType, cardIndex = 0, isHighlighted, frame, domain = '' }) => {
   const normType = (algoType || '').toLowerCase();
 
   // K-Means: animated colored point clusters with moving X centroids
@@ -491,100 +491,395 @@ const MiniCanvas = ({ algoType, cardIndex = 0, isHighlighted, frame }) => {
     );
   }
 
-  // 4 Distinct Mini-SVGs for Bento Cards when specialized algorithms are not active
+  // 4 Distinct Domain-Aware Mini-SVGs for Bento Cards
   const slot = Math.abs(cardIndex || 0) % 4;
+  const normDomain = (domain || '').toLowerCase();
+  const isMathDomain = normDomain.includes('math') || normType.includes('limit') || normType.includes('integral') || normType.includes('riemann') || normType.includes('taylor') || normType.includes('curv') || normType.includes('extrema') || normType.includes('secant') || normType.includes('derivative');
+  const isQuantumDomain = normDomain.includes('quantum') || normType.includes('schrodinger') || normType.includes('tunnel') || normType.includes('heisenberg') || normType.includes('dirac');
+  const isMechanicsDomain = normDomain.includes('mechanic') || normType.includes('equilibrium') || normType.includes('torque') || normType.includes('shear') || normType.includes('axle') || normType.includes('truss');
+  const isElectricalDomain = normDomain.includes('electr') || normType.includes('kcl') || normType.includes('thevenin') || normType.includes('dispatch') || normType.includes('opf');
 
-  if (slot === 0) {
-    // Card 0: Animated Node/Network Loop or Vector Diagram SVG
-    const loopOffset = (frame * 2.5) % 40;
-    const pulseNode = 1 + Math.sin(frame * 0.12) * 0.1;
-    return (
-      <svg width="100%" height="180" viewBox="0 0 380 180">
-        <rect x="50" y="30" width="280" height="120" rx="18" fill="none" stroke="#00f0ff" strokeWidth="2.5" strokeDasharray="10 6" strokeDashoffset={-loopOffset} />
-        <g transform={`translate(190, 90) scale(${pulseNode}) translate(-190, -90)`}>
-          <circle cx="190" cy="90" r="22" fill="rgba(0, 240, 255, 0.2)" stroke="#00f0ff" strokeWidth="3" />
-          <circle cx="190" cy="90" r="10" fill="#00f0ff" />
-        </g>
-        <polygon points="175,25 195,30 175,35" fill="#00f0ff" />
-        <polygon points="205,145 185,150 205,155" fill="#00f0ff" />
-        <text x="190" y="22" fill="#00f0ff" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
-          CURRENT LOOP I₁ →
-        </text>
-        <circle cx="90" cy="90" r="6" fill="#34d399" />
-        <circle cx="290" cy="90" r="6" fill="#34d399" />
-        <line x1="90" y1="90" x2="168" y2="90" stroke="#34d399" strokeWidth="2.5" strokeDasharray="4 4" />
-        <line x1="212" y1="90" x2="290" y2="90" stroke="#34d399" strokeWidth="2.5" strokeDasharray="4 4" />
-        <text x="190" y="130" fill="#cbd5e1" fontSize="14" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
-          NODE CONSERVATION ΣI = 0
-        </text>
-      </svg>
-    );
-  }
-
-  if (slot === 1) {
-    // Card 1: Animated Dual-Terminal / Wave / Equilibrium Balance SVG
-    const oscWave = Math.sin(frame * 0.1) * 12;
-    return (
-      <svg width="100%" height="180" viewBox="0 0 380 180">
-        <circle cx="85" cy="85" r="26" fill="rgba(56, 189, 248, 0.15)" stroke="#38bdf8" strokeWidth="2.5" />
-        <text x="85" y="92" fill="#38bdf8" fontSize="17" fontWeight="bold" textAnchor="middle">V_th</text>
-        <line x1="111" y1="85" x2="155" y2="85" stroke="#38bdf8" strokeWidth="2.5" />
-        <rect x="155" y="71" width="70" height="28" rx="6" fill="#0f172a" stroke="#f59e0b" strokeWidth="2.5" />
-        <text x="190" y="90" fill="#f59e0b" fontSize="13" fontWeight="bold" textAnchor="middle">Z_eq / R_th</text>
-        <line x1="225" y1="85" x2="295" y2="85" stroke="#38bdf8" strokeWidth="2.5" />
-        <circle cx="295" cy="85" r="6" fill="#34d399" />
-        <text x="315" y="90" fill="#34d399" fontSize="15" fontWeight="bold" fontFamily="monospace">A</text>
-        <circle cx="295" cy="135" r="6" fill="#34d399" />
-        <text x="315" y="140" fill="#34d399" fontSize="15" fontWeight="bold" fontFamily="monospace">B</text>
-        <line x1="85" y1="111" x2="85" y2="135" stroke="#38bdf8" strokeWidth="2.5" />
-        <line x1="85" y1="135" x2="295" y2="135" stroke="#38bdf8" strokeWidth="2.5" />
-        <path d={`M 130 ${45 + oscWave} Q 190 ${30 - oscWave} 250 ${45 + oscWave}`} fill="none" stroke="#a855f7" strokeWidth="3" />
-        <text x="190" y="165" fill="#34d399" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
-          EQUIVALENCE: 2-TERMINAL DUALITY
-        </text>
-      </svg>
-    );
-  }
-
-  if (slot === 2) {
-    // Card 2: Animated Rising Peak Curve / Energy Barrier SVG
+  // 1. PURE MATHEMATICS & CALCULUS MINI-SVGS
+  if (isMathDomain) {
+    if (slot === 0) {
+      const secantShift = 30 * Math.max(0.05, (1 + Math.cos(frame * 0.08)) / 2);
+      const x0 = 120;
+      const y0 = 125;
+      const x1 = 120 + secantShift + 40;
+      const y1 = 125 - (secantShift + 40) * 0.85;
+      return (
+        <svg width="100%" height="180" viewBox="0 0 380 180">
+          <line x1="40" y1="140" x2="340" y2="140" stroke="#334155" strokeWidth="2" />
+          <line x1="60" y1="20" x2="60" y2="150" stroke="#334155" strokeWidth="2" />
+          <path d="M 60 140 Q 160 130 320 25" fill="none" stroke="#38bdf8" strokeWidth="3" />
+          <line x1={x0 - 30} y1={y0 + 25} x2={x1 + 45} y2={y1 - 35} stroke="#f59e0b" strokeWidth="2.5" strokeDasharray="6 4" />
+          <circle cx={x0} cy={y0} r="6" fill="#38bdf8" />
+          <circle cx={x1} cy={y1} r="5" fill="#f59e0b" />
+          <line x1={x0} y1={y0} x2={x1} y2={y0} stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="3 3" />
+          <line x1={x1} y1={y0} x2={x1} y2={y1} stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="3 3" />
+          <text x="190" y="22" fill="#f59e0b" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+            SECANT → TANGENT LIMIT
+          </text>
+          <text x="190" y="166" fill="#34d399" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+            lim Δx→0 [Δy / Δx] = f'(x)
+          </text>
+        </svg>
+      );
+    }
+    if (slot === 1) {
+      const bars = [
+        { x: 80, w: 32, h: 42 },
+        { x: 115, w: 32, h: 62 },
+        { x: 150, w: 32, h: 78 },
+        { x: 185, w: 32, h: 86 },
+        { x: 220, w: 32, h: 80 },
+        { x: 255, w: 32, h: 60 },
+      ];
+      return (
+        <svg width="100%" height="180" viewBox="0 0 380 180">
+          <line x1="50" y1="140" x2="330" y2="140" stroke="#334155" strokeWidth="2" />
+          {bars.map((b, i) => (
+            <rect
+              key={i}
+              x={b.x}
+              y={140 - b.h}
+              width={b.w - 3}
+              height={b.h}
+              fill="rgba(52, 211, 153, 0.35)"
+              stroke="#34d399"
+              strokeWidth="2"
+            />
+          ))}
+          <path d="M 60 130 C 120 68, 200 45, 310 130" fill="none" stroke="#38bdf8" strokeWidth="3" />
+          <text x="190" y="24" fill="#34d399" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+            RIEMANN AREA SUM ∫f(x)dx
+          </text>
+          <text x="190" y="166" fill="#cbd5e1" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+            ACCUMULATED NET AREA: Σ f(xᵢ)·Δx
+          </text>
+        </svg>
+      );
+    }
+    if (slot === 2) {
+      const osc = Math.sin(frame * 0.1) * 8;
+      return (
+        <svg width="100%" height="180" viewBox="0 0 380 180">
+          <line x1="50" y1="140" x2="330" y2="140" stroke="#334155" strokeWidth="2" />
+          <line x1="50" y1="20" x2="50" y2="140" stroke="#334155" strokeWidth="2" />
+          <path d="M 60 130 Q 190 20 320 130" fill="none" stroke="#64748b" strokeWidth="2" strokeDasharray="6 4" />
+          <path d={`M 60 ${130 - osc} Q 190 ${25 + osc * 0.5} 320 ${130 - osc}`} fill="none" stroke="#a855f7" strokeWidth="3.5" />
+          <circle cx="190" cy="25" r="5" fill="#f59e0b" />
+          <text x="190" y="22" fill="#a855f7" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+            POLYNOMIAL CONVERGENCE
+          </text>
+          <text x="190" y="166" fill="#cbd5e1" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+            TAYLOR EXPANSION: Pₙ(x) → f(x)
+          </text>
+        </svg>
+      );
+    }
+    // Card 3: Critical Extrema (slot === 3)
     const peakGlow = 0.5 + 0.5 * Math.sin(frame * 0.14);
     return (
       <svg width="100%" height="180" viewBox="0 0 380 180">
-        <line x1="50" y1="140" x2="330" y2="140" stroke="#64748b" strokeWidth="2" />
-        <line x1="50" y1="25" x2="50" y2="140" stroke="#64748b" strokeWidth="2" />
-        <path d="M 60 135 Q 190 20 320 135" fill="none" stroke="#f59e0b" strokeWidth="4" strokeLinecap="round" />
-        <line x1="140" y1="48" x2="240" y2="48" stroke="#34d399" strokeWidth="2.5" strokeDasharray="6 4" />
-        <circle cx="190" cy="48" r={7 + 3 * peakGlow} fill="#f59e0b" stroke="#ffffff" strokeWidth="2" />
-        <text x="190" y="32" fill="#f59e0b" fontSize="14" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
-          MAXIMUM TRANSFER: dP/dR = 0
+        <line x1="50" y1="140" x2="330" y2="140" stroke="#334155" strokeWidth="2" />
+        <path d="M 70 135 Q 190 30 310 135" fill="none" stroke="#38bdf8" strokeWidth="3" />
+        <line x1="130" y1="30" x2="250" y2="30" stroke="#f59e0b" strokeWidth="2.5" strokeDasharray="6 4" />
+        <circle cx="190" cy="30" r={6 + 2 * peakGlow} fill="#f59e0b" stroke="#ffffff" strokeWidth="2" />
+        <line x1="190" y1="30" x2="190" y2="140" stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="4 4" />
+        <text x="190" y="22" fill="#f59e0b" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+          CRITICAL POINT f'(x) = 0
         </text>
-        <text x="190" y="165" fill="#cbd5e1" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
-          MATCHED IMPEDANCE / ACTIVATION PEAK
+        <text x="190" y="166" fill="#34d399" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+          EXTREMA &amp; CONCAVITY: f''(x) &lt; 0
         </text>
       </svg>
     );
   }
 
-  // Card 3: Animated 4-Node Grid / Matrix Topology SVG
-  const flowDash = (frame * 2.5) % 30;
+  // 2. QUANTUM MECHANICS MINI-SVGS
+  if (isQuantumDomain) {
+    if (slot === 0 || normType.includes('schrodinger')) {
+      return (
+        <svg width="100%" height="180" viewBox="0 0 380 180">
+          <line x1="40" y1="90" x2="340" y2="90" stroke="#334155" strokeWidth="1.5" />
+          <path d="M 60 90 Q 120 40 190 90 T 320 90" fill="none" stroke="#c084fc" strokeWidth="3" />
+          <path d="M 100 90 Q 190 20 280 90" fill="none" stroke="#38bdf8" strokeWidth="2" strokeDasharray="4 4" />
+          <text x="190" y="24" fill="#c084fc" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+            WAVEFUNCTION Ψ(x,t)
+          </text>
+          <text x="190" y="166" fill="#cbd5e1" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+            iℏ ∂Ψ/∂t = ĤΨ • UNITARY PROPAGATION
+          </text>
+        </svg>
+      );
+    }
+    if (slot === 1 || normType.includes('tunnel')) {
+      const decay = Math.sin(frame * 0.1) * 4;
+      return (
+        <svg width="100%" height="180" viewBox="0 0 380 180">
+          <rect x="150" y="40" width="70" height="90" rx="4" fill="rgba(192, 132, 252, 0.15)" stroke="#c084fc" strokeWidth="2" />
+          <path d="M 60 85 Q 100 60 150 85" fill="none" stroke="#38bdf8" strokeWidth="3" />
+          <path d={`M 150 85 Q 185 ${95 + decay} 220 110`} fill="none" stroke="#f59e0b" strokeWidth="2.5" />
+          <path d="M 220 110 Q 270 95 320 110" fill="none" stroke="#38bdf8" strokeWidth="2" strokeDasharray="4 4" />
+          <text x="190" y="24" fill="#f59e0b" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+            BARRIER TUNNELING T &gt; 0
+          </text>
+          <text x="190" y="166" fill="#34d399" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+            EVANESCENT PENETRATION: T ≈ e^(-2κL)
+          </text>
+        </svg>
+      );
+    }
+    if (slot === 2 || normType.includes('heisenberg')) {
+      const squeeze = 18 * Math.sin(frame * 0.12);
+      return (
+        <svg width="100%" height="180" viewBox="0 0 380 180">
+          <ellipse cx="130" cy="85" rx={35 + squeeze} ry={25 - squeeze * 0.5} fill="rgba(56, 189, 248, 0.2)" stroke="#38bdf8" strokeWidth="2" />
+          <text x="130" y="90" fill="#38bdf8" fontSize="12" fontWeight="bold" textAnchor="middle">Δx</text>
+          <ellipse cx="250" cy="85" rx={35 - squeeze} ry={25 + squeeze * 0.5} fill="rgba(168, 85, 247, 0.2)" stroke="#a855f7" strokeWidth="2" />
+          <text x="250" y="90" fill="#a855f7" fontSize="12" fontWeight="bold" textAnchor="middle">Δp</text>
+          <text x="190" y="24" fill="#a855f7" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+            UNCERTAINTY Δx·Δp ≥ ℏ/2
+          </text>
+          <text x="190" y="166" fill="#cbd5e1" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+            CANONICAL COMMUTATOR: [x̂, p̂] = iℏ
+          </text>
+        </svg>
+      );
+    }
+    // Card 3: Dirac Spinor
+    const rot = (frame * 2.5) % 360;
+    return (
+      <svg width="100%" height="180" viewBox="0 0 380 180">
+        <g transform={`translate(190, 85) rotate(${rot}) translate(-190, -85)`}>
+          <ellipse cx="190" cy="60" rx="18" ry="28" fill="rgba(192, 132, 252, 0.3)" stroke="#c084fc" strokeWidth="2" />
+          <ellipse cx="190" cy="110" rx="18" ry="28" fill="rgba(56, 189, 248, 0.3)" stroke="#38bdf8" strokeWidth="2" />
+        </g>
+        <circle cx="190" cy="85" r="5" fill="#ffffff" />
+        <text x="190" y="24" fill="#c084fc" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+          SPINOR ORBITAL STATE
+        </text>
+        <text x="190" y="166" fill="#38bdf8" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+          RELATIVISTIC DIRAC 4-SPINOR (1s, 2p)
+        </text>
+      </svg>
+    );
+  }
+
+  // 3. STRUCTURAL MECHANICS MINI-SVGS
+  if (isMechanicsDomain) {
+    if (slot === 0 || normType.includes('force')) {
+      return (
+        <svg width="100%" height="180" viewBox="0 0 380 180">
+          <line x1="190" y1="85" x2="270" y2="85" stroke="#34d399" strokeWidth="3" />
+          <line x1="190" y1="85" x2="110" y2="85" stroke="#34d399" strokeWidth="3" />
+          <line x1="190" y1="85" x2="190" y2="35" stroke="#38bdf8" strokeWidth="3" />
+          <line x1="190" y1="85" x2="190" y2="135" stroke="#38bdf8" strokeWidth="3" />
+          <circle cx="190" cy="85" r="8" fill="#f59e0b" />
+          <text x="190" y="24" fill="#34d399" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+            FORCE BALANCE ΣF = 0
+          </text>
+          <text x="190" y="166" fill="#cbd5e1" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+            ΣF_x = 0 • ΣF_y = 0 TRANSLATIONAL EQUILIBRIUM
+          </text>
+        </svg>
+      );
+    }
+    if (slot === 1 || normType.includes('torque')) {
+      const tilt = Math.sin(frame * 0.08) * 8;
+      return (
+        <svg width="100%" height="180" viewBox="0 0 380 180">
+          <line x1="90" y1={85 + tilt} x2="290" y2={85 - tilt} stroke="#f59e0b" strokeWidth="5" strokeLinecap="round" />
+          <polygon points="180,120 200,120 190,87" fill="#64748b" />
+          <line x1="70" y1="120" x2="310" y2="120" stroke="#334155" strokeWidth="2" />
+          <text x="190" y="24" fill="#f59e0b" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+            MOMENT EQUILIBRIUM Στ = 0
+          </text>
+          <text x="190" y="166" fill="#34d399" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+            ZERO ROTATIONAL MOMENT ABOUT PIN SUPPORT
+          </text>
+        </svg>
+      );
+    }
+    if (slot === 2 || normType.includes('shear')) {
+      return (
+        <svg width="100%" height="180" viewBox="0 0 380 180">
+          <line x1="60" y1="85" x2="320" y2="85" stroke="#334155" strokeWidth="1.5" />
+          <path d="M 70 85 Q 190 25 310 85" fill="none" stroke="#38bdf8" strokeWidth="3" />
+          <circle cx="190" cy="25" r="5" fill="#f59e0b" />
+          <text x="190" y="22" fill="#38bdf8" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+            BENDING MOMENT PEAK
+          </text>
+          <text x="190" y="166" fill="#cbd5e1" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+            INTERNAL SHEAR &amp; MOMENT: dM/dx = V(x)
+          </text>
+        </svg>
+      );
+    }
+    // Card 3: Truss / Axle
+    return (
+      <svg width="100%" height="180" viewBox="0 0 380 180">
+        <polygon points="100,120 190,50 280,120" fill="none" stroke="#38bdf8" strokeWidth="3" />
+        <line x1="190" y1="50" x2="190" y2="120" stroke="#38bdf8" strokeWidth="2.5" />
+        <circle cx="100" cy="120" r="5" fill="#f59e0b" />
+        <circle cx="280" cy="120" r="5" fill="#f59e0b" />
+        <circle cx="190" cy="50" r="5" fill="#f59e0b" />
+        <text x="190" y="24" fill="#38bdf8" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+          TRUSS LOAD TRANSFER
+        </text>
+        <text x="190" y="166" fill="#34d399" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+          AXIAL TENSION &amp; COMPRESSION PIN DYNAMICS
+        </text>
+      </svg>
+    );
+  }
+
+  // 4. ELECTRICAL ENGINEERING MINI-SVGS (STRICTLY FOR ELECTRICAL DOMAIN)
+  if (isElectricalDomain) {
+    if (slot === 0) {
+      const loopOffset = (frame * 2.5) % 40;
+      const pulseNode = 1 + Math.sin(frame * 0.12) * 0.1;
+      return (
+        <svg width="100%" height="180" viewBox="0 0 380 180">
+          <rect x="50" y="30" width="280" height="120" rx="18" fill="none" stroke="#00f0ff" strokeWidth="2.5" strokeDasharray="10 6" strokeDashoffset={-loopOffset} />
+          <g transform={`translate(190, 90) scale(${pulseNode}) translate(-190, -90)`}>
+            <circle cx="190" cy="90" r="22" fill="rgba(0, 240, 255, 0.2)" stroke="#00f0ff" strokeWidth="3" />
+            <circle cx="190" cy="90" r="10" fill="#00f0ff" />
+          </g>
+          <polygon points="175,25 195,30 175,35" fill="#00f0ff" />
+          <polygon points="205,145 185,150 205,155" fill="#00f0ff" />
+          <text x="190" y="22" fill="#00f0ff" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+            CURRENT LOOP I₁ →
+          </text>
+          <circle cx="90" cy="90" r="6" fill="#34d399" />
+          <circle cx="290" cy="90" r="6" fill="#34d399" />
+          <line x1="90" y1="90" x2="168" y2="90" stroke="#34d399" strokeWidth="2.5" strokeDasharray="4 4" />
+          <line x1="212" y1="90" x2="290" y2="90" stroke="#34d399" strokeWidth="2.5" strokeDasharray="4 4" />
+          <text x="190" y="130" fill="#cbd5e1" fontSize="14" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+            NODE CONSERVATION ΣI = 0
+          </text>
+        </svg>
+      );
+    }
+    if (slot === 1) {
+      const oscWave = Math.sin(frame * 0.1) * 12;
+      return (
+        <svg width="100%" height="180" viewBox="0 0 380 180">
+          <circle cx="85" cy="85" r="26" fill="rgba(56, 189, 248, 0.15)" stroke="#38bdf8" strokeWidth="2.5" />
+          <text x="85" y="92" fill="#38bdf8" fontSize="17" fontWeight="bold" textAnchor="middle">V_th</text>
+          <line x1="111" y1="85" x2="155" y2="85" stroke="#38bdf8" strokeWidth="2.5" />
+          <rect x="155" y="71" width="70" height="28" rx="6" fill="#0f172a" stroke="#f59e0b" strokeWidth="2.5" />
+          <text x="190" y="90" fill="#f59e0b" fontSize="13" fontWeight="bold" textAnchor="middle">Z_eq / R_th</text>
+          <line x1="225" y1="85" x2="295" y2="85" stroke="#38bdf8" strokeWidth="2.5" />
+          <circle cx="295" cy="85" r="6" fill="#34d399" />
+          <text x="315" y="90" fill="#34d399" fontSize="15" fontWeight="bold" fontFamily="monospace">A</text>
+          <circle cx="295" cy="135" r="6" fill="#34d399" />
+          <text x="315" y="140" fill="#34d399" fontSize="15" fontWeight="bold" fontFamily="monospace">B</text>
+          <line x1="85" y1="111" x2="85" y2="135" stroke="#38bdf8" strokeWidth="2.5" />
+          <line x1="85" y1="135" x2="295" y2="135" stroke="#38bdf8" strokeWidth="2.5" />
+          <path d={`M 130 ${45 + oscWave} Q 190 ${30 - oscWave} 250 ${45 + oscWave}`} fill="none" stroke="#a855f7" strokeWidth="3" />
+          <text x="190" y="165" fill="#34d399" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+            EQUIVALENCE: 2-TERMINAL DUALITY
+          </text>
+        </svg>
+      );
+    }
+    if (slot === 2) {
+      const peakGlow = 0.5 + 0.5 * Math.sin(frame * 0.14);
+      return (
+        <svg width="100%" height="180" viewBox="0 0 380 180">
+          <line x1="50" y1="140" x2="330" y2="140" stroke="#64748b" strokeWidth="2" />
+          <line x1="50" y1="25" x2="50" y2="140" stroke="#64748b" strokeWidth="2" />
+          <path d="M 60 135 Q 190 20 320 135" fill="none" stroke="#f59e0b" strokeWidth="4" strokeLinecap="round" />
+          <line x1="140" y1="48" x2="240" y2="48" stroke="#34d399" strokeWidth="2.5" strokeDasharray="6 4" />
+          <circle cx="190" cy="48" r={7 + 3 * peakGlow} fill="#f59e0b" stroke="#ffffff" strokeWidth="2" />
+          <text x="190" y="32" fill="#f59e0b" fontSize="14" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+            MAXIMUM TRANSFER: dP/dR = 0
+          </text>
+          <text x="190" y="165" fill="#cbd5e1" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+            MATCHED IMPEDANCE / ACTIVATION PEAK
+          </text>
+        </svg>
+      );
+    }
+    // Card 3: 4-Node Mesh
+    const flowDash = (frame * 2.5) % 30;
+    return (
+      <svg width="100%" height="180" viewBox="0 0 380 180">
+        <line x1="100" y1="55" x2="280" y2="55" stroke="#00f0ff" strokeWidth="3" strokeDasharray="6 4" strokeDashoffset={-flowDash} />
+        <line x1="100" y1="125" x2="280" y2="125" stroke="#34d399" strokeWidth="3" strokeDasharray="6 4" strokeDashoffset={-flowDash} />
+        <line x1="100" y1="55" x2="100" y2="125" stroke="#f59e0b" strokeWidth="3" />
+        <line x1="280" y1="55" x2="280" y2="125" stroke="#f59e0b" strokeWidth="3" />
+        <line x1="100" y1="55" x2="280" y2="125" stroke="#a855f7" strokeWidth="2" strokeDasharray="4 4" />
+        <circle cx="100" cy="55" r="16" fill="#0f172a" stroke="#00f0ff" strokeWidth="2.5" />
+        <text x="100" y="60" fill="#00f0ff" fontSize="11" fontWeight="bold" textAnchor="middle">B1</text>
+        <circle cx="280" cy="55" r="16" fill="#0f172a" stroke="#00f0ff" strokeWidth="2.5" />
+        <text x="280" y="60" fill="#00f0ff" fontSize="11" fontWeight="bold" textAnchor="middle">B2</text>
+        <circle cx="100" cy="125" r="16" fill="#0f172a" stroke="#34d399" strokeWidth="2.5" />
+        <text x="100" y="130" fill="#34d399" fontSize="11" fontWeight="bold" textAnchor="middle">B3</text>
+        <circle cx="280" cy="125" r="16" fill="#0f172a" stroke="#34d399" strokeWidth="2.5" />
+        <text x="280" y="130" fill="#34d399" fontSize="11" fontWeight="bold" textAnchor="middle">B4</text>
+        <text x="190" y="165" fill="#00f0ff" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+          4-NODE MESH TOPOLOGY &amp; OPF FLOW
+        </text>
+      </svg>
+    );
+  }
+
+  // 5. CLEAN DOMAIN-NEUTRAL / GENERIC MINI-SVGS (ZERO LEAKS)
+  if (slot === 0) {
+    return (
+      <svg width="100%" height="180" viewBox="0 0 380 180">
+        <circle cx="190" cy="85" r="42" fill="none" stroke="#38bdf8" strokeWidth="3" strokeDasharray="8 6" />
+        <circle cx="190" cy="85" r="14" fill="#38bdf8" />
+        <text x="190" y="24" fill="#38bdf8" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+          SYSTEM INVARIANT
+        </text>
+        <text x="190" y="166" fill="#cbd5e1" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+          CONSERVED PARAMETER STATE
+        </text>
+      </svg>
+    );
+  }
+  if (slot === 1) {
+    return (
+      <svg width="100%" height="180" viewBox="0 0 380 180">
+        <line x1="80" y1="85" x2="300" y2="85" stroke="#34d399" strokeWidth="3" />
+        <circle cx="190" cy="85" r="12" fill="#f59e0b" />
+        <text x="190" y="24" fill="#34d399" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+          EQUILIBRIUM BALANCE
+        </text>
+        <text x="190" y="166" fill="#cbd5e1" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+          STABLE POTENTIAL MINIMUM
+        </text>
+      </svg>
+    );
+  }
+  if (slot === 2) {
+    return (
+      <svg width="100%" height="180" viewBox="0 0 380 180">
+        <path d="M 70 130 Q 190 35 310 130" fill="none" stroke="#f59e0b" strokeWidth="3.5" />
+        <circle cx="190" cy="35" r="6" fill="#ffffff" />
+        <text x="190" y="24" fill="#f59e0b" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+          OPTIMAL BOUNDARY
+        </text>
+        <text x="190" y="166" fill="#cbd5e1" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+          CRITICAL TRANSITION THRESHOLD
+        </text>
+      </svg>
+    );
+  }
   return (
     <svg width="100%" height="180" viewBox="0 0 380 180">
-      <line x1="100" y1="55" x2="280" y2="55" stroke="#00f0ff" strokeWidth="3" strokeDasharray="6 4" strokeDashoffset={-flowDash} />
-      <line x1="100" y1="125" x2="280" y2="125" stroke="#34d399" strokeWidth="3" strokeDasharray="6 4" strokeDashoffset={-flowDash} />
-      <line x1="100" y1="55" x2="100" y2="125" stroke="#f59e0b" strokeWidth="3" />
-      <line x1="280" y1="55" x2="280" y2="125" stroke="#f59e0b" strokeWidth="3" />
-      <line x1="100" y1="55" x2="280" y2="125" stroke="#a855f7" strokeWidth="2" strokeDasharray="4 4" />
-      <circle cx="100" cy="55" r="16" fill="#0f172a" stroke="#00f0ff" strokeWidth="2.5" />
-      <text x="100" y="60" fill="#00f0ff" fontSize="11" fontWeight="bold" textAnchor="middle">B1</text>
-      <circle cx="280" cy="55" r="16" fill="#0f172a" stroke="#00f0ff" strokeWidth="2.5" />
-      <text x="280" y="60" fill="#00f0ff" fontSize="11" fontWeight="bold" textAnchor="middle">B2</text>
-      <circle cx="100" cy="125" r="16" fill="#0f172a" stroke="#34d399" strokeWidth="2.5" />
-      <text x="100" y="130" fill="#34d399" fontSize="11" fontWeight="bold" textAnchor="middle">B3</text>
-      <circle cx="280" cy="125" r="16" fill="#0f172a" stroke="#34d399" strokeWidth="2.5" />
-      <text x="280" y="130" fill="#34d399" fontSize="11" fontWeight="bold" textAnchor="middle">B4</text>
-      <text x="190" y="165" fill="#00f0ff" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
-        4-NODE MESH TOPOLOGY &amp; OPF FLOW
+      <circle cx="120" cy="85" r="16" fill="#0f172a" stroke="#a855f7" strokeWidth="2.5" />
+      <circle cx="260" cy="85" r="16" fill="#0f172a" stroke="#a855f7" strokeWidth="2.5" />
+      <line x1="136" y1="85" x2="244" y2="85" stroke="#a855f7" strokeWidth="2.5" strokeDasharray="6 4" />
+      <text x="190" y="24" fill="#a855f7" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+        TOPOLOGICAL CONVERGENCE
+      </text>
+      <text x="190" y="166" fill="#cbd5e1" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+        DYNAMIC MULTI-NODE ATTRACTOR
       </text>
     </svg>
   );
@@ -647,6 +942,7 @@ export const BentoGridScene = ({
     isMechanics ? 'EQUILIBRIUM & LOAD MATRIX' :
     isQuantum ? 'OPERATOR & STATE MATRIX' :
     isChemistry ? 'SN1 VS SN2 DECISION MATRIX' :
+    isMath ? 'CALCULUS & INTEGRAL MATRIX' :
     'UNSUPERVISED ML ARCHITECTURES'
   );
 
@@ -655,6 +951,7 @@ export const BentoGridScene = ({
     isMechanics ? 'Static Equilibrium & Force Decomposition' :
     isQuantum ? 'Fundamental Postulates of Quantum Mechanics' :
     isChemistry ? 'The 4 Decisive Reaction Factors' :
+    isMath ? '4 Core Cornerstones of Modern Calculus' :
     'Algorithms You Need To Know'
   );
 
@@ -683,6 +980,11 @@ export const BentoGridScene = ({
         { title: 'Quantum Tunneling', algo_type: 'tunneling', category: 'BARRIER DYNAMICS', description: 'Evanescent decay T = exp(-2κL) barrier penetration' },
         { title: 'Heisenberg Uncertainty', algo_type: 'heisenberg', category: 'OBSERVABLES', description: 'Canonical commutator [x̂, p̂] = iℏ • Δx·Δp ≥ ℏ/2' },
         { title: 'Dirac Spinors & Orbitals', algo_type: 'dirac_orbitals', category: 'RELATIVISTIC QM', description: '4-component bi-spinor • Hydrogen spatial probability density' },
+      ] : isMath ? [
+        { title: 'Secant → Tangent', algo_type: 'derivative_limit', category: 'DIFFERENTIAL', description: 'Secant line slope converges to instantaneous rate df/dx' },
+        { title: 'Riemann Integral', algo_type: 'riemann_sum', category: 'INTEGRAL', description: 'Accumulated rectangular partitions converge to continuous area ∫f(x)dx' },
+        { title: 'Critical Extrema', algo_type: 'critical_points', category: 'OPTIMIZATION', description: 'Stationary points f\'(x)=0 reveal global maxima & minima bounds' },
+        { title: 'Evaluation Theorem', algo_type: 'fundamental_thm', category: 'DUALITY', description: 'Antiderivative net evaluation: ∫_a^b f\'(x)dx = f(b) - f(a)' },
       ] : [
         { title: 'Principle 1', algo_type: 'p1', category: 'CORE', description: 'Primary invariant relationship' },
         { title: 'Principle 2', algo_type: 'p2', category: 'EQUILIBRIUM', description: 'Conservation and balance equations' },
@@ -695,8 +997,9 @@ export const BentoGridScene = ({
       <div
         style={{
           width: '960px',
-          height: '1540px',
-          minHeight: '1540px',
+          height: '1360px',
+          maxHeight: '1380px',
+          overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
@@ -710,12 +1013,12 @@ export const BentoGridScene = ({
         {/* TOP TIER: EDITORIAL HEADER */}
         <div
           style={{
-            height: '220px',
+            height: '160px',
             backgroundColor: '#111724',
-            borderRadius: '24px',
+            borderRadius: '20px',
             border: `1.5px solid ${eyebrowColor}55`,
             boxShadow: `0 24px 48px -12px rgba(0, 0, 0, 0.85), 0 0 28px ${eyebrowColor}22`,
-            padding: '24px 36px',
+            padding: '16px 28px',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
@@ -725,9 +1028,9 @@ export const BentoGridScene = ({
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span
               style={{
-                fontSize: '24px',
+                fontSize: '20px',
                 fontWeight: 900,
-                letterSpacing: '3px',
+                letterSpacing: '2.5px',
                 color: eyebrowColor,
                 textTransform: 'uppercase',
                 fontFamily: 'monospace',
@@ -741,7 +1044,7 @@ export const BentoGridScene = ({
           <h1
             style={{
               margin: 0,
-              fontSize: '50px',
+              fontSize: '40px',
               fontWeight: 900,
               color: '#f8fafc',
               lineHeight: 1.15,
@@ -751,7 +1054,7 @@ export const BentoGridScene = ({
             {sectionTitle}
           </h1>
 
-          <div style={{ fontSize: '26px', color: '#94a3b8', fontWeight: 600 }}>
+          <div style={{ fontSize: '22px', color: '#94a3b8', fontWeight: 600 }}>
             {subtitle}
           </div>
         </div>
@@ -759,10 +1062,10 @@ export const BentoGridScene = ({
         {/* 4-CARD DECISION MATRIX GRID (2x2) */}
         <div
           style={{
-            height: '1260px',
+            height: '1180px',
             display: 'grid',
             gridTemplateColumns: 'repeat(2, 1fr)',
-            gap: '20px',
+            gap: '16px',
             boxSizing: 'border-box',
           }}
         >
@@ -770,11 +1073,11 @@ export const BentoGridScene = ({
             <div
               key={idx}
               style={{
-                height: '610px',
+                height: '570px',
                 backgroundColor: '#141824',
                 borderRadius: '20px',
                 border: `1.5px solid ${eyebrowColor}44`,
-                padding: '24px 28px',
+                padding: '18px 22px',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
@@ -782,27 +1085,27 @@ export const BentoGridScene = ({
               }}
             >
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '30px', fontWeight: 900, color: '#f8fafc' }}>{card.title}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '28px', fontWeight: 900, color: '#f8fafc' }}>{card.title}</span>
                   <span
                     style={{
-                      fontSize: '17px',
+                      fontSize: '15px',
                       color: eyebrowColor,
                       fontWeight: 800,
                       fontFamily: 'monospace',
                       backgroundColor: `${eyebrowColor}1a`,
-                      padding: '4px 12px',
+                      padding: '4px 10px',
                       borderRadius: '8px',
                     }}
                   >
                     {card.category}
                   </span>
                 </div>
-                <div style={{ fontSize: '22px', color: '#cbd5e1', lineHeight: 1.3 }}>
+                <div style={{ fontSize: '20px', color: '#cbd5e1', lineHeight: 1.3 }}>
                   {card.description}
                 </div>
               </div>
-              <MiniCanvas algoType={card.algo_type} cardIndex={idx} isHighlighted={true} frame={frame} />
+              <MiniCanvas algoType={card.algo_type} cardIndex={idx} isHighlighted={true} frame={frame} domain={domain} />
             </div>
           ))}
         </div>
@@ -814,8 +1117,9 @@ export const BentoGridScene = ({
     <div
       style={{
         width: '960px',
-        height: '1540px',
-        minHeight: '1540px',
+        height: '1360px',
+        maxHeight: '1380px',
+        overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
@@ -826,15 +1130,15 @@ export const BentoGridScene = ({
         margin: '0 auto',
       }}
     >
-      {/* 1. TOP TIER: EDITORIAL HEADER (220px tall) */}
+      {/* 1. TOP TIER: EDITORIAL HEADER (160px tall) */}
       <div
         style={{
-          height: '220px',
+          height: '160px',
           backgroundColor: '#111724',
-          borderRadius: '24px',
+          borderRadius: '20px',
           border: '1.5px solid rgba(245, 158, 11, 0.3)',
           boxShadow: '0 24px 48px -12px rgba(0, 0, 0, 0.85), 0 0 28px rgba(245, 158, 11, 0.15)',
-          padding: '24px 36px',
+          padding: '16px 28px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
@@ -878,10 +1182,10 @@ export const BentoGridScene = ({
         </div>
       </div>
 
-      {/* 2. MIDDLE TIER: CLUSTERING SECTION (620px tall) */}
+      {/* 2. MIDDLE TIER: CLUSTERING SECTION (540px tall) */}
       <div
         style={{
-          height: '620px',
+          height: '540px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
@@ -891,7 +1195,7 @@ export const BentoGridScene = ({
         {/* Section Header */}
         <div
           style={{
-            fontSize: '24px',
+            fontSize: '22px',
             fontWeight: 900,
             color: '#f59e0b',
             letterSpacing: '3px',
@@ -903,16 +1207,16 @@ export const BentoGridScene = ({
           CLUSTERING ALGORITHMS
         </div>
 
-        {/* 2 Tall Cards on Top (each 260px tall) */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
+        {/* 2 Tall Cards on Top (each 230px tall) */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
           {/* Card 1: K-Means */}
           <div
             style={{
-              height: '260px',
+              height: '230px',
               backgroundColor: '#141824',
               borderRadius: '20px',
               border: '1.5px solid rgba(245, 158, 11, 0.35)',
-              padding: '20px 24px',
+              padding: '16px 20px',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
@@ -920,20 +1224,20 @@ export const BentoGridScene = ({
             }}
           >
             <div>
-              <div style={{ fontSize: '32px', fontWeight: 900, color: '#f8fafc' }}>K-Means</div>
-              <div style={{ fontSize: '22px', color: '#94a3b8' }}>Centroid-based spatial partitioning</div>
+              <div style={{ fontSize: '28px', fontWeight: 900, color: '#f8fafc' }}>K-Means</div>
+              <div style={{ fontSize: '19px', color: '#94a3b8' }}>Centroid-based spatial partitioning</div>
             </div>
-            <MiniCanvas algoType="kmeans" isHighlighted={true} frame={frame} />
+            <MiniCanvas algoType="kmeans" isHighlighted={true} frame={frame} domain="ml" />
           </div>
 
           {/* Card 2: Hierarchical */}
           <div
             style={{
-              height: '260px',
+              height: '230px',
               backgroundColor: '#141824',
               borderRadius: '20px',
               border: '1px solid rgba(255, 255, 255, 0.12)',
-              padding: '20px 24px',
+              padding: '16px 20px',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
@@ -941,22 +1245,22 @@ export const BentoGridScene = ({
             }}
           >
             <div>
-              <div style={{ fontSize: '32px', fontWeight: 900, color: '#f8fafc' }}>Hierarchical</div>
-              <div style={{ fontSize: '22px', color: '#94a3b8' }}>Tree-structured dendrogram linkage</div>
+              <div style={{ fontSize: '28px', fontWeight: 900, color: '#f8fafc' }}>Hierarchical</div>
+              <div style={{ fontSize: '19px', color: '#94a3b8' }}>Tree-structured dendrogram linkage</div>
             </div>
-            <MiniCanvas algoType="hierarchical" isHighlighted={false} frame={frame} />
+            <MiniCanvas algoType="hierarchical" isHighlighted={false} frame={frame} domain="ml" />
           </div>
         </div>
 
-        {/* 1 Wide Featured Card Below: DBSCAN (280px tall) */}
+        {/* 1 Wide Featured Card Below: DBSCAN (240px tall) */}
         <div
           style={{
-            height: '280px',
+            height: '240px',
             backgroundColor: '#141824',
             borderRadius: '20px',
             border: '1.5px solid #10b981',
             boxShadow: '0 0 24px rgba(16, 185, 129, 0.25)',
-            padding: '20px 28px',
+            padding: '16px 24px',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
@@ -965,21 +1269,21 @@ export const BentoGridScene = ({
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <span style={{ fontSize: '32px', fontWeight: 900, color: '#f8fafc' }}>DBSCAN</span>
-              <span style={{ marginLeft: '16px', fontSize: '22px', color: '#10b981', fontWeight: 800, fontFamily: 'monospace' }}>
-                DENSITY CORE & NOISE HANDLING
+              <span style={{ fontSize: '28px', fontWeight: 900, color: '#f8fafc' }}>DBSCAN</span>
+              <span style={{ marginLeft: '16px', fontSize: '20px', color: '#10b981', fontWeight: 800, fontFamily: 'monospace' }}>
+                DENSITY CORE &amp; NOISE HANDLING
               </span>
             </div>
-            <span style={{ fontSize: '22px', color: '#94a3b8' }}>Robust to arbitrary cluster shapes</span>
+            <span style={{ fontSize: '19px', color: '#94a3b8' }}>Robust to arbitrary cluster shapes</span>
           </div>
-          <MiniCanvas algoType="dbscan" isHighlighted={true} frame={frame} />
+          <MiniCanvas algoType="dbscan" isHighlighted={true} frame={frame} domain="ml" />
         </div>
       </div>
 
-      {/* 3. BOTTOM TIER: DIMENSIONALITY REDUCTION (620px tall) */}
+      {/* 3. BOTTOM TIER: DIMENSIONALITY REDUCTION (580px tall) */}
       <div
         style={{
-          height: '620px',
+          height: '580px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
@@ -989,7 +1293,7 @@ export const BentoGridScene = ({
         {/* Section Header */}
         <div
           style={{
-            fontSize: '24px',
+            fontSize: '22px',
             fontWeight: 900,
             color: '#f59e0b',
             letterSpacing: '3px',
@@ -998,19 +1302,19 @@ export const BentoGridScene = ({
             paddingLeft: '4px',
           }}
         >
-          DIMENSIONALITY REDUCTION & MANIFOLD
+          DIMENSIONALITY REDUCTION &amp; MANIFOLD
         </div>
 
-        {/* 2 Tall Side-by-Side Cards (each 560px tall) */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+        {/* 2 Tall Side-by-Side Cards (each 520px tall) */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
           {/* Card 1: PCA */}
           <div
             style={{
-              height: '560px',
+              height: '520px',
               backgroundColor: '#141824',
               borderRadius: '20px',
               border: '1.5px solid rgba(245, 158, 11, 0.35)',
-              padding: '24px',
+              padding: '20px',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
@@ -1018,13 +1322,13 @@ export const BentoGridScene = ({
             }}
           >
             <div>
-              <div style={{ fontSize: '34px', fontWeight: 900, color: '#f8fafc', marginBottom: '8px' }}>PCA</div>
-              <div style={{ fontSize: '24px', color: '#cbd5e1', lineHeight: 1.3 }}>
+              <div style={{ fontSize: '30px', fontWeight: 900, color: '#f8fafc', marginBottom: '6px' }}>PCA</div>
+              <div style={{ fontSize: '21px', color: '#cbd5e1', lineHeight: 1.3 }}>
                 Linear projection onto orthogonal principal component vectors
               </div>
             </div>
-            <MiniCanvas algoType="pca" isHighlighted={true} frame={frame} />
-            <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '16px', fontSize: '22px', color: '#94a3b8' }}>
+            <MiniCanvas algoType="pca" isHighlighted={true} frame={frame} domain="ml" />
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '12px', fontSize: '19px', color: '#94a3b8' }}>
               • Maximizes global variance<br />• Fast O(n · d²) covariance SVD
             </div>
           </div>
@@ -1032,11 +1336,11 @@ export const BentoGridScene = ({
           {/* Card 2: t-SNE / UMAP */}
           <div
             style={{
-              height: '560px',
+              height: '520px',
               backgroundColor: '#141824',
               borderRadius: '20px',
               border: '1.5px solid rgba(56, 189, 248, 0.35)',
-              padding: '24px',
+              padding: '20px',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
@@ -1044,13 +1348,13 @@ export const BentoGridScene = ({
             }}
           >
             <div>
-              <div style={{ fontSize: '34px', fontWeight: 900, color: '#f8fafc', marginBottom: '8px' }}>t-SNE / UMAP</div>
-              <div style={{ fontSize: '24px', color: '#cbd5e1', lineHeight: 1.3 }}>
+              <div style={{ fontSize: '30px', fontWeight: 900, color: '#f8fafc', marginBottom: '6px' }}>t-SNE / UMAP</div>
+              <div style={{ fontSize: '21px', color: '#cbd5e1', lineHeight: 1.3 }}>
                 Non-linear manifold embedding for cluster separation
               </div>
             </div>
-            <MiniCanvas algoType="tsne" isHighlighted={true} frame={frame} />
-            <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '16px', fontSize: '22px', color: '#94a3b8' }}>
+            <MiniCanvas algoType="tsne" isHighlighted={true} frame={frame} domain="ml" />
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '12px', fontSize: '19px', color: '#94a3b8' }}>
               • Preserves local topological rings<br />• Student-t probability divergence
             </div>
           </div>

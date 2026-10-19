@@ -321,6 +321,12 @@ export const CodingShort = ({ data }) => {
   const nextScene = scenes[actualIndex + 1];
   const nextSceneStartTime = nextScene ? nextScene.start_time : null;
   const sceneStartFrame = Math.round((activeScene?.start_time || 0) * fps);
+  const sceneDurationFrames = Math.max(
+    1,
+    Math.round(
+      (activeScene?.duration || (nextSceneStartTime ? nextSceneStartTime - (activeScene?.start_time || 0) : 5)) * fps
+    )
+  );
 
   // Scene micro-transition: smooth 6–8 frame entrance opacity fade
   const sceneElapsedFrames = frame - sceneStartFrame;
@@ -345,8 +351,8 @@ export const CodingShort = ({ data }) => {
 
   const layoutDensity = activeScene?.choreography?.layout_density || activeScene?.layout_density || 'full_dashboard';
 
-  let stageTop = '80px';
-  let stageHeight = '1540px';
+  let stageTop = '90px';
+  let stageHeight = '1360px';
   let stageJustify = 'space-between';
 
   if (layoutDensity === 'compact_punch') {
@@ -359,12 +365,14 @@ export const CodingShort = ({ data }) => {
     stageJustify = 'flex-start';
   } else {
     // 'full_dashboard'
-    stageTop = '80px';
-    stageHeight = '1540px';
+    stageTop = '90px';
+    stageHeight = '1360px';
     stageJustify = 'space-between';
   }
 
-  const sceneType = activeScene?.scene_type || activeScene?.visual_type;
+  const rawSceneType = activeScene?.scene_type || activeScene?.visual_type;
+  const hasManim = Boolean(activeScene?.manim_asset_url || activeScene?.manim_video_src);
+  const sceneType = hasManim ? 'manim_scene' : rawSceneType;
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#0d1117', color: 'white', fontFamily: 'sans-serif' }}>
@@ -386,17 +394,17 @@ export const CodingShort = ({ data }) => {
       {sceneType !== 'neural_code_split' && <Subtitles words={data.words} />}
 
       {/*
-        Mandatory Vertical Stage Container: 960px x 1540px, top 80px, left 60px.
+        Mandatory Vertical Stage Container: 960px x 1360px, top 90px, left 60px.
         Dynamic Viewport Breathing: adjusts height & top across compact_punch, canvas_spotlight, full_dashboard.
       */}
       <div
         style={{
           position: 'absolute',
-          top: stageTop, /* top: '80px' */
+          top: stageTop, /* top: '90px' */
           left: '60px',
           width: '960px',
-          height: stageHeight, /* height: '1540px' */
-          maxHeight: layoutDensity === 'compact_punch' ? '960px' : stageHeight,
+          height: stageHeight, /* height: '1360px' */
+          maxHeight: '1380px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: stageJustify, /* justifyContent: 'space-between' */
@@ -499,6 +507,7 @@ export const CodingShort = ({ data }) => {
             <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
               <ComparisonScene
                 scene={activeScene}
+                subject={data?.subject || activeScene?.subject || activeScene?.domain}
                 focusPhrase={activeScene.focus_phrase}
                 words={data?.words}
                 sceneStartFrame={sceneStartFrame}
@@ -526,6 +535,7 @@ export const CodingShort = ({ data }) => {
                 scene={activeScene}
                 words={data?.words}
                 sceneStartFrame={sceneStartFrame}
+                sceneDurationFrames={sceneDurationFrames}
               />
             </CameraRig>
           )}
@@ -536,6 +546,7 @@ export const CodingShort = ({ data }) => {
               <GraphScene
                 scene={activeScene}
                 sceneStartFrame={sceneStartFrame}
+                sceneDurationFrames={sceneDurationFrames}
               />
             </CameraRig>
           )}
@@ -599,6 +610,7 @@ export const CodingShort = ({ data }) => {
               <QuantumScene
                 scene={activeScene}
                 sceneStartFrame={sceneStartFrame}
+                sceneDurationFrames={sceneDurationFrames}
               />
             </CameraRig>
           )}
@@ -629,6 +641,7 @@ export const CodingShort = ({ data }) => {
               <ManimScene
                 scene={activeScene}
                 sceneStartFrame={sceneStartFrame}
+                sceneDurationFrames={sceneDurationFrames}
               />
             </CameraRig>
           )}

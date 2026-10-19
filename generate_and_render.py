@@ -25,6 +25,10 @@ if str(ENGINE_DIR) not in sys.path:
     sys.path.insert(0, str(ENGINE_DIR))
 
 from validation.output import validate_video_output
+from validation.reflection import write_reflection_error
+from renderer.lambda_dispatcher import dispatch_lambda_render
+from pipeline.manifest import init_manifest, archive_revision_snapshot, load_manifest, create_baseline_artifacts
+from revise import execute_revision
 
 
 # ---------------------------------------------------------------------------
@@ -81,7 +85,7 @@ def load_dotenv():
 def main():
     load_dotenv()
     parser = argparse.ArgumentParser(description="V2 Video Engine: One-Click Pipeline")
-    parser.add_argument("--topic", type=str, required=True, help="Topic for the video short")
+    parser.add_argument("--topic", type=str, default=None, help="Topic for the video short")
     parser.add_argument("--length", type=int, choices=[15, 30, 35, 60], default=60, help="Target duration in seconds")
     parser.add_argument("--subject", type=str, choices=["auto", "code", "math", "physics", "systems", "ml", "chemistry", "quantum_physics", "mechanics", "electrical"], default="auto", help="Subject domain for video")
     parser.add_argument("--no-cache", action="store_true", help="Force regenerate AI script")
@@ -90,14 +94,40 @@ def main():
     parser.add_argument("--frames", type=str, default=None, help="Frame range to render (e.g. '0-89') for benchmarks")
     parser.add_argument("--fast-test", action="store_true", help="Quick 90-frame (3s) benchmark render (equivalent to --frames 0-89)")
     parser.add_argument("--no-manim", action="store_true", help="Disable Stage 4.5 Manim Community pre-rendering")
+    parser.add_argument("--mock", action="store_true", help="Bypass Gemini API calls and load pre-validated mock script")
+    parser.add_argument("--render-backend", choices=["local", "lambda"], default="local", help="Rendering backend (local or AWS Remotion Lambda)")
+    # Revision CLI Entrypoints (Checkpoint 02)
+    parser.add_argument("--revise-scene", type=str, default=None, help="Target scene_id to surgically revise (Mode A or B)")
+    parser.add_argument("--set-visual-type", type=str, default=None, help="Mode A: New visual_type for scene")
+    parser.add_argument("--set-title", type=str, default=None, help="Mode A: New title for scene")
+    parser.add_argument("--set-visual-json", type=str, default=None, help="Mode A: JSON dictionary of visual props")
+    parser.add_argument("--set-narration", type=str, default=None, help="Mode B: New spoken narration for scene")
     args = parser.parse_args()
+
+    # Dispatch to surgical scene revision engine if --revise-scene is present
+    if args.revise_scene:
+        if not args.run_id:
+            stage_error("REVISE", "--run-id is required when using --revise-scene.", exit_code=1)
+        out_file = execute_revision(
+            run_id=args.run_id,
+            target_scene_id=args.revise_scene,
+            set_visual_type=args.set_visual_type,
+            set_title=args.set_title,
+            set_visual_json=args.set_visual_json,
+            set_narration=args.set_narration,
+            output_path=args.output,
+        )
+        stage_success("REVISE", f"Revision complete! Video saved to {out_file}")
+        return
 
     if args.fast_test and not args.frames:
         args.frames = "0-89"
 
-    topic = args.topic.strip()
-    if not topic:
+    if args.topic is None:
+        stage_error("PIPELINE", "--topic is required.", exit_code=1)
+    if not args.topic.strip():
         stage_error("PIPELINE", "--topic cannot be empty.", exit_code=1)
+    topic = args.topic.strip()
 
     run_id = args.run_id or generate_run_id()
 
@@ -126,6 +156,8 @@ def main():
         cmd.append("--no-cache")
     if args.no_manim:
         cmd.append("--no-manim")
+    if args.mock:
+        cmd.append("--mock")
 
     gen_env = os.environ.copy()
     gen_env["PYTHONPATH"] = f"{REPO_DIR}:{ENGINE_DIR}:{gen_env.get('PYTHONPATH', '')}"
@@ -148,6 +180,28 @@ def main():
     if data_file_path.stat().st_size == 0:
         stage_error("VALIDATION", f"Generated data file is empty: {data_file_path}")
 
+    # Step 1.5: Stage 4.8 - Node.js TypeScript Zod Validation Gate
+    stage_start("ZOD_GATE", f"Validating {data_file_path.name} against TypeScript Zod schema...")
+    zod_script = VIDEO_DIR / "scripts" / "validate_timeline.mjs"
+    try:
+        zod_res = subprocess.run(["node", str(zod_script), str(data_file_path)], cwd=str(VIDEO_DIR))
+        if zod_res.returncode != 0:
+            write_reflection_error(
+                run_dir=run_dir,
+                stage="zod_gate",
+                message=f"Node.js Zod validation gate failed on {data_file_path.name}",
+            )
+            stage_error("ZOD_GATE", f"Node.js Zod validation gate failed. Review {run_dir}/validation.error.json", exit_code=zod_res.returncode)
+    except Exception as exc:
+        write_reflection_error(
+            run_dir=run_dir,
+            stage="zod_gate",
+            message=f"Failed to execute Zod validation subprocess: {exc}",
+        )
+        stage_error("ZOD_GATE", f"Failed to execute Zod validation subprocess: {exc}", exit_code=1)
+
+    stage_success("ZOD_GATE", "Timeline schema successfully verified by Zod gate.")
+
     # Step 2: Clear Remotion build cache
     cache_dir = VIDEO_DIR / "node_modules" / ".cache"
     if cache_dir.is_dir():
@@ -167,9 +221,7 @@ def main():
     except ValueError:
         remotion_out = str(out_file_path)
 
-    # Step 4: Render Video with Remotion
-    stage_start("RENDER", f"Rendering {out_file_path.name} with props: {data_file_path}")
-
+    # Step 4: Render Video with Remotion (Lambda or Local Engine)
     remotion_cmd = [
         "npx", "remotion", "render", "CodingShort", remotion_out,
         "--codec", "h264",
@@ -178,12 +230,29 @@ def main():
     if args.frames:
         remotion_cmd.extend(["--frames", str(args.frames)])
 
-    try:
-        res = subprocess.run(remotion_cmd, cwd=str(VIDEO_DIR))
-        if res.returncode != 0:
-            stage_error("RENDER", f"Remotion render failed with exit code {res.returncode}.", exit_code=res.returncode)
-    except Exception as exc:
-        stage_error("RENDER", f"Failed to execute Remotion subprocess: {exc}", exit_code=1)
+    if args.render_backend == "lambda":
+        stage_start("RENDER_LAMBDA", f"Dispatching render to AWS Remotion Lambda: {out_file_path.name}")
+        lambda_ok = dispatch_lambda_render(
+            data_file_path=data_file_path,
+            output_file_path=out_file_path,
+            frames=args.frames,
+        )
+        if not lambda_ok:
+            stage_start("RENDER_LOCAL", f"Rendering locally {out_file_path.name} with props: {data_file_path}")
+            try:
+                res = subprocess.run(remotion_cmd, cwd=str(VIDEO_DIR))
+                if res.returncode != 0:
+                    stage_error("RENDER", f"Remotion render failed with exit code {res.returncode}.", exit_code=res.returncode)
+            except Exception as exc:
+                stage_error("RENDER", f"Failed to execute Remotion subprocess: {exc}", exit_code=1)
+    else:
+        stage_start("RENDER", f"Rendering {out_file_path.name} with props: {data_file_path}")
+        try:
+            res = subprocess.run(remotion_cmd, cwd=str(VIDEO_DIR))
+            if res.returncode != 0:
+                stage_error("RENDER", f"Remotion render failed with exit code {res.returncode}.", exit_code=res.returncode)
+        except Exception as exc:
+            stage_error("RENDER", f"Failed to execute Remotion subprocess: {exc}", exit_code=1)
 
     stage_success("RENDER", f"Video rendered successfully: {out_file_path}")
 
@@ -204,6 +273,12 @@ def main():
         meta = {}
 
     if not is_valid:
+        write_reflection_error(
+            run_dir=run_dir,
+            stage="output_validation",
+            message="Rendered video failed output validation",
+            errors=errors,
+        )
         # Quarantine or clean up corrupt video
         if out_file_path.exists():
             quarantine_path = out_file_path.with_name(f"{out_file_path.stem}.corrupt{out_file_path.suffix}")
@@ -227,6 +302,34 @@ def main():
         "OUTPUT_VALIDATION",
         f"Video verified: {width}x{height}, h264/aac, duration {vid_dur:.2f}s ({out_file_path.stat().st_size:,} bytes)"
     )
+
+    # Step 6: Initialize manifest & baseline segments for surgical revisions (Checkpoint 02)
+    try:
+        import json
+        with open(data_file_path, "r", encoding="utf-8") as f:
+            data_payload = json.load(f)
+        scenes = data_payload.get("scenes", [])
+        manifest = load_manifest(run_dir)
+        if not manifest:
+            manifest = init_manifest(run_id, run_dir, scenes)
+
+        create_baseline_artifacts(
+            run_dir=run_dir,
+            data_payload=data_payload,
+            master_video_path=out_file_path,
+            master_audio_path=audio_file_path,
+        )
+
+        archive_revision_snapshot(
+            run_dir=run_dir,
+            revision=1,
+            data_payload=data_payload,
+            manifest_data=manifest,
+            output_mp4=out_file_path,
+        )
+        stage_success("MANIFEST", f"Artifact manifest initialized and revision 1 archived at revisions/rev_001/")
+    except Exception as exc:
+        print(f"[MANIFEST:WARN] Non-critical error archiving baseline revision: {exc}", file=sys.stderr)
 
     stage_success("PIPELINE", f"Upload-ready video available at: {out_file_path}")
 

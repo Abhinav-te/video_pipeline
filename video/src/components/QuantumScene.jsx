@@ -1,5 +1,5 @@
 import React from 'react';
-import { OffthreadVideo, staticFile, useCurrentFrame, useVideoConfig, interpolate, spring } from 'remotion';
+import { Sequence, OffthreadVideo, staticFile, useCurrentFrame, useVideoConfig, interpolate, spring } from 'remotion';
 import { SceneBadge } from './SceneBadge';
 import { QuantumIcon, SparklesIcon, LightningIcon, ScaleIcon } from './SvgIcons';
 
@@ -9,7 +9,7 @@ import { QuantumIcon, SparklesIcon, LightningIcon, ScaleIcon } from './SvgIcons'
  * Viewport Breathing:
  *   - 'compact_punch': ~55% height (centered, maxHeight: 960px)
  *   - 'canvas_spotlight': ~72% height (1260px tall) - expands simulation canvas to 920x940
- *   - 'full_dashboard': ~88% height (1540px tall) - full 3-tier layout with live telemetry
+ *   - 'full_dashboard': ~88% height (1360px tall) - full 3-tier layout with live telemetry
  *
  * 3 Distinct Sub-Modes:
  *   1. 'schrodinger_tunneling': Time-Dependent Schrödinger Wavepacket & Barrier Tunneling
@@ -19,6 +19,7 @@ import { QuantumIcon, SparklesIcon, LightningIcon, ScaleIcon } from './SvgIcons'
 export const QuantumScene = ({
   scene,
   sceneStartFrame = 0,
+  sceneDurationFrames = 150,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -59,7 +60,7 @@ export const QuantumScene = ({
   const isPhase3 = progress >= 0.70;
 
   // Viewport Height
-  const stageHeight = isSpotlight ? '1260px' : (isCompact ? '960px' : '1540px');
+  const stageHeight = isSpotlight ? '1260px' : (isCompact ? '960px' : '1360px');
   const canvasHeight = isSpotlight ? 760 : (isCompact ? 520 : 680);
   const canvasWidth = 896;
 
@@ -275,11 +276,13 @@ export const QuantumScene = ({
       >
         {scene?.manim_video_src ? (
           <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-            <OffthreadVideo
-              src={staticFile(scene.manim_video_src)}
-              muted
-              style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '20px' }}
-            />
+            <Sequence from={sceneStartFrame} durationInFrames={sceneDurationFrames} layout="none">
+              <OffthreadVideo
+                src={staticFile(scene.manim_video_src)}
+                muted
+                style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '20px' }}
+              />
+            </Sequence>
             <div
               style={{
                 position: 'absolute',

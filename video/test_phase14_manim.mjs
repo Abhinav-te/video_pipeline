@@ -33,7 +33,7 @@ const mockRemotionPlugin = {
         export const staticFile = (f) => f;
         export const OffthreadVideo = (props) => React.createElement('video', { 'data-testid': 'offthread-video', src: props.src, muted: props.muted, style: props.style });
         export const AbsoluteFill = (props) => React.createElement('div', props);
-        export const Sequence = (props) => React.createElement('div', props);
+        export const Sequence = ({ children }) => React.createElement(React.Fragment, null, children);
         export const Audio = (props) => null;
       `,
       loader: 'js',

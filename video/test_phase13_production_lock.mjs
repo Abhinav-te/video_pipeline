@@ -30,6 +30,8 @@ const mockRemotionPlugin = {
         export const spring = () => 1;
         export const staticFile = (path) => path;
         export const OffthreadVideo = (props) => null;
+        export const Sequence = ({ children }) => children;
+        export const AbsoluteFill = (props) => null;
       `,
       loader: 'js',
     }));
