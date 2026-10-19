@@ -1,8 +1,8 @@
 import React from 'react';
-import { useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
+import { useCurrentFrame, useVideoConfig } from 'remotion';
 import { SceneBadge } from './SceneBadge';
 import { KineticCallout } from './KineticCallout';
-import { CodeIcon, LightningIcon, SparklesIcon } from './SvgIcons';
+import { CodeIcon, LightningIcon } from './SvgIcons';
 import { splitCodeByToken, resolveCalloutTiming } from '../calloutUtils';
 
 // Blinking terminal cursor at ~2Hz (every 15 frames at 30fps)
@@ -30,7 +30,7 @@ export const TerminalCursor = () => {
   );
 };
 
-// Line-level code renderer with kinetic token callout support
+// Line-level code renderer with progressive spotlight highlighting
 const CodeLine = ({
   lineText,
   lineIdx,
@@ -41,6 +41,9 @@ const CodeLine = ({
   nextSceneStartTime,
   isLatestRevealed,
   showCursor,
+  isHighlighted = true,
+  hasActiveSpotlight = false,
+  fontSize = 28,
 }) => {
   const target = focusPhrase || scene?.focus_phrase || scene?.emphasis_word;
   const tokenData = lineText ? splitCodeByToken(lineText, target) : null;
@@ -70,30 +73,40 @@ const CodeLine = ({
     );
   }
 
+  // Spotlight line styles
+  const isLineActive = isHighlighted || !hasActiveSpotlight;
+  const lineOpacity = isLineActive ? 1.0 : 0.38;
+
   return (
     <div
       style={{
         display: 'flex',
         alignItems: 'baseline',
         lineHeight: '1.5',
-        fontFamily: 'monospace',
-        fontSize: '28px',
-        color: '#c9d1d9',
+        fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+        fontSize: `${fontSize}px`,
+        color: isLineActive ? '#f1f5f9' : '#64748b',
         boxSizing: 'border-box',
         transform: 'none',
         backfaceVisibility: 'hidden',
+        opacity: lineOpacity,
+        backgroundColor: (hasActiveSpotlight && isHighlighted) ? 'rgba(56, 189, 248, 0.12)' : 'transparent',
+        borderLeft: (hasActiveSpotlight && isHighlighted) ? '4px solid #38bdf8' : '4px solid transparent',
+        paddingLeft: (hasActiveSpotlight && isHighlighted) ? '8px' : '0px',
+        borderRadius: '4px',
+        transition: 'all 0.15s ease',
       }}
     >
       <span
         style={{
-          width: '50px',
+          width: '46px',
           flexShrink: 0,
-          color: '#484f58',
+          color: (hasActiveSpotlight && isHighlighted) ? '#38bdf8' : '#475569',
           userSelect: 'none',
-          fontSize: '24px',
+          fontSize: `${Math.max(16, fontSize - 4)}px`,
           textAlign: 'right',
-          marginRight: '24px',
-          transform: 'none',
+          marginRight: '20px',
+          fontWeight: (hasActiveSpotlight && isHighlighted) ? 'bold' : 'normal',
         }}
       >
         {String(lineIdx + 1).padStart(2, '0')}
@@ -114,11 +127,12 @@ const CodeLine = ({
 };
 
 /**
- * CodeRevealScene (Phase 5 - 1540px Vertical Stage Layout)
- * Full-height 1540px layout filling 85% of the 1080x1920 canvas:
- *   - Top Editorial Header (140px): CodeIcon, filename, macOS controls, SceneBadge.
- *   - Center Code Editor (980px): Line-by-line typewriter code reveal with 28px font and blinking cursor.
- *   - Bottom Execution Console (380px): Simulated terminal runner ($ python3 solution.py) with test results.
+ * CodeRevealScene (Phase A DevTool Primitive)
+ * Progressive Line Spotlight Code Inspector:
+ *   - Supports code, language, filename (e.g. agent.ts), highlight_lines: number[]
+ *   - Dims non-active lines (opacity: 0.38) while spotlighting active lines with cyan accent bar
+ *   - Auto-scales font size (19px-28px) to prevent horizontal card overflow
+ *   - Context-aware execution console
  */
 export const CodeRevealScene = ({
   scene,
@@ -129,15 +143,33 @@ export const CodeRevealScene = ({
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const code = scene?.code_snippet || '';
+  const code = scene?.code || scene?.code_snippet || '';
   const lines = code ? code.split('\n') : [''];
   const filename = scene?.filename || 'solution.py';
+  const language = (scene?.language || (filename.endsWith('.ts') ? 'typescript' : (filename.endsWith('.py') ? 'python' : 'code'))).toLowerCase();
+
+  // Highlight lines (1-indexed)
+  const rawHighlights = scene?.highlight_lines || [];
+  const highlightSet = new Set(Array.isArray(rawHighlights) ? rawHighlights : []);
+  const hasActiveSpotlight = highlightSet.size > 0;
+
+  // Font auto-scaling based on max line length and line count
+  const maxLineLen = Math.max(...lines.map((l) => l.length), 0);
+  const lineCount = lines.length;
+
+  let fontSize = 28;
+  if (maxLineLen > 52 || lineCount > 13) {
+    fontSize = 19;
+  } else if (maxLineLen > 44 || lineCount > 10) {
+    fontSize = 22;
+  } else if (maxLineLen > 36 || lineCount > 8) {
+    fontSize = 25;
+  }
 
   // Stagger each line entrance by 4 frames
   const staggerFrames = 4;
   const revealDuration = 6;
 
-  // Find the index of the latest revealed line
   let latestRevealedIdx = 0;
   lines.forEach((_, idx) => {
     const lineStart = sceneStartFrame + idx * staggerFrames;
@@ -145,6 +177,16 @@ export const CodeRevealScene = ({
       latestRevealedIdx = idx;
     }
   });
+
+  // Dynamic console labels based on language
+  const isTypeScript = language === 'typescript' || language === 'ts' || filename.endsWith('.ts');
+  const consoleCommand = isTypeScript
+    ? `$ npx tsx ${filename}`
+    : `$ python3 -m pytest ${filename} -v`;
+  const consoleStatus = isTypeScript
+    ? 'STREAM ACTIVE • 200 OK'
+    : 'PASSED 42/42 tests in 0.038s';
+  const consoleBadge = isTypeScript ? 'TS 5.4 • ESM' : 'EXIT CODE: 0';
 
   return (
     <div
@@ -166,26 +208,25 @@ export const CodeRevealScene = ({
         justifyContent: 'space-between',
       }}
     >
-      {/* 1. TOP TERMINAL HEADER BAR (140px) */}
+      {/* 1. TOP TERMINAL HEADER BAR (110px) */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          height: '110px',
+          height: '90px',
           paddingBottom: '16px',
           borderBottom: '1.5px solid rgba(255, 255, 255, 0.08)',
           boxSizing: 'border-box',
         }}
       >
-        {/* macOS Window Controls + Filename */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <span style={{ width: 16, height: 16, borderRadius: '50%', backgroundColor: '#ff5f56', display: 'inline-block', boxShadow: '0 0 8px rgba(255,95,86,0.5)' }} />
-          <span style={{ width: 16, height: 16, borderRadius: '50%', backgroundColor: '#ffbd2e', display: 'inline-block', boxShadow: '0 0 8px rgba(255,189,46,0.5)' }} />
-          <span style={{ width: 16, height: 16, borderRadius: '50%', backgroundColor: '#27c93f', display: 'inline-block', boxShadow: '0 0 8px rgba(39,201,63,0.5)' }} />
+          <span style={{ width: 14, height: 14, borderRadius: '50%', backgroundColor: '#ff5f56', display: 'inline-block', boxShadow: '0 0 8px rgba(255,95,86,0.5)' }} />
+          <span style={{ width: 14, height: 14, borderRadius: '50%', backgroundColor: '#ffbd2e', display: 'inline-block', boxShadow: '0 0 8px rgba(255,189,46,0.5)' }} />
+          <span style={{ width: 14, height: 14, borderRadius: '50%', backgroundColor: '#27c93f', display: 'inline-block', boxShadow: '0 0 8px rgba(39,201,63,0.5)' }} />
           <div
             style={{
-              marginLeft: '16px',
+              marginLeft: '14px',
               backgroundColor: 'rgba(255, 255, 255, 0.06)',
               border: '1px solid rgba(255, 255, 255, 0.1)',
               borderRadius: '8px',
@@ -195,10 +236,10 @@ export const CodeRevealScene = ({
               gap: '8px',
             }}
           >
-            <LightningIcon size={20} color="#58a6ff" />
+            <LightningIcon size={18} color="#58a6ff" />
             <span
               style={{
-                fontSize: '22px',
+                fontSize: '20px',
                 color: '#e6edf3',
                 fontFamily: 'monospace',
                 fontWeight: 'bold',
@@ -208,6 +249,22 @@ export const CodeRevealScene = ({
               {filename}
             </span>
           </div>
+
+          {/* Language Badge */}
+          <span
+            style={{
+              backgroundColor: isTypeScript ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255, 214, 51, 0.15)',
+              border: `1px solid ${isTypeScript ? '#38bdf8' : '#ffd633'}`,
+              color: isTypeScript ? '#38bdf8' : '#ffd633',
+              borderRadius: '6px',
+              padding: '4px 10px',
+              fontSize: '14px',
+              fontFamily: 'monospace',
+              fontWeight: 800,
+            }}
+          >
+            {isTypeScript ? 'TS' : 'PYTHON'}
+          </span>
         </div>
 
         {/* Scene Badge */}
@@ -216,18 +273,21 @@ export const CodeRevealScene = ({
         ) : null}
       </div>
 
-      {/* 2. CODE AREA (980px) */}
+      {/* 2. CODE AREA (1020px) */}
       <div
         style={{
-          height: '980px',
-          padding: '28px 24px',
+          flex: 1,
+          margin: '18px 0',
+          padding: '24px 20px',
           boxSizing: 'border-box',
           display: 'flex',
           flexDirection: 'column',
-          justifyContent: 'space-around',
+          justifyContent: lines.length <= 6 ? 'flex-start' : 'space-around',
+          gap: lines.length <= 6 ? '20px' : '8px',
           backgroundColor: '#0d1117',
-          borderRadius: '20px',
+          borderRadius: '18px',
           border: '1px solid rgba(255, 255, 255, 0.06)',
+          overflow: 'hidden',
         }}
       >
         {lines.map((line, idx) => {
@@ -239,6 +299,8 @@ export const CodeRevealScene = ({
             const elapsed = frame - lineStart;
             lineOpacity = elapsed < revealDuration ? Math.round((elapsed / revealDuration) * 100) / 100 : 1;
           }
+
+          const isHighlighted = highlightSet.has(idx + 1);
 
           return (
             <div
@@ -259,21 +321,24 @@ export const CodeRevealScene = ({
                 nextSceneStartTime={nextSceneStartTime}
                 isLatestRevealed={idx === latestRevealedIdx}
                 showCursor={true}
+                isHighlighted={isHighlighted}
+                hasActiveSpotlight={hasActiveSpotlight}
+                fontSize={fontSize}
               />
             </div>
           );
         })}
       </div>
 
-      {/* 3. BOTTOM TERMINAL EXECUTION CONSOLE (380px) */}
+      {/* 3. BOTTOM TERMINAL EXECUTION CONSOLE (320px) */}
       <div
         style={{
-          height: '380px',
+          height: '320px',
           backgroundColor: '#090d13',
-          borderRadius: '22px',
+          borderRadius: '20px',
           border: '1.5px solid rgba(88, 166, 255, 0.3)',
           boxShadow: '0 16px 32px rgba(0, 0, 0, 0.6)',
-          padding: '24px 28px',
+          padding: '22px 26px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
@@ -283,39 +348,36 @@ export const CodeRevealScene = ({
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <CodeIcon size={24} color="#58a6ff" />
-            <span style={{ fontSize: '22px', color: '#58a6ff', fontWeight: 900, letterSpacing: '1px' }}>
+            <CodeIcon size={22} color="#58a6ff" />
+            <span style={{ fontSize: '20px', color: '#58a6ff', fontWeight: 900, letterSpacing: '1px' }}>
               STDOUT • EXECUTION ENVIRONMENT
             </span>
           </div>
-          <span style={{ fontSize: '18px', color: '#56d364', fontWeight: 'bold' }}>
-            EXIT CODE: 0
+          <span style={{ fontSize: '16px', color: '#56d364', fontWeight: 'bold' }}>
+            {consoleBadge}
           </span>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '22px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '20px' }}>
           <div style={{ color: '#8b949e' }}>
-            $ python3 -m pytest {filename} -v
+            {consoleCommand}
           </div>
           <div style={{ color: '#56d364', fontWeight: 'bold' }}>
-            PASSED 42/42 tests in 0.038s
-          </div>
-          <div style={{ color: '#79c0ff' }}>
-            Peak Memory: 12.8 MB • Aux Space: O(1)
+            {consoleStatus}
           </div>
         </div>
 
         <div
           style={{
-            padding: '12px 18px',
+            padding: '10px 16px',
             backgroundColor: 'rgba(88, 166, 255, 0.1)',
             borderRadius: '10px',
             border: '1px solid rgba(88, 166, 255, 0.25)',
-            fontSize: '20px',
+            fontSize: '18px',
             color: '#c9d1d9',
           }}
         >
-          {scene?.spoken_text || 'Execution finishes in optimal asymptotic bounds.'}
+          {scene?.spoken_text || scene?.narration || 'Execution finishes in optimal asymptotic bounds.'}
         </div>
       </div>
     </div>

@@ -129,6 +129,7 @@ COMPARISON_FOOTERS = {
     "code": "KEY TAKEAWAY: ASYMPTOTIC COMPLEXITY ANALYSIS — Hash table indexing eliminates nested O(n²) bottlenecks in critical loops",
     "ml": "KEY TAKEAWAY: Density clustering partitions non-linear manifold geometry without spherical centroid assumptions",
     "systems": "KEY TAKEAWAY: Decoupled asynchronous architecture prevents cascading bottlenecks across microservices",
+    "devtools": "KEY TAKEAWAY: v2 SDK reduces cold-start latency by 6x with 90% less code",
 }
 
 DOMAIN_MATH_STEPS = {
@@ -260,7 +261,7 @@ DOMAIN_MATH_INTUITION = {
 
 def resolve_domain(timed_scenes: List[Dict[str, Any]], domain_hint: str = "auto") -> str:
     """Resolves active domain from hint or scene primitives."""
-    if domain_hint in {"code", "math", "physics", "systems", "ml", "chemistry", "quantum_physics", "mechanics", "electrical"}:
+    if domain_hint in {"code", "math", "physics", "systems", "ml", "chemistry", "quantum_physics", "mechanics", "electrical", "devtools"}:
         return domain_hint
 
     has_quantum = any(

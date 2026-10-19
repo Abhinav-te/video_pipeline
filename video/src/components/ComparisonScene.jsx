@@ -321,6 +321,7 @@ export const ComparisonScene = ({
         const isPhysicsOrMechanics = domain.includes('mechanic') || domain.includes('physics') || textLower.includes('beam') || textLower.includes('equilibrium') || textLower.includes('inclined plane') || textLower.includes('axle') || textLower.includes('newton');
         const isElectrical = domain.includes('electr') || textLower.includes('thevenin') || textLower.includes('kvl') || textLower.includes('smart grid') || textLower.includes('circuit');
         const isML = domain.includes('ml') || textLower.includes('cluster') || textLower.includes('centroid') || textLower.includes('dbscan') || textLower.includes('kmeans');
+        const isDevTools = domain.includes('devtools') || textLower.includes('sdk') || textLower.includes('migration') || textLower.includes('latency');
 
         // Derive labels dynamically from leftSide / rightSide cards if provided
         const leftTag = leftSide?.tag ? `${leftSide.tag.toUpperCase()}` : '';
@@ -382,6 +383,14 @@ export const ComparisonScene = ({
           defaultRightMetric = rightSide?.metric || 'd = 2 (Non-linear)';
           defaultSummary = 'KEY TAKEAWAY: Manifold learning preserves topological neighborhoods across complex distributions';
           defaultTag = leftTag && rightTag ? `${leftTag} VS ${rightTag}` : 'TOPOLOGY: NEIGHBORHOOD';
+        } else if (isDevTools) {
+          footerTitle = 'PERFORMANCE & DEVELOPER EXPERIENCE BENCHMARK';
+          defaultLeftLabel = leftTag || 'LEGACY SDK (V1)';
+          defaultLeftMetric = leftSide?.metric || '840ms Latency';
+          defaultRightLabel = rightTag || 'NEW SDK (V2)';
+          defaultRightMetric = rightSide?.metric || '140ms Latency (6x Faster)';
+          defaultSummary = scene?.comparison_footer || 'KEY TAKEAWAY: v2 SDK reduces cold-start latency by 6x with 90% less boilerplate';
+          defaultTag = leftTag && rightTag ? `${leftTag} VS ${rightTag}` : 'BENCHMARK: 6x SPEEDUP';
         } else if (!isMath) {
           footerTitle = 'COMPARATIVE REGIME ANALYSIS';
           defaultLeftLabel = leftTag || (leftSide?.title ? `${leftSide.title.toUpperCase()}` : 'BASELINE APPROACH');

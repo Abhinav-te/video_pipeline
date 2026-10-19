@@ -47,6 +47,7 @@ ALL_SUBJECTS = {
     "quantum_physics",
     "mechanics",
     "electrical",
+    "devtools",
 }
 
 STEM_SUBJECTS = {
@@ -332,29 +333,43 @@ def validate_script_plan(script_data: Any) -> Tuple[bool, List[str]]:
 
         # 2. Code Reveal & Code Transform
         elif scene_type in {"code_reveal", "code_transform"}:
-            code = scene.get("code_snippet") or scene.get("code", "")
+            code = scene.get("code_snippet") or scene.get("code") or scene.get("after_code") or scene.get("before_code", "")
             if not isinstance(code, str) or not code.strip():
-                errors.append(f"Scene {index} ({scene_type}) requires non-empty 'code_snippet'.")
-            elif script_subject == "code":
-                # Strict Python AST validation ONLY for code subject
-                lang = scene.get("language", "python").lower()
-                if lang == "python":
-                    valid, err = check_syntax(code)
-                    if not valid:
-                        errors.append(
-                            f"Scene {index} ({scene_type}) AST syntax check failed: {err}\nCode snippet:\n{code}"
-                        )
+                errors.append(f"Scene {index} ({scene_type}) requires non-empty 'code_snippet' or code fields.")
             else:
-                # STEM/Non-code subject: validate as formatted equation or pseudo-code string
-                valid, err = validate_formula_string(code, "code_snippet", index)
-                if not valid:
-                    errors.append(err)
+                if not scene.get("code_snippet"):
+                    scene["code_snippet"] = code
+                if script_subject == "code":
+                    # Strict Python AST validation ONLY for code subject and python language
+                    lang = scene.get("language", "python").lower()
+                    if lang == "python":
+                        valid, err = check_syntax(code)
+                        if not valid:
+                            errors.append(
+                                f"Scene {index} ({scene_type}) AST syntax check failed: {err}\nCode snippet:\n{code}"
+                            )
+                else:
+                    # STEM/DevTools/Non-code subject: validate as formatted equation or snippet string
+                    valid, err = validate_formula_string(code, "code_snippet", index)
+                    if not valid:
+                        errors.append(err)
 
         # 3. Terminal Run
         elif scene_type == "terminal":
+            commands = scene.get("commands")
             code = scene.get("code_snippet") or scene.get("code", "")
+            if not code and commands and isinstance(commands, list):
+                cmd_lines = []
+                for c in commands:
+                    if isinstance(c, dict):
+                        cmd_lines.append(f"$ {c.get('cmd', '')}")
+                        for out_l in c.get("output", []):
+                            cmd_lines.append(str(out_l))
+                code = "\n".join(cmd_lines)
+                scene["code_snippet"] = code
+
             if not isinstance(code, str) or not code.strip():
-                errors.append(f"Scene {index} (terminal) requires non-empty 'code_snippet'.")
+                errors.append(f"Scene {index} (terminal) requires non-empty 'code_snippet' or 'commands'.")
             else:
                 valid, err = check_terminal_snippet(code)
                 if not valid:

@@ -14,6 +14,8 @@ Each STEM script defines rich manim_spec configurations on 3 to 5 body scenes
 so offline compilation and Remotion compositing can be tested in sub-second time.
 """
 
+import copy
+import re
 from typing import Dict, Any
 
 
@@ -1203,17 +1205,268 @@ MOCK_SCRIPTS: Dict[str, Dict[int, Dict[str, Any]]] = {
             ],
         },
     },
+    "devtools": {
+        35: {
+            "title": "Acme Cloud SDK v2 Launch",
+            "subject": "devtools",
+            "duration": 35,
+            "scenes": [
+                {
+                    "scene_id": 1,
+                    "title": "Acme Cloud SDK v2 Launch",
+                    "visual_type": "fullscreen_text",
+                    "spoken_text": "Acme SDK version two delivers streaming with zero boilerplate.",
+                    "display_text": "ACME SDK v2.0 LAUNCH",
+                    "emphasis_word": "boilerplate",
+                },
+                {
+                    "scene_id": 2,
+                    "title": "CLI Installation",
+                    "visual_type": "terminal",
+                    "spoken_text": "Upgrade instantly with npm install at acme slash sdk at latest.",
+                    "commands": [
+                        {
+                            "cmd": "npm install @acme/sdk@latest",
+                            "output": [
+                                "+ @acme/sdk@2.0.0",
+                                "added 1 package in 140ms",
+                                "✓ Audited 42 packages with 0 vulnerabilities",
+                            ],
+                            "status": "✓ Built in 140ms",
+                        }
+                    ],
+                    "code_snippet": "$ npm install @acme/sdk@latest\n+ @acme/sdk@2.0.0\n✓ Installed in 140ms",
+                },
+                {
+                    "scene_id": 3,
+                    "title": "V1 to V2 Migration",
+                    "visual_type": "code_transform",
+                    "spoken_text": "Migrate twenty-eight lines of verbose boilerplate into four declarative lines.",
+                    "before_label": "Legacy v1 (28 lines)",
+                    "after_label": "New v2 SDK (4 lines)",
+                    "before_code": "client = AcmeClient(api_key, retry_limit=5)\nsession = client.create_session(timeout=30)\nreq = session.prepare_request(model='agent')\nres = session.execute(req)\nreturn res.data",
+                    "after_code": "client = Acme(api_key)\nreturn client.agents.stream(prompt)",
+                },
+                {
+                    "scene_id": 4,
+                    "title": "Agent Execution Stream",
+                    "visual_type": "code_reveal",
+                    "spoken_text": "Stream token responses directly with native async generator support.",
+                    "filename": "agent.ts",
+                    "language": "typescript",
+                    "code": "import { Acme } from '@acme/sdk';\n\nconst client = new Acme({ apiKey: process.env.ACME_KEY });\n\nfor await (const chunk of client.agents.stream('deploy')) {\n  process.stdout.write(chunk.text);\n}",
+                    "code_snippet": "import { Acme } from '@acme/sdk';\n\nconst client = new Acme({ apiKey: process.env.ACME_KEY });\n\nfor await (const chunk of client.agents.stream('deploy')) {\n  process.stdout.write(chunk.text);\n}",
+                    "highlight_lines": [5, 6],
+                    "focus_phrase": "client.agents.stream",
+                },
+                {
+                    "scene_id": 5,
+                    "title": "Edge Architecture & Flow",
+                    "visual_type": "diagram",
+                    "spoken_text": "Client requests stream through edge gateways directly into vector indexes.",
+                    "nodes": ["Client SDK", "Edge Gateway", "Vector DB"],
+                    "request_method": "POST /v2/agents/stream",
+                    "request_payload": '{\n  "model": "acme-2",\n  "stream": true,\n  "max_tokens": 1024\n}',
+                    "response_status": "200 OK • 14ms",
+                    "response_payload": '{\n  "status": 200,\n  "latency_ms": 14,\n  "stream": "active"\n}',
+                },
+                {
+                    "scene_id": 6,
+                    "title": "Performance & DX Benchmark",
+                    "visual_type": "comparison",
+                    "spoken_text": "Cut cold-start latency by eighty percent with ninety percent fewer lines.",
+                    "problem_label": "Legacy SDK v1",
+                    "problem_code": "latency: 840ms\nboilerplate: 28 lines\nerror_rate: 4.2%",
+                    "solution_label": "New v2 SDK",
+                    "solution_code": "latency: 140ms\nboilerplate: 4 lines\nerror_rate: 0.01%",
+                    "comparison_sides": {
+                        "left": {"tag": "LEGACY V1", "metric": "840ms Latency"},
+                        "right": {"tag": "NEW V2 SDK", "metric": "140ms Latency (6x Faster)"},
+                    },
+                    "comparison_footer": "KEY TAKEAWAY: v2 SDK reduces cold-start latency by 6x with 90% less code",
+                },
+            ],
+        },
+        60: {
+            "title": "Acme Cloud SDK v2 Launch & Migration Guide",
+            "subject": "devtools",
+            "duration": 60,
+            "scenes": [
+                {
+                    "scene_id": 1,
+                    "title": "Acme Cloud SDK v2 Launch",
+                    "visual_type": "fullscreen_text",
+                    "spoken_text": "Welcome to the next generation of cloud developer tools where lightning fast SDK performance meets zero configuration.",
+                    "display_text": "ACME SDK v2.0 LAUNCH",
+                    "emphasis_word": "performance",
+                },
+                {
+                    "scene_id": 2,
+                    "title": "CLI Installation",
+                    "visual_type": "terminal",
+                    "spoken_text": "Upgrade your project dependencies in a single step using npm install at acme slash sdk at latest with zero peer conflicts.",
+                    "commands": [
+                        {
+                            "cmd": "npm install @acme/sdk@latest",
+                            "output": [
+                                "+ @acme/sdk@2.0.0",
+                                "added 1 package in 140ms",
+                                "✓ Audited 42 packages with 0 vulnerabilities",
+                            ],
+                            "status": "✓ Built in 140ms",
+                        }
+                    ],
+                    "code_snippet": "$ npm install @acme/sdk@latest\n+ @acme/sdk@2.0.0\n✓ Installed in 140ms",
+                },
+                {
+                    "scene_id": 3,
+                    "title": "V1 to V2 Migration",
+                    "visual_type": "code_transform",
+                    "spoken_text": "Replace twenty-eight lines of legacy session connection boilerplate with four clean declarative lines of code.",
+                    "before_label": "Legacy v1 (28 lines)",
+                    "after_label": "New v2 SDK (4 lines)",
+                    "before_code": "client = AcmeClient(api_key, retry_limit=5)\nsession = client.create_session(timeout=30)\nreq = session.prepare_request(model='agent')\nres = session.execute(req)\nreturn res.data",
+                    "after_code": "client = Acme(api_key)\nreturn client.agents.stream(prompt)",
+                },
+                {
+                    "scene_id": 4,
+                    "title": "Agent Execution Stream",
+                    "visual_type": "code_reveal",
+                    "spoken_text": "Stream real-time tokens directly to your client interface using native async generators and structured TypeScript typing.",
+                    "filename": "agent.ts",
+                    "language": "typescript",
+                    "code": "import { Acme } from '@acme/sdk';\n\nconst client = new Acme({ apiKey: process.env.ACME_KEY });\n\nfor await (const chunk of client.agents.stream('deploy')) {\n  process.stdout.write(chunk.text);\n}",
+                    "code_snippet": "import { Acme } from '@acme/sdk';\n\nconst client = new Acme({ apiKey: process.env.ACME_KEY });\n\nfor await (const chunk of client.agents.stream('deploy')) {\n  process.stdout.write(chunk.text);\n}",
+                    "highlight_lines": [5, 6],
+                    "focus_phrase": "client.agents.stream",
+                },
+                {
+                    "scene_id": 5,
+                    "title": "Edge Architecture & Flow",
+                    "visual_type": "diagram",
+                    "spoken_text": "Client payloads stream across global edge nodes with automatic failover directly querying low latency vector search indices.",
+                    "nodes": ["Client SDK", "Edge Gateway", "Vector DB"],
+                    "request_method": "POST /v2/agents/stream",
+                    "request_payload": '{\n  "model": "acme-2",\n  "stream": true,\n  "max_tokens": 1024\n}',
+                    "response_status": "200 OK • 14ms",
+                    "response_payload": '{\n  "status": 200,\n  "latency_ms": 14,\n  "stream": "active"\n}',
+                },
+                {
+                    "scene_id": 6,
+                    "title": "Performance & DX Benchmark",
+                    "visual_type": "comparison",
+                    "spoken_text": "Cut cold start latency by eighty percent while reducing boilerplate maintenance by ninety percent across all engineering teams.",
+                    "problem_label": "Legacy SDK v1",
+                    "problem_code": "latency: 840ms\nboilerplate: 28 lines\nerror_rate: 4.2%",
+                    "solution_label": "New v2 SDK",
+                    "solution_code": "latency: 140ms\nboilerplate: 4 lines\nerror_rate: 0.01%",
+                    "comparison_sides": {
+                        "left": {"tag": "LEGACY V1", "metric": "840ms Latency"},
+                        "right": {"tag": "NEW V2 SDK", "metric": "140ms Latency (6x Faster)"},
+                    },
+                    "comparison_footer": "KEY TAKEAWAY: v2 SDK reduces cold-start latency by 6x with 90% less code",
+                },
+            ],
+        },
+    },
 }
 
 
-def get_mock_script(topic: str, duration: int, subject: str = "auto") -> Dict[str, Any]:
+def inject_source_facts_into_mock(script: Dict[str, Any], facts: Dict[str, Any]) -> Dict[str, Any]:
+    """Inject customer ground-truth facts (CLI commands, snippets, endpoints) directly into mock scenes."""
+    if not facts:
+        return script
+
+    prod_name = facts.get("product_name") or ""
+    cmds = facts.get("cli_commands") or []
+    snippets = facts.get("code_snippets") or []
+    endpoints = facts.get("api_endpoints") or []
+    key_points = facts.get("key_points") or []
+
+    for sc in script.get("scenes", []):
+        v_type = sc.get("visual_type") or sc.get("scene_type")
+
+        # 1. Fullscreen Text / Hero Hook
+        if v_type == "fullscreen_text" and prod_name:
+            if not sc.get("title") or "Launch" in sc.get("title", ""):
+                sc["title"] = f"{prod_name} Launch"
+            sc["display_text"] = f"{prod_name.upper()}"
+
+        # 2. Terminal CLI Simulator
+        elif v_type == "terminal" and cmds:
+            primary_cmd = cmds[0]
+            sc["title"] = f"Install {prod_name or 'CLI'}"
+            sc["commands"] = [
+                {
+                    "cmd": primary_cmd,
+                    "output": [
+                        f"+ {prod_name or 'package'}@latest",
+                        "added 1 package in 120ms",
+                        "✓ Audited dependencies with 0 vulnerabilities",
+                    ],
+                    "status": "✓ Built in 120ms",
+                }
+            ]
+            sc["code_snippet"] = f"$ {primary_cmd}\n✓ Built in 120ms"
+
+        # 3. Code Reveal
+        elif v_type == "code_reveal" and snippets:
+            chosen = snippets[1] if len(snippets) >= 2 else snippets[0]
+            sc["code"] = chosen["code"]
+            sc["code_snippet"] = chosen["code"]
+            if chosen.get("language"):
+                sc["language"] = chosen["language"]
+            if prod_name:
+                sc["title"] = f"{prod_name} SDK Integration"
+
+        # 4. Code Transform (Before -> After Morph)
+        elif v_type == "code_transform" and snippets:
+            if len(snippets) >= 2:
+                sc["before_code"] = snippets[0]["code"]
+                sc["after_code"] = snippets[1]["code"]
+                sc["before_label"] = f"Legacy v1 ({len(snippets[0]['code'].splitlines())} lines)"
+                sc["after_label"] = f"New {prod_name or 'v2'} ({len(snippets[1]['code'].splitlines())} lines)"
+            else:
+                sc["after_code"] = snippets[0]["code"]
+                sc["after_label"] = f"New {prod_name or 'v2'} SDK"
+
+        # 5. Diagram
+        elif v_type == "diagram":
+            if endpoints:
+                sc["request_method"] = endpoints[0]
+            if prod_name:
+                sc["nodes"] = ["Client SDK", f"{prod_name} Gateway", "Edge Store"]
+                sc["title"] = f"{prod_name} Architecture"
+
+        # 6. Comparison
+        elif v_type == "comparison" and key_points:
+            point_summary = "\n".join(key_points[:3])
+            sc["solution_code"] = point_summary
+            if "comparison_sides" in sc and isinstance(sc["comparison_sides"], dict):
+                if "right" in sc["comparison_sides"]:
+                    sc["comparison_sides"]["right"]["metric"] = key_points[0]
+
+    return script
+
+
+def get_mock_script(
+    topic: str,
+    duration: int,
+    subject: str = "auto",
+    source_text: Any = None,
+    source_facts: Any = None,
+) -> Dict[str, Any]:
     """
     Returns a rich, pre-validated mock script from the library for offline testing.
     Falls back gracefully across subjects and durations.
+    Injects customer-provided ground-truth source facts into scenes.
     """
     subj = (subject or "math").lower()
-    if subj not in MOCK_SCRIPTS:
-        t = (topic or "").lower()
+    t = (topic or "").lower()
+
+    if subj == "devtools" or (source_text and str(source_text).strip()) or any(w in t for w in ("sdk", "devtools", "api", "cli", "migration", "changelog", "endpoint")):
+        subj = "devtools"
+    elif subj not in MOCK_SCRIPTS:
         if any(w in t for w in ("quantum", "tunnel", "wave", "schrodinger")):
             subj = "quantum_physics"
         elif any(w in t for w in ("circuit", "voltage", "grid", "electrical", "thevenin")):
@@ -1235,4 +1488,21 @@ def get_mock_script(topic: str, duration: int, subject: str = "auto") -> Dict[st
     script = copy.deepcopy(MOCK_SCRIPTS[subj][dur])
     if topic:
         script["title"] = topic.strip()
+
+    # Extract source facts if not explicitly provided
+    facts = source_facts
+    if not facts and source_text and isinstance(source_text, str) and source_text.strip():
+        try:
+            try:
+                from engine.ingestion.source_loader import extract_source_facts
+            except ImportError:
+                from ingestion.source_loader import extract_source_facts
+            facts = extract_source_facts(source_text.strip())
+        except Exception:
+            facts = None
+
+    if facts:
+        script = inject_source_facts_into_mock(script, facts)
+
     return script
+

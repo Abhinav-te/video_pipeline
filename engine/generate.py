@@ -146,7 +146,7 @@ ENGINE_VERSION = "2.0"
 # Cache
 # ---------------------------------------------------------------------------
 
-def build_cache_key(topic, duration, subject="auto"):
+def build_cache_key(topic, duration, subject="auto", source_text=None):
     """
     Create a stable cache key from the actual generation inputs.
 
@@ -159,6 +159,7 @@ def build_cache_key(topic, duration, subject="auto"):
             "topic": topic.strip(),
             "duration": duration,
             "subject": subject,
+            "source_text": (source_text or "").strip(),
             "model": model,
             "schema_version": SCHEMA_VERSION,
             "engine_version": ENGINE_VERSION,
@@ -169,13 +170,13 @@ def build_cache_key(topic, duration, subject="auto"):
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
 
 
-def get_script_cache_path(topic, duration, subject="auto"):
-    key = build_cache_key(topic, duration, subject=subject)
+def get_script_cache_path(topic, duration, subject="auto", source_text=None):
+    key = build_cache_key(topic, duration, subject=subject, source_text=source_text)
     return SCRIPT_CACHE_DIR / f"{key}.json"
 
 
-def load_script_cache(topic, duration, subject="auto"):
-    cache_file = get_script_cache_path(topic, duration, subject=subject)
+def load_script_cache(topic, duration, subject="auto", source_text=None):
+    cache_file = get_script_cache_path(topic, duration, subject=subject, source_text=source_text)
 
     if not cache_file.exists():
         return None
@@ -200,10 +201,10 @@ def load_script_cache(topic, duration, subject="auto"):
         return None
 
 
-def save_script_cache(topic, duration, data, subject="auto"):
+def save_script_cache(topic, duration, data, subject="auto", source_text=None):
     SCRIPT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
-    cache_file = get_script_cache_path(topic, duration, subject=subject)
+    cache_file = get_script_cache_path(topic, duration, subject=subject, source_text=source_text)
 
     with open(cache_file, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
@@ -262,11 +263,11 @@ def build_spoken_text(script):
 # Stage Execution
 # ---------------------------------------------------------------------------
 
-def generate_or_load_script(topic, duration, no_cache=False, subject="auto", mock=False):
+def generate_or_load_script(topic, duration, no_cache=False, subject="auto", mock=False, source_text=None, source_facts=None):
     if mock:
         stage_start("DIRECTOR", f"Loading pre-validated mock script for topic='{topic}', subject='{subject}', length={duration}s")
         from director.mock_library import get_mock_script
-        script = get_mock_script(topic=topic, duration=duration, subject=subject)
+        script = get_mock_script(topic=topic, duration=duration, subject=subject, source_text=source_text, source_facts=source_facts)
         stage_success("DIRECTOR", f"Loaded mock script ({len(script.get('scenes', []))} scenes)")
         stage_start("VALIDATION", f"Validating mock script ({len(script.get('scenes', []))} scenes)")
         is_valid, errors = validate_script_plan(script)
@@ -276,7 +277,7 @@ def generate_or_load_script(topic, duration, no_cache=False, subject="auto", moc
         return script
 
     if not no_cache:
-        cached = load_script_cache(topic, duration, subject=subject)
+        cached = load_script_cache(topic, duration, subject=subject, source_text=source_text)
 
         if cached is not None:
             stage_start("DIRECTOR", f"Loading cached script for '{topic}' ({duration}s)")
@@ -301,7 +302,7 @@ def generate_or_load_script(topic, duration, no_cache=False, subject="auto", moc
         stage_start("DIRECTOR", f"Generating script with Gemini for '{topic}' ({duration}s){attempt_str}")
 
         try:
-            script = generate_script(topic, duration, subject=subject)
+            script = generate_script(topic, duration, subject=subject, source_text=source_text, source_facts=source_facts)
         except KeyError as exc:
             stage_error("DIRECTOR", f"Gemini generation failed: Environment variable {exc} is not set.")
         except Exception as exc:
@@ -328,7 +329,7 @@ def generate_or_load_script(topic, duration, no_cache=False, subject="auto", moc
 
         if is_valid:
             stage_success("VALIDATION", f"Script validation passed ({len(script.get('scenes', []))} scenes)")
-            save_script_cache(topic, duration, script, subject=subject)
+            save_script_cache(topic, duration, script, subject=subject, source_text=source_text)
             return script
 
         last_errors = errors
@@ -469,7 +470,7 @@ def generate_timeline(script, audio_file: Path):
     return timed_scenes, words
 
 
-def build_final_payload(script, timed_scenes, words, run_id: str):
+def build_final_payload(script, timed_scenes, words, run_id: str, source_facts=None):
     """
     Build the exact top-level object expected by Remotion/CodingShort.jsx.
     """
@@ -486,6 +487,8 @@ def build_final_payload(script, timed_scenes, words, run_id: str):
         "words": words,
         "audio_file": f"runs/{run_id}/audio.mp3",
     }
+    if source_facts:
+        payload["source_facts"] = source_facts
 
     return payload
 
@@ -558,9 +561,30 @@ def main():
     parser.add_argument(
         "--subject",
         type=str,
-        choices=["auto", "code", "math", "physics", "systems", "ml", "chemistry", "quantum_physics", "mechanics", "electrical"],
+        choices=["auto", "code", "devtools", "math", "physics", "systems", "ml", "chemistry", "quantum_physics", "mechanics", "electrical"],
         default="auto",
         help="Subject domain for video.",
+    )
+
+    parser.add_argument(
+        "--source-file",
+        type=str,
+        default=None,
+        help="Path to source documentation, README, changelog, or code snippet.",
+    )
+
+    parser.add_argument(
+        "--source-url",
+        type=str,
+        default=None,
+        help="Public documentation or GitHub README URL to ingest.",
+    )
+
+    parser.add_argument(
+        "--source-text",
+        type=str,
+        default=None,
+        help="Raw source markdown or code snippet text.",
     )
 
     parser.add_argument(
@@ -604,6 +628,27 @@ def main():
 
     if not topic:
         stage_error("DIRECTOR", "--topic cannot be empty.")
+
+    source_text = ""
+    source_facts = {}
+    if args.source_file or args.source_url or args.source_text:
+        stage_start("INGESTION", "Loading and parsing customer documentation / code source...")
+        try:
+            try:
+                from engine.ingestion.source_loader import load_source_content, extract_source_facts, format_source_summary
+            except ImportError:
+                from ingestion.source_loader import load_source_content, extract_source_facts, format_source_summary
+
+            source_text = load_source_content(
+                source_file=args.source_file,
+                source_url=args.source_url,
+                source_text=args.source_text,
+            )
+            source_facts = extract_source_facts(source_text) if source_text else {}
+            summary_str = format_source_summary(source_facts)
+            stage_success("INGESTION", f"Source ingested: {summary_str}")
+        except Exception as exc:
+            stage_error("INGESTION", f"Failed to ingest source material: {exc}")
 
     # ---------------------------------------------------------------
     # Environment check
@@ -657,6 +702,8 @@ def main():
             no_cache=args.no_cache,
             subject=args.subject,
             mock=args.mock,
+            source_text=source_text,
+            source_facts=source_facts,
         )
 
         # ---------------------------------------------------------------
@@ -707,6 +754,7 @@ def main():
             timed_scenes=timed_scenes,
             words=words,
             run_id=run_id,
+            source_facts=source_facts,
         )
 
         write_data_file(payload, data_file)

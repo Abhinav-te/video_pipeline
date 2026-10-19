@@ -238,59 +238,157 @@ export const DiagramScene = ({
         })}
       </div>
 
-      {/* 3. BOTTOM ARCHITECTURE INVARIANTS CARD (340px) */}
-      <div
-        style={{
-          height: '340px',
-          backgroundColor: '#161b22',
-          borderRadius: '22px',
-          border: '1.5px solid rgba(88, 166, 255, 0.3)',
-          boxShadow: '0 16px 32px rgba(0, 0, 0, 0.6)',
-          padding: '28px 32px',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          boxSizing: 'border-box',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <SparklesIcon size={26} color="#58a6ff" />
-          <span
-            style={{
-              fontSize: '24px',
-              fontWeight: 900,
-              color: '#58a6ff',
-              fontFamily: 'monospace',
-              letterSpacing: '1.5px',
-            }}
-          >
-            PIPELINE INVARIANTS & CONSTRAINTS
-          </span>
-        </div>
-
-        <div style={{ fontSize: '24px', color: '#cbd5e1', lineHeight: '1.5' }}>
-          {scene?.spoken_text || 'Strict exactly-once semantic delivery guarantees with low latency.'}
-        </div>
-
+      {/* 3. BOTTOM CARD: API FLOW PAYLOADS (DevTools) OR ARCHITECTURE INVARIANTS */}
+      {(scene?.request_payload || scene?.response_payload || scene?.request_method || scene?.response_status) ? (
         <div
           style={{
-            padding: '14px 20px',
-            backgroundColor: 'rgba(88, 166, 255, 0.12)',
-            borderRadius: '12px',
-            border: '1px solid rgba(88, 166, 255, 0.28)',
+            height: '420px',
+            backgroundColor: '#0c1017',
+            borderRadius: '22px',
+            border: '1.5px solid rgba(56, 189, 248, 0.35)',
+            boxShadow: '0 16px 32px rgba(0, 0, 0, 0.7)',
+            padding: '20px 24px',
             display: 'flex',
-            alignItems: 'center',
+            flexDirection: 'column',
             justifyContent: 'space-between',
+            boxSizing: 'border-box',
+            fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
           }}
         >
-          <span style={{ fontSize: '22px', color: '#58a6ff', fontFamily: 'monospace', fontWeight: 'bold' }}>
-            Throughput: 50,000 req/sec • p99 &lt; 5ms
-          </span>
-          <span style={{ fontSize: '18px', color: '#56d364', fontFamily: 'monospace', fontWeight: 800 }}>
-            OPTIMAL
-          </span>
+          {/* Method and Status Headers */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span
+                style={{
+                  backgroundColor: 'rgba(56, 189, 248, 0.15)',
+                  border: '1px solid #38bdf8',
+                  color: '#38bdf8',
+                  borderRadius: '6px',
+                  padding: '4px 12px',
+                  fontSize: '16px',
+                  fontWeight: 800,
+                  letterSpacing: '0.5px',
+                }}
+              >
+                {scene.request_method || 'POST /v2/agents/stream'}
+              </span>
+            </div>
+            <span
+              style={{
+                backgroundColor: 'rgba(52, 211, 153, 0.15)',
+                border: '1px solid #34d399',
+                color: '#34d399',
+                borderRadius: '6px',
+                padding: '4px 12px',
+                fontSize: '16px',
+                fontWeight: 800,
+              }}
+            >
+              {scene.response_status || '200 OK • 14ms'}
+            </span>
+          </div>
+
+          {/* JSON Payload Split Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', margin: '10px 0', flex: 1 }}>
+            {/* Request Payload */}
+            <div
+              style={{
+                backgroundColor: 'rgba(15, 23, 42, 0.6)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '12px',
+                padding: '12px 14px',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+              }}
+            >
+              <div style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 700, marginBottom: '6px', letterSpacing: '0.5px' }}>
+                REQUEST BODY
+              </div>
+              <pre style={{ margin: 0, fontSize: '17px', color: '#cbd5e1', lineHeight: 1.4, whiteSpace: 'pre-wrap', wordBreak: 'break-all', overflow: 'hidden' }}>
+                {scene.request_payload || '{\n  "stream": true\n}'}
+              </pre>
+            </div>
+
+            {/* Response Payload */}
+            <div
+              style={{
+                backgroundColor: 'rgba(6, 40, 24, 0.4)',
+                border: '1px solid rgba(52, 211, 153, 0.25)',
+                borderRadius: '12px',
+                padding: '12px 14px',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+              }}
+            >
+              <div style={{ fontSize: '13px', color: '#34d399', fontWeight: 700, marginBottom: '6px', letterSpacing: '0.5px' }}>
+                RESPONSE STREAM
+              </div>
+              <pre style={{ margin: 0, fontSize: '17px', color: '#86efac', lineHeight: 1.4, whiteSpace: 'pre-wrap', wordBreak: 'break-all', overflow: 'hidden' }}>
+                {scene.response_payload || '{\n  "status": 200\n}'}
+              </pre>
+            </div>
+          </div>
+
+          <div style={{ fontSize: '18px', color: '#94a3b8', lineHeight: 1.3 }}>
+            {scene?.spoken_text || scene?.narration || 'Requests stream with low-latency edge caching.'}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div
+          style={{
+            height: '340px',
+            backgroundColor: '#161b22',
+            borderRadius: '22px',
+            border: '1.5px solid rgba(88, 166, 255, 0.3)',
+            boxShadow: '0 16px 32px rgba(0, 0, 0, 0.6)',
+            padding: '28px 32px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            boxSizing: 'border-box',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <SparklesIcon size={26} color="#58a6ff" />
+            <span
+              style={{
+                fontSize: '24px',
+                fontWeight: 900,
+                color: '#58a6ff',
+                fontFamily: 'monospace',
+                letterSpacing: '1.5px',
+              }}
+            >
+              PIPELINE INVARIANTS & CONSTRAINTS
+            </span>
+          </div>
+
+          <div style={{ fontSize: '24px', color: '#cbd5e1', lineHeight: '1.5' }}>
+            {scene?.spoken_text || 'Strict exactly-once semantic delivery guarantees with low latency.'}
+          </div>
+
+          <div
+            style={{
+              padding: '14px 20px',
+              backgroundColor: 'rgba(88, 166, 255, 0.12)',
+              borderRadius: '12px',
+              border: '1px solid rgba(88, 166, 255, 0.28)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <span style={{ fontSize: '22px', color: '#58a6ff', fontFamily: 'monospace', fontWeight: 'bold' }}>
+              Throughput: 50,000 req/sec • p99 &lt; 5ms
+            </span>
+            <span style={{ fontSize: '18px', color: '#56d364', fontFamily: 'monospace', fontWeight: 800 }}>
+              OPTIMAL
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

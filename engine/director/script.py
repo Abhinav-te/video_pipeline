@@ -11,7 +11,7 @@ try:
 except ImportError:
     from timeline.beats import calculate_target_scenes, merge_excess_scenes
 
-DOMAINS = {"code", "math", "physics", "systems", "ml", "chemistry", "quantum_physics", "mechanics", "electrical"}
+DOMAINS = {"code", "devtools", "math", "physics", "systems", "ml", "chemistry", "quantum_physics", "mechanics", "electrical"}
 
 
 def _read_env_file(path: Path) -> dict:
@@ -101,6 +101,24 @@ class ScenePlanModel(pydantic.BaseModel):
     problem_label: Optional[str] = None
     solution_label: Optional[str] = None
     manim_spec: Optional[Dict[str, Any]] = None
+    # DevTool Primitives Fields (Phase A)
+    code: Optional[str] = None
+    code_snippet: Optional[str] = None
+    filename: Optional[str] = None
+    language: Optional[str] = None
+    highlight_lines: Optional[List[int]] = None
+    focus_phrase: Optional[str] = None
+    before_code: Optional[str] = None
+    after_code: Optional[str] = None
+    before_label: Optional[str] = None
+    after_label: Optional[str] = None
+    commands: Optional[List[Dict[str, Any]]] = None
+    nodes: Optional[List[str]] = None
+    request_payload: Optional[str] = None
+    response_payload: Optional[str] = None
+    request_method: Optional[str] = None
+    response_status: Optional[str] = None
+    comparison_footer: Optional[str] = None
 
 
 class DirectorScriptPlanModel(pydantic.BaseModel):
@@ -183,7 +201,15 @@ def detect_domain(topic: str) -> str:
         "concurrency", "thread", "process", "deadlock", "networking", "tcp", "udp",
         "load balancer", "paxos", "consensus", "system design", "sharding", "replication"
     ]
+    devtools_kw = [
+        "sdk", "api", "cli", "devtools", "endpoint", "changelog", "migration",
+        "npm install", "pip install", "request", "response", "webhook", "rest api",
+        "sdk release", "b2b", "developer tool", "v1 to v2", "v2 sdk"
+    ]
 
+    for kw in devtools_kw:
+        if re.search(rf"\b{re.escape(kw)}", t):
+            return "devtools"
     for kw in quantum_kw:
         if re.search(rf"\b{re.escape(kw)}", t):
             return "quantum_physics"
@@ -369,6 +395,17 @@ def get_system_prompt(duration, subject="code"):
 - "concept": High-impact electrical takeaway card. Uses "display_text"."""
         extra_rules = """7. ELECTRICAL INTEGRITY: For "electrical_grid", specify valid sub_mode ("kvl_kcl_mesh", "thevenin_equivalence", or "smart_grid_opf")."""
 
+    elif subject == "devtools":
+        domain_desc = "code-first B2B developer-tool video (SDK release, API flow, CLI workflow, or code migration)"
+        beat_types = """AVAILABLE BEAT TYPES:
+- "fullscreen_text": High-impact hook or release headline. Uses "display_text".
+- "terminal": Authentic dark terminal CLI command and output simulator. Uses "commands" (list of {"cmd": "npm install @acme/sdk@latest", "output": ["+ @acme/sdk@2.0.0", "added 1 package in 140ms"], "status": "✓ Built in 140ms"}) or "code_snippet".
+- "code_transform": Before -> After code diff showing dramatic lines-of-code reduction and modern SDK migration. Uses "before_code", "after_code", "before_label" (e.g. "Legacy v1 (28 lines)"), "after_label" (e.g. "New v2 SDK (4 lines)").
+- "code_reveal": Core SDK code snippet with progressive line spotlight. Uses "code_snippet" (or "code"), "filename" (e.g. "agent.ts"), "language" (e.g. "typescript"), "highlight_lines" (list of line numbers to spotlight e.g. [5, 6]), and optional "focus_phrase".
+- "diagram": Architecture and API request/response flow. Uses "nodes" (2-3 connected nodes e.g. ["Client SDK", "Edge Gateway", "Vector DB"]), "request_method", "request_payload", "response_status", "response_payload".
+- "comparison": Performance, latency, or lines-of-code takeaway card. Uses "problem_label", "problem_code", "solution_label", "solution_code", "comparison_footer"."""
+        extra_rules = """7. DEVTOOL ACCURACY CONTRACT: When source material (README, changelog, code snippet, API doc) is provided, preserve exact function names, CLI commands, imports, types, method calls, and JSON keys from the source material. Never invent fake or hallucinated SDK methods."""
+
     else:  # code (default)
         domain_desc = "high-retention Python educational short"
         beat_types = """AVAILABLE BEAT TYPES:
@@ -465,7 +502,7 @@ def _call_model(client, model, contents, prompt, max_retries=2):
     raise last_err
 
 
-def generate_script(topic, duration, subject="auto"):
+def generate_script(topic, duration, subject="auto", source_text=None, source_facts=None):
     """Generates the script using Gemini, walking a fallback chain of
     (API key × model) combinations.
     """
@@ -474,7 +511,13 @@ def generate_script(topic, duration, subject="auto"):
 
     prompt = get_system_prompt(duration, subject=subject)
 
-    if subject == "math":
+    if subject == "devtools":
+        contents = (
+            f"Topic: {topic}. Domain: {subject}. STRICT REQUIREMENT: Create a 6-scene B2B developer tool video: "
+            f"Scene 1 'fullscreen_text' (hook) -> Scene 2 'terminal' (CLI install) -> Scene 3 'code_transform' (v1 to v2 migration) -> "
+            f"Scene 4 'code_reveal' (SDK spotlight) -> Scene 5 'diagram' (API request/response flow) -> Scene 6 'comparison' (benchmark/DX takeaway)."
+        )
+    elif subject == "math":
         contents = (
             f"Topic: {topic}. Domain: {subject}. STRICT REQUIREMENT: Scene 1 MUST be 'fullscreen_text' (hook). "
             f"Include at least one 'math_equation' derivation scene and optionally 'function_graph'."
@@ -522,6 +565,33 @@ def generate_script(topic, duration, subject="auto"):
         contents = (
             f"Topic: {topic}. Domain: {subject}. STRICT REQUIREMENT: Scene 1 MUST be 'fullscreen_text'. "
             f"You MUST also include at least one 'comparison' scene."
+        )
+
+    if source_text and source_text.strip():
+        contents += (
+            f"\n\nSOURCE DOCUMENTATION / CODE MATERIAL:\n{source_text.strip()}\n\n"
+            f"STRICT ACCURACY CONTRACT: Preserve exact function names, CLI commands, imports, types, "
+            f"and JSON response keys from the source material above. Never invent fake or hallucinated SDK methods."
+        )
+
+    if source_facts:
+        p_name = source_facts.get("product_name") or ""
+        cmds = source_facts.get("cli_commands") or []
+        endpoints = source_facts.get("api_endpoints") or []
+        points = source_facts.get("key_points") or []
+        facts_summary = f"PRODUCT NAME: {p_name}\n"
+        if cmds:
+            facts_summary += f"CLI COMMANDS: {', '.join(cmds)}\n"
+        if endpoints:
+            facts_summary += f"API ENDPOINTS: {', '.join(endpoints)}\n"
+        if points:
+            facts_summary += f"KEY BENCHMARKS: {'; '.join(points[:4])}\n"
+
+        contents += (
+            f"\n\nCUSTOMER GROUND-TRUTH EXTRACTED FACTS:\n{facts_summary}\n"
+            f"STRICT COMPONENT CONTRACT: When generating visual scenes, you MUST inject the exact "
+            f"CLI commands into the terminal scene, the exact API endpoints into diagram scenes, "
+            f"and the exact code snippets from the source documentation into code_reveal / code_transform scenes."
         )
 
     keys = get_api_keys()

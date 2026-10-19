@@ -24,6 +24,11 @@ OUT_DIR = VIDEO_DIR / "out"
 if str(ENGINE_DIR) not in sys.path:
     sys.path.insert(0, str(ENGINE_DIR))
 
+# Auto re-exec into engine virtualenv if running under standard system Python
+VENV_PYTHON = ENGINE_DIR / ".venv" / "bin" / "python"
+if VENV_PYTHON.exists() and sys.executable != str(VENV_PYTHON):
+    os.execv(str(VENV_PYTHON), [str(VENV_PYTHON)] + sys.argv)
+
 from validation.output import validate_video_output
 from validation.reflection import write_reflection_error
 from renderer.lambda_dispatcher import dispatch_lambda_render
@@ -87,7 +92,10 @@ def main():
     parser = argparse.ArgumentParser(description="V2 Video Engine: One-Click Pipeline")
     parser.add_argument("--topic", type=str, default=None, help="Topic for the video short")
     parser.add_argument("--length", type=int, choices=[15, 30, 35, 60], default=60, help="Target duration in seconds")
-    parser.add_argument("--subject", type=str, choices=["auto", "code", "math", "physics", "systems", "ml", "chemistry", "quantum_physics", "mechanics", "electrical"], default="auto", help="Subject domain for video")
+    parser.add_argument("--subject", type=str, choices=["auto", "code", "devtools", "math", "physics", "systems", "ml", "chemistry", "quantum_physics", "mechanics", "electrical"], default="auto", help="Subject domain for video")
+    parser.add_argument("--source-file", type=str, default=None, help="Path to source documentation, README, changelog, or code snippet")
+    parser.add_argument("--source-url", type=str, default=None, help="Public documentation or GitHub README URL to ingest")
+    parser.add_argument("--source-text", type=str, default=None, help="Raw source markdown or code text")
     parser.add_argument("--no-cache", action="store_true", help="Force regenerate AI script")
     parser.add_argument("--run-id", type=str, default=None, help="Explicit run ID (auto-generated if omitted)")
     parser.add_argument("--output", type=str, default=None, help="Explicit output MP4 path")
@@ -158,6 +166,12 @@ def main():
         cmd.append("--no-manim")
     if args.mock:
         cmd.append("--mock")
+    if args.source_file:
+        cmd.extend(["--source-file", str(Path(args.source_file).resolve())])
+    if args.source_url:
+        cmd.extend(["--source-url", args.source_url])
+    if args.source_text:
+        cmd.extend(["--source-text", args.source_text])
 
     gen_env = os.environ.copy()
     gen_env["PYTHONPATH"] = f"{REPO_DIR}:{ENGINE_DIR}:{gen_env.get('PYTHONPATH', '')}"

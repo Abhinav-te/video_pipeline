@@ -29,6 +29,36 @@ export const SceneSchema = z
     manim_spec: z.record(z.any()).optional(),
     badge: z.any().optional(),
     choreography: z.any().optional(),
+    code: z.string().optional(),
+    code_snippet: z.string().optional(),
+    filename: z.string().optional(),
+    language: z.string().optional(),
+    highlight_lines: z.array(z.number()).optional(),
+    focus_phrase: z.string().optional(),
+    before_code: z.string().optional(),
+    after_code: z.string().optional(),
+    before_label: z.string().optional(),
+    after_label: z.string().optional(),
+    commands: z
+      .array(
+        z.object({
+          cmd: z.string(),
+          output: z.array(z.union([z.string(), z.number()])).optional(),
+          status: z.string().optional(),
+        }).passthrough()
+      )
+      .optional(),
+    nodes: z.array(z.union([z.string(), z.record(z.any())])).optional(),
+    request_payload: z.string().optional(),
+    response_payload: z.string().optional(),
+    request_method: z.string().optional(),
+    response_status: z.string().optional(),
+    problem_label: z.string().optional(),
+    problem_code: z.string().optional(),
+    solution_label: z.string().optional(),
+    solution_code: z.string().optional(),
+    comparison_sides: z.any().optional(),
+    comparison_footer: z.string().optional(),
   })
   .passthrough()
   .refine(

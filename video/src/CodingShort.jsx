@@ -27,10 +27,66 @@ import { QuantumScene } from './components/QuantumScene';
 import { MechanicsScene } from './components/MechanicsScene';
 import { ElectricalScene } from './components/ElectricalScene';
 import { ManimScene } from './components/ManimScene';
+import { TerminalScene } from './components/TerminalScene';
 import { splitCodeByToken, resolveCalloutTiming } from './calloutUtils';
+
+// Error Boundary ensuring scene crashes never tear down the entire canvas
+export class SceneErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('[SceneErrorBoundary] Intercepted scene rendering error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div
+          style={{
+            width: '960px',
+            height: '100%',
+            backgroundColor: '#161b22',
+            border: '2px solid rgba(248, 81, 73, 0.7)',
+            borderRadius: '24px',
+            padding: '40px',
+            boxSizing: 'border-box',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            color: '#f85149',
+            fontFamily: 'monospace',
+            textAlign: 'center',
+          }}
+        >
+          <div style={{ fontSize: '26px', fontWeight: 'bold', marginBottom: '14px' }}>
+            SCENE RENDER RECOVERY
+          </div>
+          <div style={{ fontSize: '18px', color: '#c9d1d9', maxWidth: '820px', lineHeight: 1.5 }}>
+            {String(this.state.error?.message || 'Recovered gracefully from render error')}
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export {
   TerminalCursor,
+  TerminalScene,
+  CodeRevealScene,
+  CodeTransformScene,
+  ComparisonScene,
+  DiagramScene,
+  ConceptHeroScene,
   MathScene,
   GraphScene,
   PhysicsScene,
@@ -461,190 +517,231 @@ export const CodingShort = ({ data }) => {
               <SceneBadge badge={activeScene.badge} startFrame={sceneStartFrame} />
             ) : null}
           </div>
-          {/* SCENE TYPE 1: FULLSCREEN TEXT / HERO TAKEAWAY */}
-          {(sceneType === 'fullscreen_text' ||
-            sceneType === 'concept' ||
-            sceneType === 'callout_card') && (
-            <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
-              <ConceptHeroScene
-                scene={activeScene}
-                sceneStartFrame={sceneStartFrame}
-              />
-            </CameraRig>
-          )}
-
-          {/* SCENE TYPE 2: CODE REVEAL / TERMINAL (TYPEWRITER LINE-BY-LINE) */}
-          {(sceneType === 'code_reveal' || sceneType === 'terminal') && (
-            <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
-              <CodeRevealScene
-                scene={activeScene}
-                focusPhrase={activeScene.focus_phrase}
-                words={data?.words}
-                sceneStartFrame={sceneStartFrame}
-                nextSceneStartTime={nextSceneStartTime}
-                styleVariant={sceneType === 'code_transform' ? 'box_glow' : (sceneType === 'terminal' ? 'badge' : 'pill')}
-                showCursor={sceneType === 'code_reveal' || sceneType === 'terminal'}
-              />
-            </CameraRig>
-          )}
-
-          {/* SCENE TYPE 3: CODE TRANSFORM (BEFORE -> AFTER MORPH) */}
-          {sceneType === 'code_transform' && (
-            <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
-              <CodeTransformScene
-                scene={activeScene}
-                focusPhrase={activeScene.focus_phrase}
-                words={data?.words}
-                sceneStartFrame={sceneStartFrame}
-                nextSceneStartTime={nextSceneStartTime}
-                styleVariant="box_glow"
-              />
-            </CameraRig>
-          )}
-
-          {/* SCENE TYPE 4: COMPARISON (STAGGERED DUAL-CARD BATTLE) */}
-          {sceneType === 'comparison' && (
-            <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
-              <ComparisonScene
-                scene={activeScene}
-                subject={data?.subject || activeScene?.subject || activeScene?.domain}
-                focusPhrase={activeScene.focus_phrase}
-                words={data?.words}
-                sceneStartFrame={sceneStartFrame}
-                nextSceneStartTime={nextSceneStartTime}
-                styleVariant="pill"
-              />
-            </CameraRig>
-          )}
-
-          {/* SCENE TYPE 5: DIAGRAM / FLOWCHART (ANIMATED NODE-LINK FLOW) */}
-          {(sceneType === 'diagram' || sceneType === 'flowchart') && (
-            <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
-              <DiagramScene
-                scene={activeScene}
-                sceneStartFrame={sceneStartFrame}
-                nextSceneStartTime={nextSceneStartTime}
-              />
-            </CameraRig>
-          )}
-
-          {/* SCENE TYPE 6: MATH EQUATION (STEP-BY-STEP DERIVATION) */}
-          {sceneType === 'math_equation' && (
-            <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
-              <MathScene
-                scene={activeScene}
-                words={data?.words}
-                sceneStartFrame={sceneStartFrame}
-                sceneDurationFrames={sceneDurationFrames}
-              />
-            </CameraRig>
-          )}
-
-          {/* SCENE TYPE 7: FUNCTION GRAPH (2D COORDINATE PLOT) */}
-          {sceneType === 'function_graph' && (
-            <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
-              <GraphScene
-                scene={activeScene}
-                sceneStartFrame={sceneStartFrame}
-                sceneDurationFrames={sceneDurationFrames}
-              />
-            </CameraRig>
-          )}
-
-          {/* SCENE TYPE 8: PHYSICS SIMULATION (VECTORS & FREE-BODY DIAGRAMS) */}
-          {sceneType === 'physics_sim' && (
-            <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
-              <PhysicsScene
-                scene={activeScene}
-                sceneStartFrame={sceneStartFrame}
-              />
-            </CameraRig>
-          )}
-
-          {/* SCENE TYPE 9: BENTO GRID (EDITORIAL ML OVERVIEW) */}
-          {sceneType === 'bento_grid' && (
-            <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
-              <BentoGridScene
-                scene={activeScene}
-                words={data?.words}
-                sceneStartFrame={sceneStartFrame}
-              />
-            </CameraRig>
-          )}
-
-          {/* SCENE TYPE 10: ALGORITHM EXPLORER (3-TIER DEEP DIVE) */}
-          {sceneType === 'algorithm_explorer' && (
-            <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
-              <AlgorithmExplorerScene
-                scene={activeScene}
-                words={data?.words}
-                sceneStartFrame={sceneStartFrame}
-              />
-            </CameraRig>
-          )}
-
-          {/* SCENE TYPE 11: NEURAL CODE SPLIT (LIVE SIMULATION + CODE WINDOW) */}
-          {sceneType === 'neural_code_split' && (
-            <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
-              <NeuralCodeSplitScene
-                scene={activeScene}
-                words={data?.words}
-                sceneStartFrame={sceneStartFrame}
-              />
-            </CameraRig>
-          )}
-
-          {/* SCENE TYPE 12: CHEMISTRY REACTION (ORGANIC REACTION & KINETICS) */}
-          {(sceneType === 'chemistry_reaction' || sceneType === 'chemistry') && (
-            <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
-              <ChemistryScene
-                scene={activeScene}
-                sceneStartFrame={sceneStartFrame}
-              />
-            </CameraRig>
-          )}
-
-          {/* SCENE TYPE 13: QUANTUM SIMULATION (SCHRODINGER, HEISENBERG, DIRAC) */}
-          {(sceneType === 'quantum_sim' || sceneType === 'quantum_physics') && (
-            <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
-              <QuantumScene
-                scene={activeScene}
-                sceneStartFrame={sceneStartFrame}
-                sceneDurationFrames={sceneDurationFrames}
-              />
-            </CameraRig>
-          )}
-
-          {/* SCENE TYPE 14: ADVANCED MECHANICS FBD (BEAM LOAD, INCLINED PLANE, AXLE TRANSFER) */}
-          {(sceneType === 'mechanics_fbd' || sceneType === 'mechanics') && (
-            <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
-              <MechanicsScene
-                scene={activeScene}
-                sceneStartFrame={sceneStartFrame}
-              />
-            </CameraRig>
-          )}
-
-          {/* SCENE TYPE 15: ELECTRICAL CIRCUITS & SMART GRID (KVL/KCL, THEVENIN, OPF) */}
-          {(sceneType === 'electrical_grid' || sceneType === 'electrical') && (
-            <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
-              <ElectricalScene
-                scene={activeScene}
-                sceneStartFrame={sceneStartFrame}
-              />
-            </CameraRig>
-          )}
-
-          {/* SCENE TYPE 16: MANIM MATHEMATICAL / VECTOR / QUANTUM CANVAS */}
-          {(sceneType === 'manim_scene' || sceneType === 'manim') && (
-            <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
-              <ManimScene
-                scene={activeScene}
-                sceneStartFrame={sceneStartFrame}
-                sceneDurationFrames={sceneDurationFrames}
-              />
-            </CameraRig>
-          )}
+          {/* SAFE SCENE ROUTER WRAPPED IN SCENE ERROR BOUNDARY */}
+          {(() => {
+            switch (sceneType) {
+              case 'code_reveal':
+                return (
+                  <SceneErrorBoundary>
+                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
+                      <CodeRevealScene
+                        scene={activeScene}
+                        focusPhrase={activeScene.focus_phrase}
+                        words={data?.words}
+                        sceneStartFrame={sceneStartFrame}
+                        nextSceneStartTime={nextSceneStartTime}
+                        styleVariant="pill"
+                        showCursor={true}
+                      />
+                    </CameraRig>
+                  </SceneErrorBoundary>
+                );
+              case 'terminal':
+                return (
+                  <SceneErrorBoundary>
+                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
+                      <TerminalScene
+                        scene={activeScene}
+                        sceneStartFrame={sceneStartFrame}
+                        nextSceneStartTime={nextSceneStartTime}
+                      />
+                    </CameraRig>
+                  </SceneErrorBoundary>
+                );
+              case 'code_transform':
+                return (
+                  <SceneErrorBoundary>
+                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
+                      <CodeTransformScene
+                        scene={activeScene}
+                        focusPhrase={activeScene.focus_phrase}
+                        words={data?.words}
+                        sceneStartFrame={sceneStartFrame}
+                        nextSceneStartTime={nextSceneStartTime}
+                        styleVariant="box_glow"
+                      />
+                    </CameraRig>
+                  </SceneErrorBoundary>
+                );
+              case 'comparison':
+                return (
+                  <SceneErrorBoundary>
+                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
+                      <ComparisonScene
+                        scene={activeScene}
+                        subject={data?.subject || activeScene?.subject || activeScene?.domain}
+                        focusPhrase={activeScene.focus_phrase}
+                        words={data?.words}
+                        sceneStartFrame={sceneStartFrame}
+                        nextSceneStartTime={nextSceneStartTime}
+                        styleVariant="pill"
+                      />
+                    </CameraRig>
+                  </SceneErrorBoundary>
+                );
+              case 'diagram':
+              case 'flowchart':
+                return (
+                  <SceneErrorBoundary>
+                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
+                      <DiagramScene
+                        scene={activeScene}
+                        sceneStartFrame={sceneStartFrame}
+                        nextSceneStartTime={nextSceneStartTime}
+                      />
+                    </CameraRig>
+                  </SceneErrorBoundary>
+                );
+              case 'math_equation':
+                return (
+                  <SceneErrorBoundary>
+                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
+                      <MathScene
+                        scene={activeScene}
+                        words={data?.words}
+                        sceneStartFrame={sceneStartFrame}
+                        sceneDurationFrames={sceneDurationFrames}
+                      />
+                    </CameraRig>
+                  </SceneErrorBoundary>
+                );
+              case 'function_graph':
+                return (
+                  <SceneErrorBoundary>
+                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
+                      <GraphScene
+                        scene={activeScene}
+                        sceneStartFrame={sceneStartFrame}
+                        sceneDurationFrames={sceneDurationFrames}
+                      />
+                    </CameraRig>
+                  </SceneErrorBoundary>
+                );
+              case 'physics_sim':
+                return (
+                  <SceneErrorBoundary>
+                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
+                      <PhysicsScene
+                        scene={activeScene}
+                        sceneStartFrame={sceneStartFrame}
+                      />
+                    </CameraRig>
+                  </SceneErrorBoundary>
+                );
+              case 'bento_grid':
+                return (
+                  <SceneErrorBoundary>
+                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
+                      <BentoGridScene
+                        scene={activeScene}
+                        words={data?.words}
+                        sceneStartFrame={sceneStartFrame}
+                      />
+                    </CameraRig>
+                  </SceneErrorBoundary>
+                );
+              case 'algorithm_explorer':
+                return (
+                  <SceneErrorBoundary>
+                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
+                      <AlgorithmExplorerScene
+                        scene={activeScene}
+                        words={data?.words}
+                        sceneStartFrame={sceneStartFrame}
+                      />
+                    </CameraRig>
+                  </SceneErrorBoundary>
+                );
+              case 'neural_code_split':
+                return (
+                  <SceneErrorBoundary>
+                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
+                      <NeuralCodeSplitScene
+                        scene={activeScene}
+                        words={data?.words}
+                        sceneStartFrame={sceneStartFrame}
+                      />
+                    </CameraRig>
+                  </SceneErrorBoundary>
+                );
+              case 'chemistry_reaction':
+              case 'chemistry':
+                return (
+                  <SceneErrorBoundary>
+                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
+                      <ChemistryScene
+                        scene={activeScene}
+                        sceneStartFrame={sceneStartFrame}
+                      />
+                    </CameraRig>
+                  </SceneErrorBoundary>
+                );
+              case 'quantum_sim':
+              case 'quantum_physics':
+                return (
+                  <SceneErrorBoundary>
+                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
+                      <QuantumScene
+                        scene={activeScene}
+                        sceneStartFrame={sceneStartFrame}
+                        sceneDurationFrames={sceneDurationFrames}
+                      />
+                    </CameraRig>
+                  </SceneErrorBoundary>
+                );
+              case 'mechanics_fbd':
+              case 'mechanics':
+                return (
+                  <SceneErrorBoundary>
+                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
+                      <MechanicsScene
+                        scene={activeScene}
+                        sceneStartFrame={sceneStartFrame}
+                      />
+                    </CameraRig>
+                  </SceneErrorBoundary>
+                );
+              case 'electrical_grid':
+              case 'electrical':
+                return (
+                  <SceneErrorBoundary>
+                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
+                      <ElectricalScene
+                        scene={activeScene}
+                        sceneStartFrame={sceneStartFrame}
+                      />
+                    </CameraRig>
+                  </SceneErrorBoundary>
+                );
+              case 'manim_scene':
+              case 'manim':
+                return (
+                  <SceneErrorBoundary>
+                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
+                      <ManimScene
+                        scene={activeScene}
+                        sceneStartFrame={sceneStartFrame}
+                        sceneDurationFrames={sceneDurationFrames}
+                      />
+                    </CameraRig>
+                  </SceneErrorBoundary>
+                );
+              case 'fullscreen_text':
+              case 'concept':
+              case 'callout_card':
+              default:
+                return (
+                  <SceneErrorBoundary>
+                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
+                      <ConceptHeroScene
+                        scene={activeScene}
+                        sceneStartFrame={sceneStartFrame}
+                      />
+                    </CameraRig>
+                  </SceneErrorBoundary>
+                );
+            }
+          })()}
         </div>
       </div>
     </AbsoluteFill>

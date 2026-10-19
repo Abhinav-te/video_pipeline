@@ -95,3 +95,94 @@ def run_in_sandbox(code_string, timeout=5):
         return False, f"Execution timed out after {timeout} seconds."
     except Exception as e:
         return False, str(e)
+
+
+def calculate_font_scale(code_string: str, base_font_size: int = 28, max_chars: int = 46, max_lines: int = 14) -> int:
+    """
+    Dynamically calculates font size (px) from maximum line length and line count
+    to guarantee code fits within the 920px card width and 1360px subtitle safe zone.
+    """
+    if not code_string:
+        return base_font_size
+
+    lines = str(code_string).split("\n")
+    max_len = max((len(l) for l in lines), default=0)
+    line_count = len(lines)
+
+    if max_len > 55 or line_count > 12:
+        return 19
+    elif max_len > 46 or line_count > 10:
+        return 22
+    elif max_len > 38 or line_count > 8:
+        return 25
+    return base_font_size
+
+
+def format_and_wrap_code_snippet(code_string: str, max_chars: int = 46, max_lines: int = 14) -> str:
+    """
+    Wraps code lines exceeding max_chars at natural token boundaries (commas, dots, spaces, parens)
+    with a clean 4-space hanging indent, and caps total lines at max_lines to prevent overflow.
+    """
+    if not code_string:
+        return ""
+
+    raw_lines = str(code_string).split("\n")
+    out_lines = []
+
+    for line in raw_lines:
+        if len(line) <= max_chars:
+            out_lines.append(line)
+            continue
+
+        indent = len(line) - len(line.lstrip())
+        indent_str = " " * (indent + 4)
+        rem = line
+        while len(rem) > max_chars:
+            split_idx = -1
+            for sep in [", ", " && ", " || ", " = ", ". ", "(", " "]:
+                idx = rem.rfind(sep, 0, max_chars)
+                if idx > indent + 4:
+                    split_idx = idx + len(sep)
+                    break
+            if split_idx == -1:
+                split_idx = max_chars
+
+            out_lines.append(rem[:split_idx].rstrip())
+            rem = indent_str + rem[split_idx:].lstrip()
+
+        if rem:
+            out_lines.append(rem)
+
+    if len(out_lines) > max_lines:
+        out_lines = out_lines[:max_lines - 1] + ["..."]
+
+    return "\n".join(out_lines)
+
+
+def validate_code_layout(code_string: str, max_chars: int = 46, max_lines: int = 14):
+    """
+    Checks line width and line count against the 920px card constraint.
+    Returns (fits_without_scaling, warning_message, layout_meta).
+    """
+    if not code_string:
+        return True, None, {"max_line_length": 0, "line_count": 0, "font_size": 28, "needs_scaling": False}
+
+    lines = str(code_string).split("\n")
+    max_len = max((len(l) for l in lines), default=0)
+    line_count = len(lines)
+    font_size = calculate_font_scale(code_string, base_font_size=28, max_chars=max_chars, max_lines=max_lines)
+
+    needs_scaling = max_len > max_chars or line_count > 10
+    msg = None
+    if max_len > max_chars:
+        msg = f"Code line exceeds {max_chars} chars (max: {max_len}). Scaling font to {font_size}px or wrapping."
+    elif line_count > max_lines:
+        msg = f"Code lines exceed {max_lines} lines (count: {line_count})."
+
+    meta = {
+        "max_line_length": max_len,
+        "line_count": line_count,
+        "font_size": font_size,
+        "needs_scaling": needs_scaling,
+    }
+    return not needs_scaling, msg, meta

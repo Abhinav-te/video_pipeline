@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Local Production Studio Control Room — Video Pipeline Engine</title>
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            studio: {
+              base: '#0b0f19',
+              card: '#111827',
+              border: '#1f2937',
+              hover: '#1e293b',
+              accent: '#3b82f6',
+              success: '#10b981',
+              warning: '#f59e0b',
+              danger: '#ef4444'
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0b0f19;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1f2937;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #374151;
+    }
+    .aspect-9-16 {
+      aspect-ratio: 9 / 16;
+    }
+  </style>
+</head>
+<body class="bg-[#0b0f19] text-gray-100 font-sans min-h-screen flex flex-col antialiased selection:bg-blue-600 selection:text-white">
+
+  <!-- TOP APP BAR -->
+  <header class="h-14 border-b border-gray-800 bg-[#111827]/90 backdrop-blur px-4 flex items-center justify-between shrink-0 sticky top-0 z-50">
+    <div class="flex items-center gap-3">
+      <div class="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-600/20 text-blue-400 border border-blue-500/30">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+      </div>
+      <div>
+        <h1 class="font-bold text-sm text-white tracking-wide flex items-center gap-2">
+          LOCAL PRODUCTION STUDIO <span class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">Control Room v2</span>
+        </h1>
+      </div>
+    </div>
+
+    <!-- Active Project Breadcrumb / Status -->
+    <div class="flex items-center gap-4 text-xs">
+      <div id="status-pill" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span id="status-text">Studio Ready</span>
+      </div>
+
+      <div class="hidden sm:flex items-center gap-2 text-gray-400 font-mono">
+        <span class="text-gray-600">Active Run:</span>
+        <span id="header-run-id" class="text-blue-400 font-bold">None</span>
+        <span id="header-rev-badge" class="px-1.5 py-0.5 rounded bg-gray-800 text-gray-300 text-[10px]">rev 0</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN 3-COLUMN STUDIO LAYOUT -->
+  <main class="flex-1 grid grid-cols-12 gap-0 overflow-hidden h-[calc(100vh-3.5rem)]">
+
+    <!-- LEFT COLUMN: PROJECTS & REVISIONS (Col 1-3) -->
+    <section class="col-span-12 lg:col-span-3 border-r border-gray-800 bg-[#0e1422] flex flex-col h-full overflow-hidden">
+      <!-- Create New Project Section -->
+      <div class="p-3 border-b border-gray-800 bg-[#111827]">
+        <details class="group" id="new-project-details">
+          <summary class="flex items-center justify-between cursor-pointer text-xs font-semibold uppercase tracking-wider text-gray-300 hover:text-white select-none">
+            <span class="flex items-center gap-1.5">
+              <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              New Video Project
+            </span>
+            <span class="text-gray-500 group-open:rotate-180 transition-transform">&#9662;</span>
+          </summary>
+
+          <form id="new-project-form" class="mt-3 space-y-2.5 text-xs" onsubmit="handleGenerate(event)">
+            <div>
+              <label class="block text-gray-400 mb-1">Topic Brief</label>
+              <input type="text" id="gen-topic" required placeholder="e.g. Calculus: Fundamental Theorem" class="w-full bg-gray-900 border border-gray-700 rounded px-2.5 py-1.5 text-gray-100 placeholder-gray-500 focus:outline-none focus:border-blue-500">
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-gray-400 mb-1">Domain / Subject</label>
+                <select id="gen-subject" class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-gray-100 focus:outline-none focus:border-blue-500">
+                  <option value="math">math</option>
+                  <option value="code">code</option>
+                  <option value="devtools">devtools</option>
+                  <option value="physics">physics</option>
+                  <option value="chemistry">chemistry</option>
+                  <option value="quantum_physics">quantum</option>
+                  <option value="mechanics">mechanics</option>
+                  <option value="electrical">electrical</option>
+                  <option value="ml">ml</option>
+                  <option value="systems">systems</option>
+                  <option value="auto">auto</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-gray-400 mb-1">Duration</label>
+                <select id="gen-length" class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-gray-100 focus:outline-none focus:border-blue-500">
+                  <option value="15">15 seconds</option>
+                  <option value="30">30 seconds</option>
+                  <option value="35" selected>35 seconds</option>
+                  <option value="60">60 seconds</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-gray-400 mb-1">Source URL (Docs / GitHub README)</label>
+              <input type="url" id="gen-source-url" placeholder="https://github.com/org/repo or https://docs..." class="w-full bg-gray-900 border border-gray-700 rounded px-2.5 py-1.5 text-gray-100 placeholder-gray-500 text-xs focus:outline-none focus:border-blue-500">
+            </div>
+
+            <div>
+              <label class="block text-gray-400 mb-1">Source Material / Docs / Code</label>
+              <textarea id="gen-source-text" rows="3" placeholder="Paste customer SDK README, changelog, or code here..." class="w-full bg-gray-900 border border-gray-700 rounded px-2.5 py-1.5 text-gray-100 placeholder-gray-500 font-mono text-[11px] focus:outline-none focus:border-blue-500"></textarea>
+            </div>
+
+            <div class="flex items-center justify-between pt-1">
+              <label class="flex items-center gap-1.5 text-gray-300 cursor-pointer select-none">
+                <input type="checkbox" id="gen-mock" checked class="rounded border-gray-700 bg-gray-900 text-blue-600 focus:ring-0">
+                <span>Fast Mock Mode (0 API Cost)</span>
+              </label>
+            </div>
+
+            <button type="submit" id="btn-generate" class="w-full mt-2 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-medium py-1.5 px-3 rounded flex items-center justify-center gap-1.5 transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span>Generate Project</span>
+            </button>
+          </form>
+        </details>
+      </div>
+
+      <!-- Projects List Header & Filter -->
+      <div class="p-2.5 border-b border-gray-800 flex items-center justify-between">
+        <span class="text-xs font-semibold uppercase tracking-wider text-gray-400">Projects (<span id="projects-count">0</span>)</span>
+        <button onclick="fetchProjects()" class="text-gray-400 hover:text-white text-xs p-1 rounded hover:bg-gray-800" title="Refresh projects">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        </button>
+      </div>
+
+      <!-- Project Cards Scroll Area -->
+      <div id="projects-list" class="flex-1 overflow-y-auto divide-y divide-gray-800/60 text-xs">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <!-- Revision History Panel (Selected Project) -->
+      <div class="h-48 border-t border-gray-800 bg-[#0b0f19] flex flex-col shrink-0">
+        <div class="p-2 border-b border-gray-800 flex items-center justify-between bg-gray-900/40">
+          <span class="text-[11px] font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-1">
+            <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Revision History Snapshots
+          </span>
+          <span id="snapshots-count" class="text-[10px] text-gray-500 font-mono">0 revs</span>
+        </div>
+        <div id="snapshots-list" class="flex-1 overflow-y-auto p-2 space-y-1.5 text-xs">
+          <div class="text-gray-500 text-center py-4">Select a project to view snapshots.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CENTER COLUMN: STORYBOARD & SURGICAL SCENE EDITOR (Col 4-8) -->
+    <section class="col-span-12 lg:col-span-5 border-r border-gray-800 bg-[#0b0f19] flex flex-col h-full overflow-hidden">
+      <!-- Storyboard Header -->
+      <div class="p-3 border-b border-gray-800 bg-[#111827] flex items-center justify-between shrink-0">
+        <div>
+          <h2 class="text-sm font-bold text-white flex items-center gap-2">
+            <span>Storyboard & Surgical Scene Editor</span>
+            <span id="storyboard-scene-count" class="text-xs font-mono font-normal px-2 py-0.5 rounded bg-gray-800 text-gray-300">0 Scenes</span>
+          </h2>
+          <p id="storyboard-subtitle" class="text-xs text-gray-400 truncate max-w-sm mt-0.5">Select a video project to inspect and edit scenes.</p>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <span class="text-[11px] font-mono px-2 py-1 rounded bg-blue-900/30 text-blue-400 border border-blue-800/40" id="project-subject-badge">
+            auto
+          </span>
+        </div>
+      </div>
+
+      <!-- Scenes Scrollable Container -->
+      <div id="scenes-container" class="flex-1 overflow-y-auto p-3 space-y-4">
+        <!-- Rendered dynamically -->
+        <div class="text-gray-500 text-center py-20">
+          <svg class="w-12 h-12 mx-auto text-gray-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"/></svg>
+          Loading active project storyboard...
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT COLUMN: MASTER 9:16 PREVIEW, DIAGNOSTICS & EXPORT (Col 9-12) -->
+    <section class="col-span-12 lg:col-span-4 bg-[#0e1422] flex flex-col h-full overflow-hidden">
+      <!-- Master Player Panel -->
+      <div class="p-3 border-b border-gray-800 bg-[#111827] shrink-0">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-bold uppercase tracking-wider text-gray-300 flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/></svg>
+            Master 9:16 Preview
+          </span>
+          <span id="master-time-display" class="text-xs font-mono text-emerald-400">0.00s / 0.00s</span>
+        </div>
+
+        <!-- 9:16 Responsive Player Box -->
+        <div class="relative w-full max-w-[270px] mx-auto bg-black rounded-xl overflow-hidden border border-gray-800 shadow-2xl aspect-9-16 flex items-center justify-center">
+          <video id="master-video" controls class="w-full h-full object-contain bg-black" preload="metadata">
+            Your browser does not support the video tag.
+          </video>
+          <div id="master-video-empty" class="absolute inset-0 flex flex-col items-center justify-center p-4 text-center bg-gray-950 text-gray-500 text-xs">
+            <svg class="w-8 h-8 mb-2 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+            <span>No master video available yet.</span>
+          </div>
+        </div>
+
+        <!-- Jump to Scene Quick Bar -->
+        <div class="mt-2">
+          <div class="text-[10px] text-gray-400 uppercase tracking-wider mb-1">Jump to Scene:</div>
+          <div id="jump-scene-strip" class="flex flex-wrap gap-1 max-h-16 overflow-y-auto">
+            <!-- Scene Jump Buttons -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Diagnostics & Production Export Card -->
+      <div class="p-3 border-b border-gray-800 bg-[#111827]/60 space-y-2 shrink-0">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-gray-300">Project Diagnostics</span>
+          <span id="diag-badge" class="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">VALIDATED</span>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2 text-[11px] font-mono">
+          <div class="bg-gray-900 p-2 rounded border border-gray-800">
+            <div class="text-gray-500 text-[9px] uppercase">Duration</div>
+            <div id="diag-dur" class="text-white font-bold">0.00s</div>
+          </div>
+          <div class="bg-gray-900 p-2 rounded border border-gray-800">
+            <div class="text-gray-500 text-[9px] uppercase">Scenes</div>
+            <div id="diag-scenes" class="text-white font-bold">0</div>
+          </div>
+          <div class="bg-gray-900 p-2 rounded border border-gray-800">
+            <div class="text-gray-500 text-[9px] uppercase">Manim Clip</div>
+            <div id="diag-manim" class="text-emerald-400 font-bold">VERIFIED</div>
+          </div>
+        </div>
+
+        <!-- Ingested Customer Source Facts (Phase A.2) -->
+        <div id="source-facts-card" class="hidden bg-gray-900 p-2 rounded border border-blue-900/50 text-[11px]">
+          <div class="text-blue-400 font-semibold text-[10px] uppercase flex items-center justify-between">
+            <span>Ingested Customer Facts</span>
+            <span id="sf-product-tag" class="text-gray-400 font-mono text-[9px]"></span>
+          </div>
+          <div id="sf-summary-content" class="text-gray-300 font-mono text-[10px] mt-1 space-y-0.5 leading-tight"></div>
+        </div>
+
+        <!-- Export Action Bar -->
+        <div class="pt-2">
+          <div class="flex gap-2">
+            <input type="text" id="export-filename" placeholder="custom_export_name.mp4" class="flex-1 bg-gray-900 border border-gray-700 rounded px-2.5 py-1 text-xs text-gray-100 placeholder-gray-500 focus:outline-none focus:border-blue-500">
+            <button onclick="handleExport()" id="btn-export" class="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-medium px-3 py-1 text-xs rounded flex items-center gap-1 transition-colors">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+              <span>Export Final MP4</span>
+            </button>
+          </div>
+          <div id="export-result" class="hidden mt-1.5 text-xs text-emerald-400 font-mono"></div>
+        </div>
+      </div>
+
+      <!-- Live Terminal Output Viewer -->
+      <div class="flex-1 flex flex-col p-3 overflow-hidden bg-black/60">
+        <div class="flex items-center justify-between mb-1.5">
+          <span class="text-[10px] font-mono uppercase text-gray-400 flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+            Terminal Operation Log
+          </span>
+          <button onclick="fetchTerminalLogs()" class="text-[10px] text-gray-500 hover:text-gray-300">refresh</button>
+        </div>
+        <pre id="terminal-log-output" class="flex-1 bg-black text-green-400 font-mono text-[11px] p-2.5 rounded border border-gray-800 overflow-y-auto whitespace-pre-wrap select-text leading-tight">
+Connecting to Studio Terminal...
+        </pre>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2 pointer-events-none"></div>
+
+  <!-- STUDIO UI CLIENT JAVASCRIPT -->
+  <script>
+    let activeRunId = null;
+    let activeProjectData = null;
+    let visualTypesList = [];
+
+    // Initialize Studio on DOM Ready
+    document.addEventListener('DOMContentLoaded', async () => {
+      await fetchVisualTypes();
+      await fetchProjects();
+      startLogPoller();
+
+      // Hook video timeupdate
+      const masterVid = document.getElementById('master-video');
+      masterVid.addEventListener('timeupdate', () => {
+        const cur = masterVid.currentTime.toFixed(2);
+        const dur = (masterVid.duration || 0).toFixed(2);
+        document.getElementById('master-time-display').innerText = `${cur}s / ${dur}s`;
+      });
+    });
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      const bg = type === 'error' ? 'bg-red-900/90 border-red-500 text-red-100' :
+                 type === 'success' ? 'bg-emerald-900/90 border-emerald-500 text-emerald-100' :
+                 'bg-blue-900/90 border-blue-500 text-blue-100';
+      toast.className = `p-3 rounded-lg border shadow-xl text-xs flex items-center gap-2 pointer-events-auto transition-opacity duration-300 ${bg}`;
+      toast.innerHTML = `<span>${message}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+
+    function setStudioStatus(text, isBusy = false) {
+      const pill = document.getElementById('status-pill');
+      const label = document.getElementById('status-text');
+      label.innerText = text;
+      if (isBusy) {
+        pill.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 font-mono';
+      } else {
+        pill.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono';
+      }
+    }
+
+    async function fetchVisualTypes() {
+      try {
+        const res = await fetch('/api/visual-types');
+        if (res.ok) {
+          const data = await res.json();
+          visualTypesList = data.visual_types || [];
+        }
+      } catch (e) {
+        console.warn('Could not load visual types', e);
+      }
+    }
+
+    async function fetchProjects() {
+      try {
+        const res = await fetch('/api/projects');
+        if (!res.ok) throw new Error('Failed to fetch projects');
+        const projects = await res.json();
+        renderProjectsList(projects);
+
+        // Auto-select test_rev_workflow if present, else first project
+        if (!activeRunId && projects.length > 0) {
+          const preferred = projects.find(p => p.run_id === 'test_rev_workflow') || projects[0];
+          selectProject(preferred.run_id);
+        }
+      } catch (err) {
+        console.error('fetchProjects error:', err);
+        showToast('Error loading projects: ' + err.message, 'error');
+      }
+    }
+
+    function renderProjectsList(projects) {
+      document.getElementById('projects-count').innerText = projects.length;
+      const listEl = document.getElementById('projects-list');
+      listEl.innerHTML = '';
+
+      if (projects.length === 0) {
+        listEl.innerHTML = '<div class="p-4 text-gray-500 text-center">No projects found. Generate one above!</div>';
+        return;
+      }
+
+      projects.forEach(p => {
+        const isSelected = p.run_id === activeRunId;
+        const item = document.createElement('div');
+        item.className = `p-3 cursor-pointer transition-colors border-l-2 ${
+          isSelected ? 'bg-blue-900/20 border-blue-500' : 'hover:bg-gray-800/50 border-transparent'
+        }`;
+        item.onclick = () => selectProject(p.run_id);
+
+        item.innerHTML = `
+          <div class="flex items-center justify-between gap-1 mb-1">
+            <span class="font-mono font-bold text-gray-200 truncate ${isSelected ? 'text-blue-300' : ''}">${p.run_id}</span>
+            <span class="px-1.5 py-0.5 rounded font-mono text-[10px] ${
+              p.has_output ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-gray-800 text-gray-400'
+            }">rev ${p.current_revision}</span>
+          </div>
+          <div class="text-gray-400 truncate text-[11px] mb-1.5">${p.topic || 'Untitled Video'}</div>
+          <div class="flex items-center justify-between text-[10px] text-gray-500 font-mono">
+            <span class="capitalize px-1.5 py-0.5 rounded bg-gray-900 text-gray-400">${p.subject}</span>
+            <span>${p.duration}s • ${p.scene_count} scenes</span>
+          </div>
+        `;
+        listEl.appendChild(item);
+      });
+    }
+
+    async function selectProject(runId) {
+      activeRunId = runId;
+      document.getElementById('header-run-id').innerText = runId;
+
+      // Update selection styling in list
+      fetchProjects();
+
+      try {
+        setStudioStatus(`Loading ${runId}...`, true);
+        const res = await fetch(`/api/projects/${runId}`);
+        if (!res.ok) throw new Error('Project not found');
+        const state = await res.json();
+        activeProjectData = state;
+
+        renderProjectDetails(state);
+        setStudioStatus('Studio Ready', false);
+      } catch (err) {
+        setStudioStatus('Error', false);
+        showToast('Failed to load project: ' + err.message, 'error');
+      }
+    }
+
+    function renderProjectDetails(state) {
+      document.getElementById('header-rev-badge').innerText = `rev ${state.current_revision}`;
+      document.getElementById('storyboard-scene-count').innerText = `${state.scenes_resolved?.length || 0} Scenes`;
+      document.getElementById('storyboard-subtitle').innerText = `${state.topic} • ${state.duration}s`;
+      document.getElementById('project-subject-badge').innerText = state.subject;
+
+      // Diagnostics
+      document.getElementById('diag-dur').innerText = `${state.duration}s`;
+      document.getElementById('diag-scenes').innerText = state.scenes_resolved?.length || 0;
+      const manimEl = document.getElementById('diag-manim');
+      if (state.diagnostics?.manim_verified) {
+        manimEl.innerText = 'VERIFIED';
+        manimEl.className = 'text-emerald-400 font-bold';
+      } else {
+        manimEl.innerText = 'N/A';
+        manimEl.className = 'text-gray-400 font-bold';
+      }
+
+      // Master Video Player
+      const masterVid = document.getElementById('master-video');
+      const emptyVid = document.getElementById('master-video-empty');
+      if (state.master_video_url) {
+        // Cache bust query string ?t=Date.now()
+        masterVid.src = `${state.master_video_url}?t=${Date.now()}`;
+        masterVid.classList.remove('hidden');
+        emptyVid.classList.add('hidden');
+      } else {
+        masterVid.src = '';
+        masterVid.classList.add('hidden');
+        emptyVid.classList.remove('hidden');
+      }
+
+      // Render Jump to Scene strip
+      renderJumpStrip(state.scenes_resolved || []);
+
+      // Render Snapshots
+      renderSnapshots(state.snapshots || []);
+
+      // Render Ingested Source Facts
+      const sfCard = document.getElementById('source-facts-card');
+      const sfContent = document.getElementById('sf-summary-content');
+      const sfTag = document.getElementById('sf-product-tag');
+      const facts = state.source_facts || state.data?.source_facts;
+      if (facts && (facts.cli_commands?.length || facts.code_snippets?.length || facts.product_name)) {
+        sfCard.classList.remove('hidden');
+        sfTag.innerText = facts.product_name || 'Customer Source';
+        let html = '';
+        if (facts.cli_commands?.length) {
+          html += `<div class="text-emerald-400 truncate">CLI: ${facts.cli_commands[0]}</div>`;
+        }
+        if (facts.code_snippets?.length) {
+          html += `<div class="text-blue-300">${facts.code_snippets.length} Code Snippet(s) (&le; 46 chars)</div>`;
+        }
+        if (facts.api_endpoints?.length) {
+          html += `<div class="text-amber-300">API: ${facts.api_endpoints[0]}</div>`;
+        }
+        sfContent.innerHTML = html;
+      } else {
+        sfCard.classList.add('hidden');
+      }
+
+      // Render Storyboard Scene Cards
+      renderStoryboard(state);
+    }
+
+    function renderJumpStrip(scenes) {
+      const strip = document.getElementById('jump-scene-strip');
+      strip.innerHTML = '';
+      scenes.forEach(s => {
+        const btn = document.createElement('button');
+        btn.className = 'px-2 py-0.5 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-[10px] font-mono';
+        btn.innerText = `Sc ${s.scene_id} (${s.start_time}s)`;
+        btn.onclick = () => jumpToTime(s.start_time);
+        strip.appendChild(btn);
+      });
+    }
+
+    function jumpToTime(timeSec) {
+      const vid = document.getElementById('master-video');
+      if (vid && vid.src) {
+        vid.currentTime = parseFloat(timeSec);
+        vid.play().catch(() => {});
+      }
+    }
+
+    function renderSnapshots(snapshots) {
+      document.getElementById('snapshots-count').innerText = `${snapshots.length} revs`;
+      const list = document.getElementById('snapshots-list');
+      list.innerHTML = '';
+
+      if (snapshots.length === 0) {
+        list.innerHTML = '<div class="text-gray-500 text-center py-2">No historical snapshots found.</div>';
+        return;
+      }
+
+      snapshots.forEach(sn => {
+        const el = document.createElement('div');
+        el.className = 'flex items-center justify-between p-2 rounded bg-gray-900 border border-gray-800';
+        el.innerHTML = `
+          <div>
+            <div class="font-mono font-bold text-gray-200 flex items-center gap-1.5">
+              <span>${sn.rev_id}</span>
+              ${sn.has_video ? '<span class="text-[9px] text-emerald-400">● MP4</span>' : ''}
+            </div>
+            <div class="text-[10px] text-gray-400 truncate max-w-[150px]">${sn.action || 'Snapshot'}</div>
+          </div>
+          <button onclick="handleRestore('${sn.rev_id}')" class="px-2 py-1 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 rounded text-[10px] font-semibold flex items-center gap-1 transition-colors">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+            Restore
+          </button>
+        `;
+        list.appendChild(el);
+      });
+    }
+
+    function renderStoryboard(state) {
+      const container = document.getElementById('scenes-container');
+      container.innerHTML = '';
+
+      const scenes = state.scenes_resolved || [];
+      if (scenes.length === 0) {
+        container.innerHTML = '<div class="text-gray-500 text-center py-10">No scenes in this project timeline.</div>';
+        return;
+      }
+
+      scenes.forEach(sc => {
+        const card = document.createElement('div');
+        card.id = `scene-card-${sc.scene_id}`;
+        card.className = 'bg-[#111827] border border-gray-800 rounded-xl overflow-hidden shadow-lg';
+
+        // Word timestamp chips
+        const wordChipsHtml = (sc.words || []).map(w =>
+          `<span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-gray-800 text-gray-300 text-[10px] font-mono border border-gray-700">
+            ${w.word} <span class="text-blue-400 text-[9px]">[${w.start}s]</span>
+           </span>`
+        ).join(' ');
+
+        // Visual types options
+        const vTypesOptions = (visualTypesList.length > 0 ? visualTypesList : [
+          { id: 'code_reveal', label: 'Code Reveal (Spotlight)' },
+          { id: 'code_transform', label: 'Code Transform / Diff' },
+          { id: 'terminal', label: 'Terminal CLI Simulator' },
+          { id: 'diagram', label: 'Architecture & API Payloads' },
+          { id: 'comparison', label: 'Comparison' },
+          { id: 'manim_scene', label: 'Manim Scene' },
+          { id: 'math_equation', label: 'Math Equation' },
+          { id: 'function_graph', label: 'Function Graph' },
+          { id: 'quantum_sim', label: 'Quantum Sim' },
+          { id: 'mechanics_fbd', label: 'Mechanics FBD' },
+          { id: 'electrical_grid', label: 'Electrical Grid' },
+          { id: 'chemistry_reaction', label: 'Chemistry Reaction' },
+          { id: 'bento_grid', label: 'Bento Grid' }
+        ]).map(t => `<option value="${t.id}" ${t.id === sc.visual_type ? 'selected' : ''}>${t.label}</option>`).join('');
+
+        // Visual props JSON prefill (exclude basic metadata)
+        const vPropsObj = {};
+        for (const [k, v] of Object.entries(sc.raw_scene || {})) {
+          if (!['scene_id', 'start_time', 'end_time', 'duration', 'spoken_text', 'narration', 'words'].includes(k)) {
+            vPropsObj[k] = v;
+          }
+        }
+        const vPropsFormatted = JSON.stringify(vPropsObj, null, 2);
+
+        card.innerHTML = `
+          <!-- Scene Card Header -->
+          <div class="px-4 py-3 bg-[#151c2c] border-b border-gray-800 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="w-6 h-6 rounded-full bg-blue-600/30 text-blue-400 border border-blue-500/40 flex items-center justify-center font-bold text-xs">
+                ${sc.scene_id}
+              </span>
+              <span class="font-bold text-sm text-white">${sc.title}</span>
+            </div>
+
+            <div class="flex items-center gap-1.5 text-xs font-mono">
+              <span class="px-2 py-0.5 rounded bg-gray-800 text-gray-300 border border-gray-700">
+                ${sc.start_time}s – ${sc.end_time}s (${sc.duration}s)
+              </span>
+              <button onclick="jumpToTime(${sc.start_time})" class="px-2 py-0.5 rounded bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 flex items-center gap-1" title="Jump to this scene in Master Player">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/></svg>
+                Seek
+              </button>
+            </div>
+          </div>
+
+          <!-- Hashes Pill Bar -->
+          <div class="px-4 py-1.5 bg-[#0e1422] border-b border-gray-800 flex items-center justify-between text-[10px] font-mono text-gray-400">
+            <div class="flex items-center gap-2 truncate">
+              <span>v_hash: <code class="text-blue-400">${(sc.visual_hash || '').slice(0, 8)}</code></span>
+              <span>a_hash: <code class="text-emerald-400">${(sc.audio_hash || '').slice(0, 8)}</code></span>
+            </div>
+            <div>
+              <span class="px-1.5 py-0.5 rounded bg-gray-900 border border-gray-800 text-gray-400 uppercase">${sc.visual_type}</span>
+            </div>
+          </div>
+
+          <!-- Scene Body: Segment Video & Editing Panels -->
+          <div class="p-4 space-y-4 text-xs">
+
+            <!-- 1. Video Segment Preview -->
+            <div>
+              <div class="flex items-center justify-between mb-1.5 text-[11px] font-semibold text-gray-400">
+                <span>Scene Segment Video</span>
+                ${sc.has_manim_asset ? `
+                  <button id="toggle-manim-btn-${sc.scene_id}" onclick="toggleSceneVideoSource(${sc.scene_id}, '${sc.segment_video_url}', '${sc.manim_asset_url}')" class="text-[10px] px-2 py-0.5 rounded bg-purple-900/30 text-purple-300 border border-purple-800 hover:bg-purple-900/50">
+                    Switch to Raw Manim Clip
+                  </button>
+                ` : ''}
+              </div>
+
+              ${sc.has_segment_video ? `
+                <div class="rounded-lg overflow-hidden bg-black border border-gray-800 max-h-48 flex items-center justify-center">
+                  <video id="scene-video-${sc.scene_id}" controls class="w-full max-h-48 object-contain" src="${sc.segment_video_url}?t=${Date.now()}"></video>
+                </div>
+              ` : `
+                <div class="p-4 bg-gray-900 border border-dashed border-gray-800 rounded-lg text-center text-gray-500">
+                  Segment video not yet rendered for Scene ${sc.scene_id}.
+                </div>
+              `}
+            </div>
+
+            <!-- 2. Mode A: Visual Controls Panel -->
+            <div class="p-3 bg-gray-900/60 border border-gray-800 rounded-lg space-y-2.5">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-gray-200 flex items-center gap-1.5">
+                  <span class="text-amber-400 font-mono">⚡</span> Mode A: Visual Controls
+                </span>
+                <span class="text-[10px] text-gray-500 font-mono">Zero Narration Drift</span>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-gray-400 text-[11px] mb-1">Visual Type</label>
+                  <select id="modeA-type-${sc.scene_id}" class="w-full bg-gray-950 border border-gray-700 rounded px-2 py-1 text-gray-100 text-xs focus:outline-none focus:border-blue-500">
+                    ${vTypesOptions}
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-gray-400 text-[11px] mb-1">Scene Title</label>
+                  <input type="text" id="modeA-title-${sc.scene_id}" value="${sc.title}" class="w-full bg-gray-950 border border-gray-700 rounded px-2.5 py-1 text-gray-100 text-xs focus:outline-none focus:border-blue-500">
+                </div>
+              </div>
+
+              <details class="text-[11px]">
+                <summary class="text-gray-400 hover:text-gray-200 cursor-pointer select-none">Advanced Visual JSON Props</summary>
+                <textarea id="modeA-json-${sc.scene_id}" rows="4" class="w-full mt-1.5 bg-black font-mono text-[11px] border border-gray-700 rounded p-2 text-gray-200 focus:outline-none focus:border-blue-500">${vPropsFormatted}</textarea>
+              </details>
+
+              <button onclick="handleModeARevision(${sc.scene_id})" id="btn-modeA-${sc.scene_id}" class="w-full py-1.5 px-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded flex items-center justify-center gap-1.5 transition-colors shadow">
+                <span>⚡ Rerender Visual Only (Mode A)</span>
+              </button>
+            </div>
+
+            <!-- 3. Mode B: Narration & Timing Panel -->
+            <div class="p-3 bg-gray-900/60 border border-gray-800 rounded-lg space-y-2.5">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-gray-200 flex items-center gap-1.5">
+                  <span class="text-purple-400">🎙️</span> Mode B: Spoken Narration & Timing
+                </span>
+                <span class="text-[10px] text-gray-500 font-mono">Regen TTS & Realign Downstream</span>
+              </div>
+
+              <div>
+                <label class="block text-gray-400 text-[11px] mb-1">Spoken Narration</label>
+                <textarea id="modeB-narration-${sc.scene_id}" rows="2" class="w-full bg-gray-950 border border-gray-700 rounded p-2 text-gray-100 text-xs focus:outline-none focus:border-purple-500">${sc.spoken_text}</textarea>
+              </div>
+
+              <!-- Whisper Word Timestamp Alignment Chips -->
+              <div>
+                <div class="text-[10px] text-gray-500 mb-1">Whisper Word Alignment:</div>
+                <div class="flex flex-wrap gap-1 max-h-20 overflow-y-auto p-1 bg-black/40 rounded border border-gray-800/80">
+                  ${wordChipsHtml || '<span class="text-gray-600">No alignment chips.</span>'}
+                </div>
+              </div>
+
+              <button onclick="handleModeBRevision(${sc.scene_id})" id="btn-modeB-${sc.scene_id}" class="w-full py-1.5 px-3 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded flex items-center justify-center gap-1.5 transition-colors shadow">
+                <span>🎙️ Revise Narration & Realign (Mode B)</span>
+              </button>
+            </div>
+
+          </div>
+        `;
+
+        container.appendChild(card);
+      });
+    }
+
+    function toggleSceneVideoSource(sceneId, segUrl, manimUrl) {
+      const vid = document.getElementById(`scene-video-${sceneId}`);
+      const btn = document.getElementById(`toggle-manim-btn-${sceneId}`);
+      if (!vid) return;
+
+      const isViewingManim = vid.src.includes('manim');
+      if (isViewingManim) {
+        vid.src = `${segUrl}?t=${Date.now()}`;
+        btn.innerText = 'Switch to Raw Manim Clip';
+        btn.className = 'text-[10px] px-2 py-0.5 rounded bg-purple-900/30 text-purple-300 border border-purple-800 hover:bg-purple-900/50';
+      } else {
+        vid.src = `${manimUrl}?t=${Date.now()}`;
+        btn.innerText = 'Switch to Rendered Segment';
+        btn.className = 'text-[10px] px-2 py-0.5 rounded bg-blue-900/30 text-blue-300 border border-blue-800 hover:bg-blue-900/50';
+      }
+      vid.load();
+    }
+
+    // MODE A REVISION HANDLER
+    async function handleModeARevision(sceneId) {
+      if (!activeRunId) return;
+
+      const visualType = document.getElementById(`modeA-type-${sceneId}`).value;
+      const title = document.getElementById(`modeA-title-${sceneId}`).value;
+      const jsonRaw = document.getElementById(`modeA-json-${sceneId}`).value;
+
+      let visualProps = null;
+      if (jsonRaw && jsonRaw.trim()) {
+        try {
+          visualProps = JSON.parse(jsonRaw);
+        } catch (e) {
+          showToast('Invalid JSON in visual props: ' + e.message, 'error');
+          return;
+        }
+      }
+
+      const btn = document.getElementById(`btn-modeA-${sceneId}`);
+      const origText = btn.innerHTML;
+      btn.innerHTML = `<span class="animate-spin">🔄</span> Rerendering Scene ${sceneId}...`;
+      btn.disabled = true;
+      setStudioStatus(`Rerendering Scene ${sceneId} (Mode A)...`, true);
+
+      try {
+        const res = await fetch(`/api/projects/${activeRunId}/scenes/${sceneId}/revise-visual`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            visual_type: visualType,
+            title: title,
+            visual_props: visualProps
+          })
+        });
+
+        if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(errData.detail || 'Mode A revision failed');
+        }
+
+        const updatedState = await res.json();
+        activeProjectData = updatedState;
+        renderProjectDetails(updatedState);
+        showToast(`✅ Scene ${sceneId} visual rerendered successfully!`, 'success');
+        setStudioStatus('Studio Ready', false);
+      } catch (err) {
+        setStudioStatus('Error', false);
+        showToast(`Revision failed: ${err.message}`, 'error');
+      } finally {
+        btn.innerHTML = origText;
+        btn.disabled = false;
+      }
+    }
+
+    // MODE B REVISION HANDLER
+    async function handleModeBRevision(sceneId) {
+      if (!activeRunId) return;
+
+      const narration = document.getElementById(`modeB-narration-${sceneId}`).value;
+      if (!narration || !narration.strip()) {
+        showToast('Narration text cannot be empty.', 'error');
+        return;
+      }
+
+      const btn = document.getElementById(`btn-modeB-${sceneId}`);
+      const origText = btn.innerHTML;
+      btn.innerHTML = `<span class="animate-spin">🔄</span> Realiging Scene ${sceneId}...`;
+      btn.disabled = true;
+      setStudioStatus(`Regenerating Audio for Scene ${sceneId} (Mode B)...`, true);
+
+      try {
+        const res = await fetch(`/api/projects/${activeRunId}/scenes/${sceneId}/revise-narration`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ narration: narration.trim() })
+        });
+
+        if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(errData.detail || 'Mode B revision failed');
+        }
+
+        const updatedState = await res.json();
+        activeProjectData = updatedState;
+        renderProjectDetails(updatedState);
+        showToast(`✅ Scene ${sceneId} narration revised & realigned!`, 'success');
+        setStudioStatus('Studio Ready', false);
+      } catch (err) {
+        setStudioStatus('Error', false);
+        showToast(`Narration revision failed: ${err.message}`, 'error');
+      } finally {
+        btn.innerHTML = origText;
+        btn.disabled = false;
+      }
+    }
+
+    // RESTORE SNAPSHOT HANDLER
+    async function handleRestore(revId) {
+      if (!activeRunId) return;
+
+      if (!confirm(`Non-destructively restore snapshot ${revId}? Your current state will be safely archived first.`)) {
+        return;
+      }
+
+      setStudioStatus(`Restoring snapshot ${revId}...`, true);
+      try {
+        const res = await fetch(`/api/projects/${activeRunId}/restore/${revId}`, {
+          method: 'POST'
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || 'Restore failed');
+        }
+
+        const updated = await res.json();
+        activeProjectData = updated;
+        renderProjectDetails(updated);
+        showToast(`⏮️ Successfully restored snapshot ${revId}!`, 'success');
+        setStudioStatus('Studio Ready', false);
+      } catch (err) {
+        setStudioStatus('Error', false);
+        showToast('Restore error: ' + err.message, 'error');
+      }
+    }
+
+    // EXPORT HANDLER
+    async function handleExport() {
+      if (!activeRunId) return;
+
+      const customName = document.getElementById('export-filename').value;
+      const btn = document.getElementById('btn-export');
+      const origText = btn.innerHTML;
+      btn.innerHTML = `<span>Exporting...</span>`;
+      btn.disabled = true;
+
+      try {
+        const res = await fetch(`/api/projects/${activeRunId}/export`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ custom_filename: customName || null })
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || 'Export failed');
+        }
+
+        const data = await res.json();
+        const resEl = document.getElementById('export-result');
+        resEl.classList.remove('hidden');
+        resEl.innerHTML = `✅ Saved: <a href="${data.download_url}" target="_blank" class="underline hover:text-emerald-300">${data.filename}</a> (${(data.size_bytes / (1024*1024)).toFixed(2)} MB)`;
+        showToast(`Export complete: ${data.filename}`, 'success');
+      } catch (err) {
+        showToast('Export error: ' + err.message, 'error');
+      } finally {
+        btn.innerHTML = origText;
+        btn.disabled = false;
+      }
+    }
+
+    // GENERATE PROJECT HANDLER
+    async function handleGenerate(e) {
+      e.preventDefault();
+      const topic = document.getElementById('gen-topic').value;
+      const subject = document.getElementById('gen-subject').value;
+      const length = parseInt(document.getElementById('gen-length').value, 10);
+      const mock = document.getElementById('gen-mock').checked;
+      const source_text = document.getElementById('gen-source-text')?.value || '';
+      const source_url = document.getElementById('gen-source-url')?.value || '';
+
+      const btn = document.getElementById('btn-generate');
+      btn.disabled = true;
+      btn.innerHTML = `<span>Starting Generation...</span>`;
+      setStudioStatus('Generating new project...', true);
+
+      try {
+        const res = await fetch('/api/projects/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ topic, subject, length, mock, source_text, source_url })
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || 'Generation failed');
+        }
+
+        const data = await res.json();
+        showToast(`Generation launched for ${data.run_id}!`, 'success');
+        document.getElementById('new-project-details').removeAttribute('open');
+
+        // Poll job until completed
+        pollJob(data.job_id, data.run_id);
+      } catch (err) {
+        showToast('Generation error: ' + err.message, 'error');
+        setStudioStatus('Studio Ready', false);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<span>Generate Project</span>`;
+      }
+    }
+
+    async function pollJob(jobId, runId) {
+      const pollTimer = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/jobs/${jobId}`);
+          if (res.ok) {
+            const job = await res.json();
+            if (job.status === 'completed') {
+              clearInterval(pollTimer);
+              showToast(`✅ Video generation complete for ${runId}!`, 'success');
+              setStudioStatus('Studio Ready', false);
+              await fetchProjects();
+              selectProject(runId);
+            } else if (job.status === 'failed') {
+              clearInterval(pollTimer);
+              showToast(`❌ Generation failed: ${job.error}`, 'error');
+              setStudioStatus('Studio Error', false);
+            }
+          }
+        } catch (e) {
+          console.warn('Job poll error', e);
+        }
+      }, 3000);
+    }
+
+    // TERMINAL LOG POLLER
+    function startLogPoller() {
+      fetchTerminalLogs();
+      setInterval(fetchTerminalLogs, 4000);
+    }
+
+    async function fetchTerminalLogs() {
+      try {
+        const res = await fetch('/api/terminal-logs');
+        if (res.ok) {
+          const data = await res.json();
+          const pre = document.getElementById('terminal-log-output');
+          if (data.logs && data.logs.length > 0) {
+            pre.innerText = data.logs.join('\n');
+            pre.scrollTop = pre.scrollHeight;
+          }
+        }
+      } catch (e) {
+        // quiet ignore
+      }
+    }
+  </script>
+</body>
+</html>
+

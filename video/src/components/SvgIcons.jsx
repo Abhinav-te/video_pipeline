@@ -140,6 +140,19 @@ export const ElectricalIcon = ({ size = 20, color = 'currentColor' }) => (
   </svg>
 );
 
+export const TerminalIcon = ({ size = 20, color = 'currentColor' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+    <polyline points="4 17 10 11 4 5" />
+    <line x1="12" y1="19" x2="20" y2="19" />
+  </svg>
+);
+
+export const CheckIcon = ({ size = 20, color = 'currentColor' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+    <polyline points="20 6 9 17 4 12" />
+  </svg>
+);
+
 /**
  * Dynamic Badge Icon Resolver: Safely intercepts Unicode emojis or type names
  * and returns the appropriate crisp inline SVG vector.
@@ -147,6 +160,12 @@ export const ElectricalIcon = ({ size = 20, color = 'currentColor' }) => (
 export const DynamicBadgeIcon = ({ icon, type, size = 22, color = 'currentColor' }) => {
   const iconStr = String(icon || type || '').toLowerCase();
 
+  if (iconStr.includes('term') || iconStr.includes('cli') || iconStr.includes('prompt') || iconStr.includes('zsh') || iconStr.includes('bash')) {
+    return <TerminalIcon size={size} color={color} />;
+  }
+  if (iconStr.includes('check') || iconStr.includes('success') || iconStr.includes('pass') || iconStr.includes('✓') || iconStr.includes('✔')) {
+    return <CheckIcon size={size} color={color} />;
+  }
   if (iconStr.includes('quantum') || iconStr.includes('tunnel') || iconStr.includes('schrodinger') || iconStr.includes('dirac')) {
     return <QuantumIcon size={size} color={color} />;
   }
@@ -195,10 +214,33 @@ export const DynamicBadgeIcon = ({ icon, type, size = 22, color = 'currentColor'
   if (iconStr.includes('layer') || iconStr.includes('stack')) {
     return <LayersIcon size={size} color={color} />;
   }
-  if (iconStr.includes('code') || iconStr.includes('term')) {
+  if (iconStr.includes('code')) {
     return <CodeIcon size={size} color={color} />;
   }
 
   // Default fallback is SparklesIcon
   return <SparklesIcon size={size} color={color} />;
+};
+
+export default {
+  WarningIcon,
+  SparklesIcon,
+  LightningIcon,
+  BulbIcon,
+  ScaleIcon,
+  BrainIcon,
+  TargetIcon,
+  GearIcon,
+  LayersIcon,
+  CodeIcon,
+  MathIcon,
+  PhysicsIcon,
+  GraphIcon,
+  ChemistryIcon,
+  QuantumIcon,
+  MechanicsIcon,
+  ElectricalIcon,
+  TerminalIcon,
+  CheckIcon,
+  DynamicBadgeIcon,
 };
