@@ -411,3 +411,56 @@ def format_source_summary(facts: Dict[str, Any]) -> str:
         parts.append(f"{len(facts['key_points'])} key point(s)")
 
     return " | ".join(parts) if parts else "Source content parsed (0 facts identified)"
+
+
+def compute_source_hash(text: str) -> str:
+    """Computes SHA-256 hash of normalized source string."""
+    import hashlib
+    normalized = "\n".join(l.rstrip() for l in text.strip().splitlines())
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
+def load_sources_from_profile(profile_data: Dict[str, Any], offline: bool = False) -> List[Dict[str, Any]]:
+    """Loads all sources configured in project_profile into a list of normalized source dicts."""
+    p_profile = profile_data.get("project_profile", profile_data)
+    sources_config = p_profile.get("sources", [])
+    loaded_docs: List[Dict[str, Any]] = []
+
+    for s in sources_config:
+        url = s.get("url") or s.get("source_url") or ""
+        local_file = s.get("local_file") or s.get("source_file") or ""
+        title = s.get("title") or url or local_file
+
+        raw_text = ""
+        resolved_source = url or local_file
+
+        if local_file and (offline or not url):
+            try:
+                raw_text = load_source_content(source_file=local_file)
+                resolved_source = local_file
+            except Exception:
+                pass
+
+        if not raw_text and url and not offline:
+            try:
+                raw_text = load_source_content(source_url=url)
+                resolved_source = url
+            except Exception:
+                pass
+
+        if not raw_text and local_file:
+            try:
+                raw_text = load_source_content(source_file=local_file)
+                resolved_source = local_file
+            except Exception:
+                pass
+
+        if raw_text:
+            loaded_docs.append({
+                "source_url": resolved_source,
+                "title": title,
+                "content_hash": compute_source_hash(raw_text),
+                "content": raw_text,
+            })
+
+    return loaded_docs

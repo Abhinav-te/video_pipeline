@@ -498,6 +498,7 @@ const MiniCanvas = ({ algoType, cardIndex = 0, isHighlighted, frame, domain = ''
   const isQuantumDomain = normDomain.includes('quantum') || normType.includes('schrodinger') || normType.includes('tunnel') || normType.includes('heisenberg') || normType.includes('dirac');
   const isMechanicsDomain = normDomain.includes('mechanic') || normType.includes('equilibrium') || normType.includes('torque') || normType.includes('shear') || normType.includes('axle') || normType.includes('truss');
   const isElectricalDomain = normDomain.includes('electr') || normType.includes('kcl') || normType.includes('thevenin') || normType.includes('dispatch') || normType.includes('opf');
+  const isCodeDomain = normDomain.includes('code') || normDomain.includes('devtool') || normDomain.includes('system') || normDomain.includes('software') || normType.includes('latency') || normType.includes('lines') || normType.includes('cache') || normType.includes('conflict') || normType.includes('perf');
 
   // 1. PURE MATHEMATICS & CALCULUS MINI-SVGS
   if (isMathDomain) {
@@ -827,7 +828,96 @@ const MiniCanvas = ({ algoType, cardIndex = 0, isHighlighted, frame, domain = ''
     );
   }
 
-  // 5. CLEAN DOMAIN-NEUTRAL / GENERIC MINI-SVGS (ZERO LEAKS)
+  // 5. SOFTWARE & DEVTOOL BENCHMARK MINI-SVGS
+  if (isCodeDomain) {
+    if (slot === 0 || normType.includes('latency')) {
+      const barH = 30 + 10 * Math.sin(frame * 0.1);
+      return (
+        <svg width="100%" height="180" viewBox="0 0 380 180">
+          <line x1="40" y1="140" x2="340" y2="140" stroke="#334155" strokeWidth="2" />
+          {/* Legacy Bar */}
+          <rect x="90" y="45" width="55" height="95" rx="6" fill="rgba(239, 68, 68, 0.25)" stroke="#ef4444" strokeWidth="2" />
+          <text x="117" y="35" fill="#ef4444" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">500ms</text>
+          <text x="117" y="158" fill="#94a3b8" fontSize="12" fontFamily="monospace" textAnchor="middle">v1 (OLD)</text>
+          {/* v2 Bar */}
+          <rect x="235" y={140 - barH} width="55" height={barH} rx="6" fill="rgba(52, 211, 153, 0.35)" stroke="#34d399" strokeWidth="2" />
+          <text x="262" y={128 - barH} fill="#34d399" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">14ms</text>
+          <text x="262" y="158" fill="#34d399" fontSize="12" fontWeight="bold" fontFamily="monospace" textAnchor="middle">v2 (-80%)</text>
+          <text x="190" y="22" fill="#38bdf8" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+            COLD-START LATENCY COMPARISON
+          </text>
+        </svg>
+      );
+    }
+    if (slot === 1 || normType.includes('line')) {
+      return (
+        <svg width="100%" height="180" viewBox="0 0 380 180">
+          <rect x="50" y="38" width="125" height="95" rx="8" fill="#0f172a" stroke="#ef4444" strokeWidth="2" />
+          <text x="112" y="60" fill="#ef4444" fontSize="12" fontWeight="bold" fontFamily="monospace" textAnchor="middle">BEFORE: 28 LINES</text>
+          <line x1="65" y1="75" x2="160" y2="75" stroke="#ef4444" strokeWidth="2" strokeDasharray="3 3" />
+          <line x1="65" y1="90" x2="145" y2="90" stroke="#ef4444" strokeWidth="2" strokeDasharray="3 3" />
+          <line x1="65" y1="105" x2="155" y2="105" stroke="#ef4444" strokeWidth="2" strokeDasharray="3 3" />
+          <line x1="65" y1="120" x2="130" y2="120" stroke="#ef4444" strokeWidth="2" strokeDasharray="3 3" />
+
+          <text x="190" y="92" fill="#38bdf8" fontSize="22" fontWeight="bold" textAnchor="middle">→</text>
+
+          <rect x="205" y="38" width="125" height="95" rx="8" fill="#0f172a" stroke="#34d399" strokeWidth="2" />
+          <text x="267" y="60" fill="#34d399" fontSize="12" fontWeight="bold" fontFamily="monospace" textAnchor="middle">AFTER: 4 LINES</text>
+          <line x1="220" y1="85" x2="315" y2="85" stroke="#34d399" strokeWidth="3" />
+          <line x1="220" y1="105" x2="285" y2="105" stroke="#34d399" strokeWidth="3" />
+
+          <text x="190" y="24" fill="#38bdf8" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+            BOILERPLATE REDUCTION: 90%
+          </text>
+          <text x="190" y="162" fill="#34d399" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+            STREAMING ASYNC ITERATOR
+          </text>
+        </svg>
+      );
+    }
+    if (slot === 2 || normType.includes('cache')) {
+      const pulseR = 40 + 3 * Math.sin(frame * 0.12);
+      return (
+        <svg width="100%" height="180" viewBox="0 0 380 180">
+          <circle cx="190" cy="85" r={pulseR} fill="rgba(56, 189, 248, 0.12)" stroke="#38bdf8" strokeWidth="2.5" />
+          <circle cx="190" cy="85" r="28" fill="#0f172a" stroke="#34d399" strokeWidth="3" />
+          <text x="190" y="90" fill="#ffffff" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">99.9%</text>
+          <circle cx="130" cy="55" r="5" fill="#38bdf8" />
+          <circle cx="250" cy="55" r="5" fill="#38bdf8" />
+          <circle cx="120" cy="115" r="5" fill="#34d399" />
+          <circle cx="260" cy="115" r="5" fill="#34d399" />
+          <line x1="135" y1="58" x2="165" y2="72" stroke="#38bdf8" strokeWidth="1.5" strokeDasharray="3 3" />
+          <line x1="245" y1="58" x2="215" y2="72" stroke="#38bdf8" strokeWidth="1.5" strokeDasharray="3 3" />
+          <text x="190" y="24" fill="#38bdf8" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+            GLOBAL EDGE HIT RATE
+          </text>
+          <text x="190" y="162" fill="#34d399" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+            40+ POPS • ZERO ORIGIN SPIKES
+          </text>
+        </svg>
+      );
+    }
+    // Slot 3: Concurrency / Zero locks
+    const dashX = (frame * 3) % 40;
+    return (
+      <svg width="100%" height="180" viewBox="0 0 380 180">
+        <line x1="60" y1="65" x2="320" y2="65" stroke="#38bdf8" strokeWidth="3" strokeDasharray="8 6" strokeDashoffset={-dashX} />
+        <line x1="60" y1="105" x2="320" y2="105" stroke="#a855f7" strokeWidth="3" strokeDasharray="8 6" strokeDashoffset={-dashX} />
+        <circle cx="190" cy="65" r="14" fill="#0f172a" stroke="#38bdf8" strokeWidth="2" />
+        <text x="190" y="70" fill="#38bdf8" fontSize="11" fontWeight="bold" fontFamily="monospace" textAnchor="middle">CH-1</text>
+        <circle cx="190" cy="105" r="14" fill="#0f172a" stroke="#a855f7" strokeWidth="2" />
+        <text x="190" y="110" fill="#a855f7" fontSize="11" fontWeight="bold" fontFamily="monospace" textAnchor="middle">CH-2</text>
+        <text x="190" y="24" fill="#38bdf8" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+          LOCK-FREE PIPELINE CONCURRENCY
+        </text>
+        <text x="190" y="162" fill="#34d399" fontSize="13" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+          ZERO LOCK CONTENTION • mTLS
+        </text>
+      </svg>
+    );
+  }
+
+  // 6. CLEAN DOMAIN-NEUTRAL / GENERIC MINI-SVGS (ZERO LEAKS)
   if (slot === 0) {
     return (
       <svg width="100%" height="180" viewBox="0 0 380 180">
@@ -912,11 +1002,11 @@ export const BentoGridScene = ({
   const isMechanics = domain.includes('mechanic') || (scene?.cards && scene.cards.some(c => ['force_equilibrium', 'torque_balance', 'shear_bending', 'axle_transfer'].includes(c.algo_type)));
   const isQuantum = domain.includes('quantum') || (scene?.cards && scene.cards.some(c => ['schrodinger', 'tunneling', 'heisenberg', 'dirac_orbitals'].includes(c.algo_type)));
   const isMath = domain.includes('math');
-  const isCode = domain.includes('code');
+  const isCode = domain.includes('code') || domain.includes('devtool') || domain.includes('system') || domain.includes('software');
   const isML = domain.includes('ml');
 
-  let eyebrow = 'MACHINE LEARNING ARCHITECTURES';
-  let eyebrowColor = '#f59e0b';
+  let eyebrow = isCode ? 'DEVELOPER PLATFORM & BENCHMARKS' : (isML ? 'MACHINE LEARNING ARCHITECTURES' : 'SYSTEM SPECIFICATIONS & BENCHMARKS');
+  let eyebrowColor = isCode ? '#38bdf8' : (isML ? '#f59e0b' : '#38bdf8');
   if (isChemistry) {
     eyebrow = 'ORGANIC CHEMISTRY • REACTION MECHANISMS';
     eyebrowColor = '#38bdf8';
@@ -933,7 +1023,7 @@ export const BentoGridScene = ({
     eyebrow = 'PURE MATHEMATICS • CALCULUS & ANALYSIS';
     eyebrowColor = '#34d399';
   } else if (isCode) {
-    eyebrow = 'SOFTWARE ARCHITECTURE & ALGORITHMS';
+    eyebrow = 'PRODUCTION SCALE & BENCHMARKS';
     eyebrowColor = '#38bdf8';
   }
 
@@ -943,7 +1033,9 @@ export const BentoGridScene = ({
     isQuantum ? 'OPERATOR & STATE MATRIX' :
     isChemistry ? 'SN1 VS SN2 DECISION MATRIX' :
     isMath ? 'CALCULUS & INTEGRAL MATRIX' :
-    'UNSUPERVISED ML ARCHITECTURES'
+    isCode ? 'PRODUCTION SCALE & BENCHMARKS' :
+    isML ? 'UNSUPERVISED ML ARCHITECTURES' :
+    'SYSTEM SPECIFICATIONS & ARCHITECTURE'
   );
 
   const subtitle = bentoData.subtitle || scene?.subtitle || (
@@ -952,7 +1044,9 @@ export const BentoGridScene = ({
     isQuantum ? 'Fundamental Postulates of Quantum Mechanics' :
     isChemistry ? 'The 4 Decisive Reaction Factors' :
     isMath ? '4 Core Cornerstones of Modern Calculus' :
-    'Algorithms You Need To Know'
+    isCode ? 'Measured Performance Across 40 Global Edge Regions' :
+    isML ? 'Algorithms You Need To Know' :
+    'Verified Operational Invariants & Metrics'
   );
 
   const cards = bentoData.cards || scene?.cards || [];
@@ -960,7 +1054,12 @@ export const BentoGridScene = ({
   // Render 4-Card 2x2 Grid for all specialized subjects or 4-card matrices
   if (cards.length === 4 || !isML) {
     const displayCards = cards.length >= 4 ? cards.slice(0, 4) : (
-      isChemistry ? [
+      isCode ? [
+        { title: 'COLD-START LATENCY', algo_type: 'latency', category: 'PERFORMANCE', description: '-80% cold-start execution latency (14ms vs 500ms)' },
+        { title: 'CODE REDUCTION', algo_type: 'lines', category: 'DEVELOPER VELOCITY', description: '90% fewer lines of code (reduced from 28 lines to 4)' },
+        { title: 'CACHE HIT RATE', algo_type: 'cache', category: 'GLOBAL EDGE', description: '99.9% cache hit rate across 40 global edge regions' },
+        { title: 'ZERO CONFLICTS', algo_type: 'conflict', category: 'RELIABILITY', description: 'Lock-free atomic writes with native async streaming' },
+      ] : isChemistry ? [
         { title: 'SUBSTRATE', algo_type: 'substrate', category: 'BULKINESS', description: 'SN2 prefers Methyl/1° • SN1 prefers bulky 3°' },
         { title: 'NUCLEOPHILE', algo_type: 'nucleophile', category: 'STRENGTH', description: 'SN2 requires strong Nu⁻ • SN1 works with weak neutral Nu' },
         { title: 'SOLVENT', algo_type: 'solvent', category: 'POLARITY', description: 'SN2 prefers polar aprotic • SN1 prefers polar protic' },
@@ -1111,6 +1210,11 @@ export const BentoGridScene = ({
         </div>
       </div>
     );
+  }
+
+  // Strictly guard: non-ML domains must never render ML clustering layout
+  if (!isML) {
+    return null;
   }
 
   return (

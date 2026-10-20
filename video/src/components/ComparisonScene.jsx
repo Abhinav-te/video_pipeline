@@ -335,7 +335,15 @@ export const ComparisonScene = ({
         let defaultSummary = 'KEY TAKEAWAY: Infinite refinement transforms discrete sums into exact continuous antiderivatives';
         let defaultTag = leftTag && rightTag ? `${leftTag} VS ${rightTag}` : 'FUNDAMENTAL THEOREM';
 
-        if (isCode) {
+        if (isDevTools) {
+          footerTitle = 'PERFORMANCE & DEVELOPER EXPERIENCE BENCHMARK';
+          defaultLeftLabel = leftTag || 'LEGACY SDK (V1)';
+          defaultLeftMetric = leftSide?.metric || '840ms Latency';
+          defaultRightLabel = rightTag || 'NEW SDK (V2)';
+          defaultRightMetric = rightSide?.metric || '140ms Latency (6x Faster)';
+          defaultSummary = scene?.comparison_footer || 'KEY TAKEAWAY: v2 SDK reduces cold-start latency by 6x with 90% less boilerplate';
+          defaultTag = leftTag && rightTag ? `${leftTag} VS ${rightTag}` : 'BENCHMARK: 6x SPEEDUP';
+        } else if (isCode) {
           footerTitle = 'ASYMPTOTIC COMPLEXITY ANALYSIS';
           defaultLeftLabel = leftTag || 'TIME COMPLEXITY';
           defaultLeftMetric = leftSide?.metric || 'O(n²) Quadratic';
@@ -383,14 +391,6 @@ export const ComparisonScene = ({
           defaultRightMetric = rightSide?.metric || 'd = 2 (Non-linear)';
           defaultSummary = 'KEY TAKEAWAY: Manifold learning preserves topological neighborhoods across complex distributions';
           defaultTag = leftTag && rightTag ? `${leftTag} VS ${rightTag}` : 'TOPOLOGY: NEIGHBORHOOD';
-        } else if (isDevTools) {
-          footerTitle = 'PERFORMANCE & DEVELOPER EXPERIENCE BENCHMARK';
-          defaultLeftLabel = leftTag || 'LEGACY SDK (V1)';
-          defaultLeftMetric = leftSide?.metric || '840ms Latency';
-          defaultRightLabel = rightTag || 'NEW SDK (V2)';
-          defaultRightMetric = rightSide?.metric || '140ms Latency (6x Faster)';
-          defaultSummary = scene?.comparison_footer || 'KEY TAKEAWAY: v2 SDK reduces cold-start latency by 6x with 90% less boilerplate';
-          defaultTag = leftTag && rightTag ? `${leftTag} VS ${rightTag}` : 'BENCHMARK: 6x SPEEDUP';
         } else if (!isMath) {
           footerTitle = 'COMPARATIVE REGIME ANALYSIS';
           defaultLeftLabel = leftTag || (leftSide?.title ? `${leftSide.title.toUpperCase()}` : 'BASELINE APPROACH');

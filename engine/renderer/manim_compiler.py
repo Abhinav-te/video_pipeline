@@ -282,11 +282,11 @@ def compile_manim_scenes(
     if not scenes:
         return timeline_data
 
-    subject = "math"
+    subject = "auto"
     if is_dict:
-        subject = timeline_data.get("subject") or timeline_data.get("domain") or "math"
+        subject = timeline_data.get("subject") or timeline_data.get("domain") or "auto"
     elif scenes and isinstance(scenes[0], dict):
-        subject = scenes[0].get("subject") or scenes[0].get("domain") or "math"
+        subject = scenes[0].get("subject") or scenes[0].get("domain") or "auto"
 
     # Eligible scenes: scenes flagged with needs_manim or STEM body scenes
     # STEM subjects: math, quantum_physics, physics, mechanics, electrical

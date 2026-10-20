@@ -331,8 +331,9 @@ export const DiagramScene = ({
             </div>
           </div>
 
-          <div style={{ fontSize: '18px', color: '#94a3b8', lineHeight: 1.3 }}>
-            {scene?.spoken_text || scene?.narration || 'Requests stream with low-latency edge caching.'}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '15px', color: '#64748b', fontFamily: 'monospace', marginTop: '4px' }}>
+            <span>PROTOCOL: HTTP/2 • TLS 1.3</span>
+            <span style={{ color: '#34d399' }}>✓ mTLS VERIFIED</span>
           </div>
         </div>
       ) : (
@@ -365,8 +366,8 @@ export const DiagramScene = ({
             </span>
           </div>
 
-          <div style={{ fontSize: '24px', color: '#cbd5e1', lineHeight: '1.5' }}>
-            {scene?.spoken_text || 'Strict exactly-once semantic delivery guarantees with low latency.'}
+          <div style={{ fontSize: '20px', color: '#cbd5e1', lineHeight: '1.4', fontFamily: 'monospace' }}>
+            <span>DETERMINISTIC PIPELINE: ZERO REDUNDANT TRANSITIONS • SUB-MS LATENCY</span>
           </div>
 
           <div

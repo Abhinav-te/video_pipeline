@@ -33,6 +33,7 @@ from timeline.beats import (
 )
 from timeline.enhancer import enhance_scenes
 from timeline.choreographer import choreograph_scenes
+from config.brand_config import load_brand_config
 
 
 # ---------------------------------------------------------------------------
@@ -356,7 +357,7 @@ async def generate_audio(text, audio_file: Path):
     stage_start("AUDIO", f"Generating Edge-TTS narration ({len(text.split())} words)")
 
     try:
-        await generate_voice(text, str(audio_file), allow_offline_fallback=True)
+        await generate_voice(text, str(audio_file))
     except Exception as exc:
         stage_error("AUDIO", f"Edge-TTS generation failed:\n{exc}")
 
@@ -470,13 +471,25 @@ def generate_timeline(script, audio_file: Path):
     return timed_scenes, words
 
 
-def build_final_payload(script, timed_scenes, words, run_id: str, source_facts=None):
+def build_final_payload(
+    script,
+    timed_scenes,
+    words,
+    run_id: str,
+    source_facts=None,
+    evidence_pack=None,
+    selected_workflow=None,
+    validation_report=None,
+    project_profile=None,
+):
     """
     Build the exact top-level object expected by Remotion/CodingShort.jsx.
     """
 
     payload = {
         "title": script.get("title", ""),
+        "topic": script.get("topic", script.get("title", "")),
+        "subject": script.get("subject", "code"),
         "schema_version": script.get(
             "schema_version",
             SCHEMA_VERSION,
@@ -489,6 +502,20 @@ def build_final_payload(script, timed_scenes, words, run_id: str, source_facts=N
     }
     if source_facts:
         payload["source_facts"] = source_facts
+    if evidence_pack:
+        payload["evidence_pack"] = evidence_pack.model_dump() if hasattr(evidence_pack, "model_dump") else evidence_pack
+    if selected_workflow:
+        payload["workflow"] = selected_workflow.model_dump() if hasattr(selected_workflow, "model_dump") else selected_workflow
+    if validation_report:
+        payload["validation_report"] = validation_report.model_dump() if hasattr(validation_report, "model_dump") else validation_report
+    if project_profile:
+        payload["project_profile"] = project_profile
+
+    # Attach Brand and Render Profile tokens
+    brand_cfg = load_brand_config(project_profile or {})
+    payload["brand"] = brand_cfg.model_dump()
+    if isinstance(project_profile, dict) and "render_profile" in project_profile:
+        payload["render_profile"] = project_profile["render_profile"]
 
     return payload
 
@@ -546,8 +573,15 @@ def main():
     parser.add_argument(
         "--topic",
         type=str,
-        required=True,
+        default=None,
         help="Topic for the educational short.",
+    )
+
+    parser.add_argument(
+        "--project",
+        type=str,
+        default=None,
+        help="Path to project profile JSON file (e.g. projects/project_profile.json).",
     )
 
     parser.add_argument(
@@ -624,14 +658,37 @@ def main():
 
     args = parser.parse_args()
 
-    topic = args.topic.strip()
+    topic = (args.topic or "").strip()
+    project_profile: Dict[str, Any] = {}
+    sources: List[Dict[str, Any]] = []
+    evidence_pack = None
+    selected_workflow = None
+    val_report = None
+
+    if args.project:
+        proj_path = Path(args.project).resolve()
+        if not proj_path.exists():
+            stage_error("PIPELINE", f"Project configuration file not found: {proj_path}")
+        with open(proj_path, "r", encoding="utf-8") as f:
+            proj_data = json.load(f)
+        project_profile = dict(proj_data.get("project_profile", proj_data))
+        if "render_profile" in proj_data and "render_profile" not in project_profile:
+            project_profile["render_profile"] = proj_data["render_profile"]
+        if "brand" in proj_data and "brand" not in project_profile:
+            project_profile["brand"] = proj_data["brand"]
+        topic = topic or project_profile.get("topic") or project_profile.get("product") or "Technical Feature"
+        if args.subject == "auto" and project_profile.get("subject"):
+            args.subject = project_profile.get("subject")
+        if args.length == 60 and project_profile.get("duration_target_seconds"):
+            args.length = int(project_profile.get("duration_target_seconds"))
+        sources = project_profile.get("sources", [])
 
     if not topic:
-        stage_error("DIRECTOR", "--topic cannot be empty.")
+        stage_error("DIRECTOR", "Either --topic or --project is required.")
 
     source_text = ""
     source_facts = {}
-    if args.source_file or args.source_url or args.source_text:
+    if not args.project and (args.source_file or args.source_url or args.source_text):
         stage_start("INGESTION", "Loading and parsing customer documentation / code source...")
         try:
             try:
@@ -680,6 +737,7 @@ def main():
     print(f"Subject:  {args.subject}")
     print(f"Length:   {args.length}s")
     print(f"Mode:     {'MOCK (OFFLINE)' if args.mock else 'LIVE API'}")
+    print(f"Project:  {args.project or 'None'}")
     print(f"Cache:    {'DISABLED' if args.no_cache else 'ENABLED'}")
     print(f"Run Dir:  {run_dir}")
     print("=" * 70)
@@ -693,18 +751,53 @@ def main():
             audio_file.unlink()
 
         # ---------------------------------------------------------------
-        # Step 1 & 2 — Gemini & Validation
+        # Step 1 & 2 — Ingestion, Evidence Extraction & Planning
         # ---------------------------------------------------------------
 
-        script = generate_or_load_script(
-            topic=topic,
-            duration=args.length,
-            no_cache=args.no_cache,
-            subject=args.subject,
-            mock=args.mock,
-            source_text=source_text,
-            source_facts=source_facts,
-        )
+        if args.project:
+            stage_start("INGESTION", f"Extracting EvidencePack from official sources for {project_profile.get('product', 'project')}...")
+            from engine.ingestion.evidence_extractor import extract_evidence_pack
+            from engine.director.workflow_selector import select_best_workflow
+            from engine.director.scene_planner import plan_scenes
+            from engine.validation.evidence_validator import validate_evidence_and_plan
+
+            evidence_pack = extract_evidence_pack(sources, project_profile=project_profile, mock=args.mock)
+            with open(run_dir / "evidence_pack.json", "w", encoding="utf-8") as f:
+                json.dump(evidence_pack.model_dump(), f, indent=2)
+            stage_success("INGESTION", f"Extracted {len(evidence_pack.records)} atomic evidence records -> {run_dir}/evidence_pack.json")
+
+            stage_start("WORKFLOW", "Scoring candidate developer workflows across 6 criteria...")
+            wf_res = select_best_workflow(evidence_pack, project_profile=project_profile, mock=args.mock)
+            selected_workflow = wf_res.selected_workflow
+            with open(run_dir / "workflow_candidates.json", "w", encoding="utf-8") as f:
+                json.dump(wf_res.model_dump(), f, indent=2)
+            stage_success("WORKFLOW", f"Selected workflow '{selected_workflow.title}' (Score: {selected_workflow.scores.total_score}/60)")
+
+            stage_start("SCENE_PLAN", "Generating evidence-linked 5-beat scene plan...")
+            scene_plan = plan_scenes(selected_workflow, evidence_pack, duration_target=args.length, mock=args.mock)
+            with open(run_dir / "scene_plan.json", "w", encoding="utf-8") as f:
+                json.dump(scene_plan.model_dump(), f, indent=2)
+            stage_success("SCENE_PLAN", f"Generated {len(scene_plan.scenes)} evidence-linked scenes -> {run_dir}/scene_plan.json")
+
+            stage_start("EVIDENCE_GATE", "Validating 100% claim coverage before timeline assembly...")
+            val_report = validate_evidence_and_plan(evidence_pack, scene_plan)
+            with open(run_dir / "validation_report.json", "w", encoding="utf-8") as f:
+                json.dump(val_report.model_dump(), f, indent=2)
+            if not val_report.passed:
+                stage_error("EVIDENCE_GATE", f"Evidence validation failed: {val_report.checks}")
+            stage_success("EVIDENCE_GATE", f"Verified 100% claim backing across all {val_report.total_claims} scenes.")
+
+            script = scene_plan.to_director_script()
+        else:
+            script = generate_or_load_script(
+                topic=topic,
+                duration=args.length,
+                no_cache=args.no_cache,
+                subject=args.subject,
+                mock=args.mock,
+                source_text=source_text,
+                source_facts=source_facts,
+            )
 
         # ---------------------------------------------------------------
         # Step 2 — Build narration
@@ -731,6 +824,8 @@ def main():
         # ---------------------------------------------------------------
 
         enable_manim = not getattr(args, "no_manim", False)
+        if args.subject in ("code", "devtools") or script.get("subject") in ("code", "devtools"):
+            enable_manim = False
         try:
             try:
                 from engine.renderer.manim_compiler import compile_manim_scenes
@@ -755,6 +850,10 @@ def main():
             words=words,
             run_id=run_id,
             source_facts=source_facts,
+            evidence_pack=evidence_pack,
+            selected_workflow=selected_workflow,
+            validation_report=val_report,
+            project_profile=project_profile,
         )
 
         write_data_file(payload, data_file)

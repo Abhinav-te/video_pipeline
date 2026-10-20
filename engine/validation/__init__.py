@@ -5,6 +5,9 @@ Validation Gate package: AST syntax checks, schema contracts, beat validation, a
 from .schema import (
     validate_script_plan,
     validate_or_raise,
+    check_narrative_consistency,
+    BANNED_PLACEHOLDER_TOKENS,
+    ML_PLACEHOLDER_TOKENS,
     resolve_script_subject,
     validate_formula_string,
     ScriptValidationError,
@@ -42,6 +45,8 @@ from .reflection import (
 __all__ = [
     "validate_script_plan",
     "validate_or_raise",
+    "check_narrative_consistency",
+    "BANNED_PLACEHOLDER_TOKENS",
     "resolve_script_subject",
     "validate_formula_string",
     "ScriptValidationError",

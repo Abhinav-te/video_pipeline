@@ -83,7 +83,15 @@ export const TerminalScene = ({
     });
     if (currentCmd) cmds.push(currentCmd);
 
-    return cmds.length > 0 ? cmds : [{ cmd: 'npm install @acme/sdk@latest', output: ['+ @acme/sdk@2.0.0', 'added 1 package in 140ms'], status: '✓ Built in 140ms' }];
+    return cmds.length > 0 ? cmds : [{
+      cmd: 'npm install @acme/edgecache@latest',
+      output: [
+        '+ @acme/edgecache@2.0.0',
+        'added 1 package, audited 48 packages in 140ms',
+        'found 0 vulnerabilities',
+      ],
+      status: '✓ Package verified & ready • 140ms',
+    }];
   }, [scene]);
 
   // Calculate total characters and line metrics for font scaling
@@ -162,17 +170,19 @@ export const TerminalScene = ({
         border: '1.5px solid rgba(56, 189, 248, 0.28)',
         boxShadow: '0 32px 64px -16px rgba(0, 0, 0, 0.95), 0 0 32px rgba(56, 189, 248, 0.10)',
         width: '960px',
-        height: '1540px',
+        height: 'fit-content',
+        maxHeight: '1160px',
         overflow: 'hidden',
         boxSizing: 'border-box',
         transform: 'none',
         backfaceVisibility: 'hidden',
         position: 'relative',
-        padding: '30px',
+        padding: '24px 28px',
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'space-between',
+        justifyContent: 'flex-start',
         fontFamily: "'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, monospace",
+        margin: 'auto 0',
       }}
     >
       {/* 1. macOS TERMINAL WINDOW HEADER (110px) */}
@@ -323,39 +333,33 @@ export const TerminalScene = ({
         })}
       </div>
 
-      {/* 3. TERMINAL FOOTER / ENVIRONMENT STATUS BAR (180px) */}
+      {/* 3. TERMINAL COMPACT TECHNICAL STATUS BAR */}
       <div
         style={{
-          height: '180px',
+          height: '56px',
           backgroundColor: '#0a0e17',
-          borderRadius: '16px',
+          borderRadius: '12px',
           border: '1px solid rgba(255, 255, 255, 0.08)',
-          padding: '20px 24px',
+          padding: '0 20px',
           display: 'flex',
-          flexDirection: 'column',
+          alignItems: 'center',
           justifyContent: 'space-between',
           boxSizing: 'border-box',
+          marginTop: '6px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#34d399', display: 'inline-block' }} />
-            <span style={{ fontSize: '18px', color: '#e2e8f0', fontWeight: 700, letterSpacing: '0.5px' }}>
-              CLI RUNTIME ACTIVE
-            </span>
-          </div>
-          <span style={{ fontSize: '16px', color: '#38bdf8', fontWeight: 600 }}>
-            NODE v20.11.0 • ESM
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#34d399', display: 'inline-block', boxShadow: '0 0 8px rgba(52,211,153,0.7)' }} />
+          <span style={{ fontSize: '16px', color: '#e2e8f0', fontWeight: 700, letterSpacing: '0.5px' }}>
+            CLI RUNTIME ACTIVE
           </span>
         </div>
-
-        <div style={{ fontSize: '20px', color: '#cbd5e1', lineHeight: 1.4 }}>
-          {scene?.spoken_text || scene?.narration || 'Seamless command execution with zero bundle overhead.'}
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '15px', color: '#64748b' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '15px', color: '#94a3b8', fontFamily: 'monospace' }}>
           <span>BUFFER: 80×24</span>
-          <span>STATUS: EXIT 0</span>
+          <span>•</span>
+          <span>NODE v20.11.0</span>
+          <span>•</span>
+          <span style={{ color: '#34d399', fontWeight: 'bold' }}>EXIT 0 (140ms)</span>
         </div>
       </div>
     </div>

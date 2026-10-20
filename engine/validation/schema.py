@@ -11,6 +11,8 @@ Formalizes polymorphic validation across all domains:
 - Diagram node bounds (2-3 items).
 """
 
+import json
+import re
 from typing import Any, Dict, List, Optional, Tuple
 
 try:
@@ -79,6 +81,14 @@ VALID_SCENE_TYPES = {
     "mechanics_fbd",
     "electrical_grid",
     "manim_scene",
+    "workflow_state_transition",
+    "workflow_transition",
+    "show_code",
+    "highlight_code",
+    "show_terminal",
+    "show_request_response",
+    "show_metric",
+    "takeaway_cta",
 }
 
 STEM_SCENE_TYPES = {
@@ -198,7 +208,107 @@ def validate_formula_string(val: Any, field_name: str, scene_idx: int) -> Tuple[
     return True, None
 
 
-def validate_script_plan(script_data: Any) -> Tuple[bool, List[str]]:
+
+BANNED_PLACEHOLDER_TOKENS = [
+    "invariant algorithmic",
+    "boilerplate state",
+    "acme vector",
+]
+
+ML_PLACEHOLDER_TOKENS = [
+    "k-means",
+    "kmeans",
+    "dbscan",
+    "t-sne",
+    "tsne",
+    "unsupervised ml",
+]
+
+
+def check_narrative_consistency(
+    script_data: Any,
+    source_text: Optional[str] = None
+) -> Tuple[bool, List[str]]:
+    """
+    Pre-render narrative consistency gate.
+    Fails fast if:
+    1. Any scene title, card label, or visual payload contains banned hardcoded placeholder
+       tokens (e.g. Invariant algorithmic, Boilerplate State, Acme Vector, or ML clustering
+       tokens in non-ML subjects) when absent from the ingested source document.
+    2. Spoken narration contains raw unpronounceable CLI syntax (@, /, --) that wasn't normalized.
+    """
+    errors: List[str] = []
+    if not isinstance(script_data, dict):
+        return True, []
+
+    source_doc = (
+        source_text
+        or script_data.get("source_text")
+        or script_data.get("source_document")
+        or ""
+    ).lower()
+    topic_str = (script_data.get("topic") or script_data.get("title") or "").lower()
+    subject_str = (script_data.get("subject") or "").lower()
+
+    scenes = script_data.get("scenes", [])
+    if not isinstance(scenes, list):
+        return True, []
+
+    # If subject is not ML, then ML clustering tokens are treated as banned placeholders
+    tokens_to_check = list(BANNED_PLACEHOLDER_TOKENS)
+    if subject_str != "ml":
+        tokens_to_check.extend(ML_PLACEHOLDER_TOKENS)
+
+    for index, scene in enumerate(scenes):
+        if not isinstance(scene, dict):
+            continue
+        scene_id = scene.get("scene_id") or scene.get("id") or f"scene_{index + 1}"
+
+        # 1. Banned placeholder token check across visual props & labels
+        scene_str = json.dumps(scene, ensure_ascii=False).lower()
+        for token in tokens_to_check:
+            if token in scene_str:
+                if token not in source_doc and token not in topic_str:
+                    errors.append(
+                        f"Scene {index} ({scene_id}) contains banned placeholder token '{token}' "
+                        f"not found in source document or topic."
+                    )
+
+        # 2. Spoken narration syntax check
+        narration = (
+            scene.get("spoken_text")
+            or scene.get("narration")
+            or scene.get("narration_text")
+            or ""
+        )
+        if narration:
+            # Check for scoped package syntax like @acme/ or @latest
+            scope_pkg = re.search(r'@[a-zA-Z0-9_\-\./]+', narration)
+            if scope_pkg:
+                errors.append(
+                    f"Scene {index} ({scene_id}) spoken narration contains raw package symbol '{scope_pkg.group(0)}'. "
+                    f"Decouple spoken narration from visual syntax (e.g. use 'the latest package')."
+                )
+
+            # Check for un-normalized flags like --flag
+            cli_flag = re.search(r'(?:^|\s)--[a-zA-Z0-9_\-]+', narration)
+            if cli_flag:
+                errors.append(
+                    f"Scene {index} ({scene_id}) spoken narration contains raw CLI flag '{cli_flag.group(0).strip()}'. "
+                    f"Spoken text must be natural English."
+                )
+
+            # Check for literal 'at ... slash' in spoken developer speech
+            literal_slash = re.search(r'\b(at\s+[a-zA-Z0-9_-]+\s+slash\s+[a-zA-Z0-9_-]+)\b', narration, re.IGNORECASE)
+            if literal_slash:
+                errors.append(
+                    f"Scene {index} ({scene_id}) spoken narration contains un-sanitized literal phonetic symbol '{literal_slash.group(0)}'."
+                )
+
+    return (len(errors) == 0, errors)
+
+
+def validate_script_plan(script_data: Any, source_text: Optional[str] = None) -> Tuple[bool, List[str]]:
     """
     Validates a complete script plan against polymorphic schema contracts and syntax checks.
 
@@ -210,6 +320,11 @@ def validate_script_plan(script_data: Any) -> Tuple[bool, List[str]]:
 
     if not isinstance(script_data, dict):
         return False, ["Script plan must be a JSON object / dict."]
+
+    # Narrative consistency check
+    n_valid, n_errors = check_narrative_consistency(script_data, source_text)
+    if not n_valid:
+        errors.extend(n_errors)
 
     # Title check
     title = script_data.get("title")
@@ -235,11 +350,11 @@ def validate_script_plan(script_data: Any) -> Tuple[bool, List[str]]:
             f"Script plan contains {len(scenes)} scenes, exceeding maximum of {MAX_SCENES}."
         )
 
-    # Scene 1 hook constraint (must be fullscreen_text or concept)
+    # Scene 1 hook constraint (must be fullscreen_text, concept, or takeaway_cta)
     first_scene = scenes[0]
     if isinstance(first_scene, dict):
         first_type = first_scene.get("visual_type") or first_scene.get("scene_type")
-        if first_type not in {"fullscreen_text", "concept"}:
+        if first_type not in {"fullscreen_text", "concept", "takeaway_cta"}:
             errors.append(
                 f"Scene 1 must be 'fullscreen_text' (hook), got {first_type!r}."
             )
@@ -247,16 +362,17 @@ def validate_script_plan(script_data: Any) -> Tuple[bool, List[str]]:
     # Polymorphic subject determination
     script_subject = resolve_script_subject(script_data)
 
-    # Comparison scene constraint: strictly required for coding domain
-    if script_subject == "code":
-        has_comparison = any(
+    # Comparison / state transition constraint: required for coding/devtools
+    if script_subject in {"code", "devtools"}:
+        has_contrast = any(
             isinstance(s, dict) and (
-                s.get("visual_type") == "comparison" or s.get("scene_type") == "comparison"
+                s.get("visual_type") in {"comparison", "workflow_state_transition", "workflow_transition", "diagram"} or
+                s.get("scene_type") in {"comparison", "workflow_state_transition", "workflow_transition", "diagram"}
             )
             for s in scenes
         )
-        if not has_comparison:
-            errors.append("Script plan must contain at least one 'comparison' scene.")
+        if not has_contrast:
+            errors.append("Script plan must contain at least one 'comparison' or 'workflow_state_transition' scene.")
 
     # Determine length/duration bounds
     plan_duration = script_data.get("duration") or script_data.get("target_duration") or script_data.get("length")
@@ -437,6 +553,21 @@ def validate_script_plan(script_data: Any) -> Tuple[bool, List[str]]:
                     f"Scene {index} (diagram) has {len(nodes)} nodes. "
                     f"Maximum is {MAX_DIAGRAM_NODES}."
                 )
+
+        # 5b. Universal Workflow State Transition
+        elif scene_type in {"workflow_state_transition", "workflow_transition"}:
+            entities = scene.get("entities")
+            if entities is not None and not isinstance(entities, list):
+                errors.append(f"Scene {index} ({scene_type}) 'entities' must be a list if provided.")
+            events = scene.get("events")
+            if events is not None and not isinstance(events, list):
+                errors.append(f"Scene {index} ({scene_type}) 'events' must be a list if provided.")
+
+        # 5c. Universal Takeaway CTA
+        elif scene_type in {"takeaway_cta"}:
+            display_text = scene.get("display_text") or scene.get("title")
+            if not display_text or not isinstance(display_text, str) or not display_text.strip():
+                scene["display_text"] = scene.get("title") or "DURABLE WORKFLOWS"
 
         # 6. STEM: Math Equation Derivation
         elif scene_type == "math_equation":

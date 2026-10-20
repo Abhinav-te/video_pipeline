@@ -28,6 +28,12 @@ import { MechanicsScene } from './components/MechanicsScene';
 import { ElectricalScene } from './components/ElectricalScene';
 import { ManimScene } from './components/ManimScene';
 import { TerminalScene } from './components/TerminalScene';
+import { WorkflowStateTransition } from './components/WorkflowStateTransition';
+import { HookScene } from './components/HookScene';
+import { CodeSpotlightScene } from './components/CodeSpotlightScene';
+import { WorkflowTraceScene } from './components/WorkflowTraceScene';
+import { EvidenceBentoScene } from './components/EvidenceBentoScene';
+import { TakeawayCTAScene } from './components/TakeawayCTAScene';
 import { splitCodeByToken, resolveCalloutTiming } from './calloutUtils';
 
 // Error Boundary ensuring scene crashes never tear down the entire canvas
@@ -98,6 +104,7 @@ export {
   MechanicsScene,
   ElectricalScene,
   ManimScene,
+  WorkflowStateTransition,
 };
 
 // Merges split hyphenated tokens (e.g. 'K', '-means' -> 'K-MEANS')
@@ -153,8 +160,23 @@ export const mergeHyphenatedTokens = (rawWords) => {
   return merged;
 };
 
+// Functional stopwords to suppress from high-contrast neon flashes
+const FUNCTIONAL_WORDS = new Set([
+  'THE', 'A', 'AN', 'IN', 'ON', 'FOR', 'OF', 'TO', 'AND', 'OR', 'IS', 'ARE', 'WAS', 'BE', 'BEEN',
+  'BY', 'FROM', 'THIS', 'THAT', 'INTO', 'YOUR', 'YOU', 'WE', 'IT', 'ITS', 'WITH', 'AT', 'SLASH',
+  'AS', 'OUR', 'SO', 'BUT', 'IF', 'THEN', 'UP', 'OUT', 'ALL', 'ANY', 'CAN', 'WILL', 'JUST'
+]);
+
+// Meaningful technical keywords that receive prominent emphasis
+const TECHNICAL_KEYWORDS = new Set([
+  'STREAMING', 'NPM', 'INSTALL', 'ASYNC', 'GENERATOR', 'EDGE', 'GATEWAY', 'CACHE', 'LATENCY',
+  'SDK', 'API', 'BOILERPLATE', 'MIGRATION', 'CLUSTER', 'CLIENT', 'PROMISES', 'TYPESCRIPT', 'KEYS',
+  'HIT', 'RATE', 'REDUCTION', 'OPTIMIZATION', 'IMPORT', 'EXPORT', 'FAST', 'CONTAINER', 'RUNTIME',
+  'EXECUTION', 'DIFF', 'ZERO', 'DEPLOY', 'PACKAGES', 'VERIFIED', 'JSON', 'BENCHMARK', 'TRANSFORM'
+]);
+
 // Subtitle component rendering a rolling word window with pause-hold & zero fallback-to-index-0 bug
-export const Subtitles = ({ words: rawWords }) => {
+export const Subtitles = ({ words: rawWords, isWidescreen = false }) => {
   const words = React.useMemo(() => mergeHyphenatedTokens(rawWords), [rawWords]);
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -207,12 +229,12 @@ export const Subtitles = ({ words: rawWords }) => {
     <div
       style={{
         position: 'absolute',
-        bottom: '120px',
+        bottom: isWidescreen ? '40px' : '120px',
         width: '100%',
         textAlign: 'center',
-        padding: '0 40px',
+        padding: isWidescreen ? '0 100px' : '0 40px',
         boxSizing: 'border-box',
-        height: '100px',
+        height: isWidescreen ? '60px' : '100px',
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
@@ -224,25 +246,53 @@ export const Subtitles = ({ words: rawWords }) => {
     >
       <div
         style={{
-          fontSize: '48px',
+          fontSize: isWidescreen ? '34px' : '48px',
           fontWeight: 900,
           textTransform: 'uppercase',
-          lineHeight: '60px',
-          height: '60px',
+          lineHeight: isWidescreen ? '44px' : '60px',
+          height: isWidescreen ? '44px' : '60px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: '14px',
+          gap: isWidescreen ? '10px' : '14px',
         }}
       >
         {subtitleSlice.map((w, i) => {
           const isActive = currentWordObj && w.word === currentWordObj.word && w.start === currentWordObj.start;
+          const cleanWord = (w.word || '').replace(/[^a-zA-Z0-9_-]/g, '').toUpperCase();
+          const isFunctional = FUNCTIONAL_WORDS.has(cleanWord);
+          const isTechnical = TECHNICAL_KEYWORDS.has(cleanWord) || (!isFunctional && cleanWord.length >= 6);
+
+          let wordColor = '#ffffff';
+          let bgColor = 'transparent';
+          let borderStyle = '1px solid transparent';
+          let textShadow = '0 4px 12px rgba(0,0,0,0.9)';
+
+          if (isActive) {
+            if (isFunctional) {
+              wordColor = '#e2e8f0';
+              bgColor = 'rgba(255, 255, 255, 0.08)';
+              borderStyle = '1px solid rgba(255, 255, 255, 0.15)';
+              textShadow = '0 2px 8px rgba(0,0,0,0.8)';
+            } else if (isTechnical) {
+              wordColor = '#ffd633';
+              bgColor = 'rgba(255, 214, 51, 0.22)';
+              borderStyle = '1.5px solid rgba(255, 214, 51, 0.6)';
+              textShadow = '0 0 28px rgba(255, 214, 51, 0.85)';
+            } else {
+              wordColor = '#f8fafc';
+              bgColor = 'rgba(255, 255, 255, 0.14)';
+              borderStyle = '1px solid rgba(255, 255, 255, 0.25)';
+              textShadow = '0 0 16px rgba(255, 255, 255, 0.5)';
+            }
+          }
+
           return (
             <span
               key={`${w.word}-${w.start}-${i}`}
               style={{
-                color: isActive ? '#ffd633' : '#ffffff',
-                backgroundColor: isActive ? 'rgba(255, 214, 51, 0.16)' : 'transparent',
+                color: wordColor,
+                backgroundColor: bgColor,
                 borderRadius: '8px',
                 padding: '2px 14px',
                 height: '56px',
@@ -250,8 +300,8 @@ export const Subtitles = ({ words: rawWords }) => {
                 display: 'inline-flex',
                 alignItems: 'center',
                 transform: 'none',
-                textShadow: isActive ? '0 0 24px rgba(255, 214, 51, 0.7)' : '0 4px 12px rgba(0,0,0,0.9)',
-                border: isActive ? '1px solid rgba(255, 214, 51, 0.35)' : '1px solid transparent',
+                textShadow,
+                border: borderStyle,
                 boxSizing: 'border-box',
                 transition: 'background-color 0.08s ease, color 0.08s ease',
               }}
@@ -349,7 +399,8 @@ export const CodeBlock = ({
 
 export const CodingShort = ({ data }) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { width, height, fps } = useVideoConfig();
+  const isWidescreen = width > height;
   const currentTime = frame / fps;
 
   const scenes = data?.scenes || [];
@@ -407,28 +458,39 @@ export const CodingShort = ({ data }) => {
 
   const layoutDensity = activeScene?.choreography?.layout_density || activeScene?.layout_density || 'full_dashboard';
 
-  let stageTop = '90px';
-  let stageHeight = '1360px';
-  let stageJustify = 'space-between';
-
-  if (layoutDensity === 'compact_punch') {
-    stageTop = '280px';
-    stageHeight = '960px';
-    stageJustify = 'center';
-  } else if (layoutDensity === 'canvas_spotlight') {
-    stageTop = '140px';
-    stageHeight = '1260px';
-    stageJustify = 'flex-start';
-  } else {
-    // 'full_dashboard'
-    stageTop = '90px';
-    stageHeight = '1360px';
-    stageJustify = 'space-between';
-  }
-
   const rawSceneType = activeScene?.scene_type || activeScene?.visual_type;
   const hasManim = Boolean(activeScene?.manim_asset_url || activeScene?.manim_video_src);
   const sceneType = hasManim ? 'manim_scene' : rawSceneType;
+
+  let stageTop = isWidescreen ? '50px' : '90px';
+  let stageLeft = isWidescreen ? '120px' : '60px';
+  let stageWidth = isWidescreen ? '1680px' : '960px';
+  let stageHeight = isWidescreen ? '860px' : '1360px';
+  let stageJustify = 'center';
+
+  if (!isWidescreen) {
+    if (sceneType === 'terminal') {
+      stageTop = '160px';
+      stageHeight = '1200px';
+      stageJustify = 'center';
+    } else if (sceneType === 'code_reveal') {
+      stageTop = '140px';
+      stageHeight = '1240px';
+      stageJustify = 'center';
+    } else if (layoutDensity === 'compact_punch') {
+      stageTop = '280px';
+      stageHeight = '960px';
+      stageJustify = 'center';
+    } else if (layoutDensity === 'canvas_spotlight') {
+      stageTop = '140px';
+      stageHeight = '1260px';
+      stageJustify = 'flex-start';
+    } else {
+      stageTop = '90px';
+      stageHeight = '1360px';
+      stageJustify = 'space-between';
+    }
+  }
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#0d1117', color: 'white', fontFamily: 'sans-serif' }}>
@@ -446,36 +508,37 @@ export const CodingShort = ({ data }) => {
         );
       })}
 
-      {/* Stabilized Bottom Subtitles Overlay (hidden for neural_code_split which has its own synced caption bar) */}
-      {sceneType !== 'neural_code_split' && <Subtitles words={data.words} />}
+      {/* Stabilized Bottom Subtitles Overlay */}
+      {sceneType !== 'neural_code_split' && <Subtitles words={data.words} isWidescreen={isWidescreen} />}
 
       {/*
-        Mandatory Vertical Stage Container: 960px x 1360px, top 90px, left 60px.
-        Dynamic Viewport Breathing: adjusts height & top across compact_punch, canvas_spotlight, full_dashboard.
+        Responsive Stage Container:
+        Widescreen (16:9): 1680px x 860px, top 50px, left 120px.
+        Vertical (9:16): 960px x 1360px, top 90px, left 60px.
       */}
       <div
         style={{
           position: 'absolute',
-          top: stageTop, /* top: '90px' */
-          left: '60px',
-          width: '960px',
-          height: stageHeight, /* height: '1360px' */
-          maxHeight: '1380px',
+          top: stageTop,
+          left: stageLeft,
+          width: stageWidth,
+          height: stageHeight,
+          maxHeight: isWidescreen ? '920px' : '1380px',
           display: 'flex',
           flexDirection: 'column',
-          justifyContent: stageJustify, /* justifyContent: 'space-between' */
+          justifyContent: stageJustify,
           zIndex: 10,
           boxSizing: 'border-box',
           transition: 'all 0.2s ease',
         }}
       >
-        {/* Ambient Backdrop Glow: separates dark code/STEM card from #0d1117 canvas */}
+        {/* Ambient Backdrop Glow */}
         <div
           style={{
             position: 'absolute',
             top: 0,
             left: 0,
-            width: '960px',
+            width: stageWidth,
             height: stageHeight,
             borderRadius: '40px',
             background: `radial-gradient(ellipse at center, ${getGlowColor()} 0%, rgba(13, 17, 23, 0.01) 70%, transparent 85%)`,
@@ -520,26 +583,67 @@ export const CodingShort = ({ data }) => {
           {/* SAFE SCENE ROUTER WRAPPED IN SCENE ERROR BOUNDARY */}
           {(() => {
             switch (sceneType) {
+              case 'takeaway_cta':
+              case 'brand_outro':
+                return (
+                  <SceneErrorBoundary>
+                    <TakeawayCTAScene
+                      scene={activeScene}
+                      sceneStartFrame={sceneStartFrame}
+                      isWidescreen={isWidescreen}
+                    />
+                  </SceneErrorBoundary>
+                );
+              case 'hook_scene':
+              case 'problem_scene':
+                return (
+                  <SceneErrorBoundary>
+                    <HookScene
+                      scene={activeScene}
+                      sceneStartFrame={sceneStartFrame}
+                      isWidescreen={isWidescreen}
+                    />
+                  </SceneErrorBoundary>
+                );
+              case 'workflow_state_transition':
+              case 'workflow_transition':
+                return (
+                  <SceneErrorBoundary>
+                    <WorkflowTraceScene
+                      scene={activeScene}
+                      sceneStartFrame={sceneStartFrame}
+                      isWidescreen={isWidescreen}
+                    />
+                  </SceneErrorBoundary>
+                );
+              case 'show_code':
+              case 'highlight_code':
               case 'code_reveal':
                 return (
                   <SceneErrorBoundary>
-                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
-                      <CodeRevealScene
-                        scene={activeScene}
-                        focusPhrase={activeScene.focus_phrase}
-                        words={data?.words}
-                        sceneStartFrame={sceneStartFrame}
-                        nextSceneStartTime={nextSceneStartTime}
-                        styleVariant="pill"
-                        showCursor={true}
-                      />
-                    </CameraRig>
+                    <CodeSpotlightScene
+                      scene={activeScene}
+                      sceneStartFrame={sceneStartFrame}
+                      isWidescreen={isWidescreen}
+                    />
                   </SceneErrorBoundary>
                 );
+              case 'show_metric':
+              case 'bento_grid':
+                return (
+                  <SceneErrorBoundary>
+                    <EvidenceBentoScene
+                      scene={activeScene}
+                      sceneStartFrame={sceneStartFrame}
+                      isWidescreen={isWidescreen}
+                    />
+                  </SceneErrorBoundary>
+                );
+              case 'show_terminal':
               case 'terminal':
                 return (
                   <SceneErrorBoundary>
-                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
+                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: stageWidth, height: stageHeight, maxHeight: stageHeight }}>
                       <TerminalScene
                         scene={activeScene}
                         sceneStartFrame={sceneStartFrame}
@@ -551,7 +655,7 @@ export const CodingShort = ({ data }) => {
               case 'code_transform':
                 return (
                   <SceneErrorBoundary>
-                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
+                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: stageWidth, height: stageHeight, maxHeight: stageHeight }}>
                       <CodeTransformScene
                         scene={activeScene}
                         focusPhrase={activeScene.focus_phrase}
@@ -566,7 +670,7 @@ export const CodingShort = ({ data }) => {
               case 'comparison':
                 return (
                   <SceneErrorBoundary>
-                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
+                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: stageWidth, height: stageHeight, maxHeight: stageHeight }}>
                       <ComparisonScene
                         scene={activeScene}
                         subject={data?.subject || activeScene?.subject || activeScene?.domain}
@@ -579,6 +683,7 @@ export const CodingShort = ({ data }) => {
                     </CameraRig>
                   </SceneErrorBoundary>
                 );
+              case 'show_request_response':
               case 'diagram':
               case 'flowchart':
                 return (
@@ -628,22 +733,10 @@ export const CodingShort = ({ data }) => {
                     </CameraRig>
                   </SceneErrorBoundary>
                 );
-              case 'bento_grid':
-                return (
-                  <SceneErrorBoundary>
-                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
-                      <BentoGridScene
-                        scene={activeScene}
-                        words={data?.words}
-                        sceneStartFrame={sceneStartFrame}
-                      />
-                    </CameraRig>
-                  </SceneErrorBoundary>
-                );
               case 'algorithm_explorer':
                 return (
                   <SceneErrorBoundary>
-                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
+                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: stageWidth, height: stageHeight, maxHeight: stageHeight }}>
                       <AlgorithmExplorerScene
                         scene={activeScene}
                         words={data?.words}
@@ -655,7 +748,7 @@ export const CodingShort = ({ data }) => {
               case 'neural_code_split':
                 return (
                   <SceneErrorBoundary>
-                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
+                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: stageWidth, height: stageHeight, maxHeight: stageHeight }}>
                       <NeuralCodeSplitScene
                         scene={activeScene}
                         words={data?.words}
@@ -668,7 +761,7 @@ export const CodingShort = ({ data }) => {
               case 'chemistry':
                 return (
                   <SceneErrorBoundary>
-                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
+                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: stageWidth, height: stageHeight, maxHeight: stageHeight }}>
                       <ChemistryScene
                         scene={activeScene}
                         sceneStartFrame={sceneStartFrame}
@@ -680,7 +773,7 @@ export const CodingShort = ({ data }) => {
               case 'quantum_physics':
                 return (
                   <SceneErrorBoundary>
-                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
+                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: stageWidth, height: stageHeight, maxHeight: stageHeight }}>
                       <QuantumScene
                         scene={activeScene}
                         sceneStartFrame={sceneStartFrame}
@@ -693,7 +786,7 @@ export const CodingShort = ({ data }) => {
               case 'mechanics':
                 return (
                   <SceneErrorBoundary>
-                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
+                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: stageWidth, height: stageHeight, maxHeight: stageHeight }}>
                       <MechanicsScene
                         scene={activeScene}
                         sceneStartFrame={sceneStartFrame}
@@ -705,7 +798,7 @@ export const CodingShort = ({ data }) => {
               case 'electrical':
                 return (
                   <SceneErrorBoundary>
-                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
+                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: stageWidth, height: stageHeight, maxHeight: stageHeight }}>
                       <ElectricalScene
                         scene={activeScene}
                         sceneStartFrame={sceneStartFrame}
@@ -717,7 +810,7 @@ export const CodingShort = ({ data }) => {
               case 'manim':
                 return (
                   <SceneErrorBoundary>
-                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
+                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: stageWidth, height: stageHeight, maxHeight: stageHeight }}>
                       <ManimScene
                         scene={activeScene}
                         sceneStartFrame={sceneStartFrame}
@@ -730,9 +823,20 @@ export const CodingShort = ({ data }) => {
               case 'concept':
               case 'callout_card':
               default:
+                if (actualIndex === 0 || activeScene?.scene_id === 1 || (activeScene?.items && activeScene.items.length > 0)) {
+                  return (
+                    <SceneErrorBoundary>
+                      <HookScene
+                        scene={activeScene}
+                        sceneStartFrame={sceneStartFrame}
+                        isWidescreen={isWidescreen}
+                      />
+                    </SceneErrorBoundary>
+                  );
+                }
                 return (
                   <SceneErrorBoundary>
-                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: '960px', height: stageHeight, maxHeight: stageHeight }}>
+                    <CameraRig scene={activeScene} focusScale={1.04} style={{ width: stageWidth, height: stageHeight, maxHeight: stageHeight }}>
                       <ConceptHeroScene
                         scene={activeScene}
                         sceneStartFrame={sceneStartFrame}

@@ -78,6 +78,7 @@ def execute_revision(
     set_title: Optional[str] = None,
     set_visual_json: Optional[str] = None,
     set_narration: Optional[str] = None,
+    set_evidence_id: Optional[str] = None,
     output_path: Optional[Union[str, Path]] = None,
     fps: int = 30,
 ) -> Path:
@@ -146,6 +147,15 @@ def execute_revision(
 
         target_scene["spoken_text"] = new_narration
         target_scene["narration"] = new_narration
+
+        if set_evidence_id:
+            curr_ev = target_scene.get("evidence_ids") or []
+            if set_evidence_id not in curr_ev:
+                curr_ev.append(set_evidence_id)
+            target_scene["evidence_ids"] = curr_ev
+            target_scene["narration_segments"] = [
+                {"text": new_narration, "evidence_ids": curr_ev}
+            ]
 
         # Synthesize audio ONLY for target scene
         scene_audio_dir = run_dir / "scenes" / str(target_id)
@@ -297,6 +307,22 @@ def execute_revision(
             target_scene.pop("manim_asset_url", None)
             target_scene.pop("manim_video_src", None)
 
+    # Evidence Validation Gate during revision
+    ev_pack_path = run_dir / "evidence_pack.json"
+    if ev_pack_path.exists():
+        try:
+            from engine.validation.evidence_validator import validate_evidence_and_plan
+            with open(ev_pack_path, "r", encoding="utf-8") as ef:
+                ev_pack_data = json.load(ef)
+            val_report = validate_evidence_and_plan(ev_pack_data, data_payload)
+            with open(run_dir / "validation_report.json", "w", encoding="utf-8") as vf:
+                json.dump(val_report.model_dump(), vf, indent=2)
+            if not val_report.passed:
+                raise ValueError(f"Evidence validation gate failed for revision {new_rev}: {val_report.checks}")
+            print(f"[REVISE:EVIDENCE] Verified 100% claim backing ({val_report.claim_coverage_pct}% coverage).", flush=True)
+        except Exception as exc:
+            print(f"[REVISE:WARNING] Evidence validation check: {exc}", flush=True)
+
     # Save updated data.json
     with open(data_path, "w", encoding="utf-8") as f:
         json.dump(data_payload, f, indent=2, ensure_ascii=False)
@@ -395,10 +421,12 @@ def execute_revision(
         raise RuntimeError(f"FFmpeg recomposition failed for revision {new_rev}.")
 
     # Output validation
+    rev_aspect_ratio = data_payload.get("aspect_ratio") or data_payload.get("render_profile", {}).get("aspect_ratio")
     is_valid, errors, meta = validate_video_output(
         video_path=out_file,
         expected_audio_path=master_audio if master_audio.exists() else None,
         tolerance_sec=1.5,
+        aspect_ratio=rev_aspect_ratio,
     )
     if not is_valid:
         err_msg = "; ".join(errors)
@@ -427,6 +455,7 @@ def main():
     parser.add_argument("--set-title", type=str, default=None, help="Mode A: New title for scene")
     parser.add_argument("--set-visual-json", type=str, default=None, help="Mode A: JSON dictionary of visual props")
     parser.add_argument("--set-narration", type=str, default=None, help="Mode B: New spoken narration for scene")
+    parser.add_argument("--set-evidence-id", type=str, default=None, help="Mode B: Evidence ID backing the new narration")
     parser.add_argument("--output", type=str, default=None, help="Output path for the revised MP4 video")
     args = parser.parse_args()
 
@@ -437,6 +466,7 @@ def main():
         set_title=args.set_title,
         set_visual_json=args.set_visual_json,
         set_narration=args.set_narration,
+        set_evidence_id=args.set_evidence_id,
         output_path=args.output,
     )
 

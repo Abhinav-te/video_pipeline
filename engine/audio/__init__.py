@@ -6,6 +6,8 @@ from .tts_whisper import (
     get_whisper_model,
     reset_whisper_cache,
     validate_and_sanitize_word_timestamps,
+    sanitize_spoken_narration,
+    master_audio,
 )
 
 __all__ = [
@@ -16,5 +18,7 @@ __all__ = [
     "get_whisper_model",
     "reset_whisper_cache",
     "validate_and_sanitize_word_timestamps",
+    "sanitize_spoken_narration",
+    "master_audio",
 ]
 

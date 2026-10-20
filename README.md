@@ -1,18 +1,20 @@
 # Automated Technical & Developer-Tool Video Generation Engine
 
-An end-to-end programmatic video generation engine that transforms technical concepts, B2B developer tool releases, and STEM topics into broadcast-quality 9:16 vertical shorts (TikTok, YouTube Shorts, Instagram Reels, LinkedIn Video) using an automated, decoupled multi-stage architecture.
+An end-to-end programmatic video generation engine that transforms technical concepts, B2B developer tool documentation, SDK releases, and STEM topics into commercial-grade **16:9 Widescreen (1920x1080)** and **9:16 Vertical Shorts (1080x1920)** using an automated, decoupled multi-stage architecture.
 
 ---
 
 ## Key Capabilities
 
-- **Code-First Developer Tool Visuals**: Native Remotion visual primitives for developer documentation, SDK releases, and API architectures (`terminal`, `code_reveal`, `code_transform`, `diagram`, `comparison`).
-- **Ground-Truth Customer Ingestion**: Ingests real customer codebases, documentation files, and live web/GitHub documentation URLs, extracting CLI commands, code snippets, and API endpoints directly into scenes.
-- **Local Production Studio Control Room**: Fast web-based 3-column UI (`studio_ui/index.html`) and FastAPI backend (`studio_api.py`) for scene-by-scene storyboard inspection, surgical visual/audio revisions (Mode A & Mode B), and instant revision rollbacks.
-- **Dependency-Tracked Scene Regeneration**: Non-destructive revisions with isolated per-scene audio and frame-targeted Remotion rendering, recomposed in seconds via normalized FFmpeg segment stitching.
-- **Zero-Crash React Reliability**: Protected with `<SceneErrorBoundary>`, strict named and default component export contracts, and runtime element type verification.
-- **Hybrid Manim Community Sub-Renderer**: Pre-renders high-precision 3Blue1Brown-style mathematical and physics animations (`ManimEquationMorphScene`, `ManimCalculusGraphScene`, `ManimLinearVectorScene`, `ManimQuantumWaveScene`).
-- **Comprehensive STEM & Algorithmic Domain Support**: Computer Science, Developer Tools, Machine Learning, Organic Chemistry, Quantum Physics, Advanced Mechanics, Electrical Engineering, and Applied Mathematics.
+- **Evidence-Based Documentation Ingestion**: Ingests official documentation, extracts source-linked `EvidencePack` records, selects verifiable developer workflows, and compiles synchronized videos where every claim, code snippet, and animation event is backed by an `evidence_id`.
+- **Zero Product Hardcoding**: Any product is strictly a data input passed via `projects/<slug>.json` or `--project`. Visual components and engine stages contain zero hardcoded strings, brand assumptions, or fake metrics.
+- **Multi-Aspect Ratio Architecture (`16:9` & `9:16`)**: Native support for `--aspect-ratio 16:9` (1920x1080 widescreen cinema canvas for docs, YouTube, and product landing pages) and `--aspect-ratio 9:16` (1080x1920 vertical format for mobile feeds).
+- **Client Brand Design System (`brand_config.json`)**: Dynamic Remotion theming via `BrandContext` supporting client hex palettes (`primary_color`, `secondary_color`, `bg_canvas`, `bg_surface`), typography (`font_sans`, `font_mono`), logo badges, and docs CTA links.
+- **Broadcast-Grade Neural Audio**: Edge-TTS senior-engineer voices (`en-US-AndrewNeural`, `en-US-BrianNeural`) with automatic retries and local disk caching, mastered with FFmpeg broadcast filters (`highpass=80Hz`, `loudnorm=-16LUFS`, anti-click fades) at 48000Hz stereo.
+- **Strict Spoken/Visual Separation**: Phonetic replacements (e.g. `step.run()` $\rightarrow$ `"step dot run"`) are applied strictly within the TTS synthesis function right before audio generation, ensuring visual titles, IDE code, and captions always render clean technical syntax.
+- **Modern B2B Motion Primitives**: Linear/Vercel/Stripe-styled motion components (`HookScene`, `CodeSpotlightScene`, `WorkflowTraceScene`, `EvidenceBentoScene`, `TakeawayCTAScene`).
+- **Local Production Studio & GitHub Webhooks**: Interactive 3-column UI (`studio_ui/index.html`) with Mode A/B surgical revisions, aspect ratio toggling, and `POST /api/webhooks/github` release automation.
+- **Hybrid Manim Community Sub-Renderer**: Pre-renders high-precision mathematical and physics animations (`ManimEquationMorphScene`, `ManimCalculusGraphScene`, `ManimLinearVectorScene`, `ManimQuantumWaveScene`).
 
 ---
 
@@ -37,56 +39,49 @@ The engine natively generates visual simulations, LaTeX derivations, kinetic bad
                generate_and_render.py / studio_api.py
                                  │
                                  ▼
-   [Stage 0: Ingestion]      --> engine/ingestion/source_loader.py
-                                 │ (Extracts customer CLI, code, endpoints)
+   [Stage 0: Ingestion]      --> engine/ingestion/evidence_extractor.py
+                                 │ (Extracts source-backed atomic EvidencePack)
                                  ▼
-   [Stage 1: AI Director]    --> engine/director/ (Gemini API / Mock Library)
-                                 │ (Structured JSON Scene Plan)
+   [Stage 1: Workflow]       --> engine/director/workflow_selector.py
+                                 │ (Scores verifiable developer workflows 0-60)
                                  ▼
-   [Stage 2: Validation]     --> engine/validation/ (Polymorphic AST & Line Wrap Gate)
-                                 │ (Bounds-checked JSON Plan)
+   [Stage 1.5: Scene Plan]   --> engine/director/scene_planner.py
+                                 │ (Evidence-linked 5-beat scene plan)
                                  ▼
-   [Stage 3: Audio & TTS]    --> engine/audio/ (Edge-TTS + GPU/CPU Whisper Alignment)
-                                 │ (Playable Audio + Word-Level Timestamps)
+   [Stage 2: Validation]     --> engine/validation/evidence_validator.py
+                                 │ (100% claim backing & citation verification gate)
                                  ▼
-   [Stage 4: Timeline]       --> engine/timeline/ (Choreographer & Pacing Engine)
-                                 │ (Run-isolated data.json)
+   [Stage 3: Audio & TTS]    --> engine/audio/ (Edge-TTS Neural + FFmpeg Broadcast Mastering)
+                                 │ (48kHz Stereo, -16 LUFS, Whisper Timestamps)
                                  ▼
-   [Stage 4.5: Manim Bridge] --> engine/renderer/ (Manim Community 920x920 Sub-Renderer)
-                                 │ (Optional pre-rendered MP4 clips)
+   [Stage 4: Timeline & Zod] --> video/scripts/validate_timeline.mjs
+                                 │ (Zod schema validation of data.json)
                                  ▼
-   [Stage 5: Remotion Comp]  --> Remotion / React 18 (<SceneErrorBoundary> Compositor)
-                                 │ (1080x1920 9:16 Vertical Video)
+   [Stage 5: Remotion Comp]  --> Remotion / React 18 (<BrandProvider> + Multi-Aspect Canvas)
+                                 │ (16:9 1920x1080 Widescreen OR 9:16 1080x1920 Vertical)
                                  ▼
-   [Stage 6: Post-Validation]--> engine/validation/output.py (ffprobe Verification)
+   [Stage 6: Post-Validation]--> engine/validation/output.py (ffprobe Dimensions & Streams)
                                  │
                                  ▼
-                   Final Production Video (MP4, 30fps)
+                   Final Broadcast-Ready Video (MP4, 30fps)
 ```
 
 ---
 
 ## Visual Primitives
 
-| Visual Primitive | Subject / Mode | Key Capabilities |
+| Visual Primitive | Component | Key Capabilities |
 |---|---|---|
-| `terminal` | `code`, `systems` | Terminal window chrome, typing CLI command (`$ ...`, `npm ...`, `pip ...`), animated status pill, progressive stdout reveal. |
-| `code_reveal` | `code`, `systems` | Syntax typewriter mounting, progressive line highlighting, focus phrase badge, auto-wrapped lines ($\le 46$ chars). |
-| `code_transform` | `code` | Side-by-side Before/After diff cards with `⚠️ Before` and `✨ After` badges and token mutation effects. |
-| `diagram` / `flowchart` | All Domains | Client-to-edge API request/response cards, status codes (`200 OK`, `204`), JSON payloads, latency metrics. |
-| `comparison` | All Domains | Dual-card split layout with clean domain-specific `KEY TAKEAWAY` footers. |
-| `fullscreen_text` / `concept` | All Domains | High-impact hook cards, hero concept resets, kinetic title typography. |
-| `function_graph` | `math`, `physics`, STEM | 2D coordinate calculus, shear-moment diagrams, quantum wavepackets, reaction energy profiles. |
-| `math_equation` | `math`, STEM | Multi-step LaTeX derivation studio with domain-specific mathematical equations. |
-| `physics_sim` | `physics` | 2D Newtonian projectile kinematics, vector decomposition, and force balance. |
-| `bento_grid` | All Domains | 4-card overview matrices with distinct animated mini-diagrams (guaranteed at most once per video). |
-| `algorithm_explorer` | `ml`, `code` | 3-tier deep dive (K-Means, DBSCAN, PCA, t-SNE) with parameter HUDs. |
-| `neural_code_split` | `ml`, `code` | Side-by-side live neural network layer simulation and PyTorch tensor code. |
-| `chemistry_reaction` | `chemistry` | $S_N2$ backside attack, steric shields, $S_N1$ carbocation ionization, and racemic products. |
-| `quantum_sim` | `quantum_physics` | Dirac atomic orbitals ($1s, 2p, 3d$), Schrödinger tunneling, Heisenberg phase space. |
-| `mechanics_fbd` | `mechanics` | Multi-support beam reaction forces, inclined plane decomposition, chassis load transfer. |
-| `electrical_grid` | `electrical` | KVL/KCL mesh loops, Thévenin equivalent reduction, multi-bus OPF dispatch. |
-| `manim_scene` | `math`, `physics`, STEM | 3Blue1Brown-style animations: equation morphs, calculus curves, vector fields, and wavepackets. |
+| `HookScene` | `HookScene.tsx` | Status pill from props (`PROBLEM • DISTRIBUTED RETRIES`), headline, multi-node flow diagram showing failure vs naive retry. |
+| `CodeSpotlightScene` | `CodeSpotlightScene.tsx` | Sleek modern IDE (Cursor/Raycast dark glass), real token syntax coloring, animated highlight bar, floating callout badge. |
+| `WorkflowTraceScene` | `WorkflowTraceScene.tsx` | OpenTelemetry/Inngest execution waterfall with live duration bars, state badges (`COMPLETED & MEMOIZED`), and memoization locks. |
+| `EvidenceBentoScene` | `EvidenceBentoScene.tsx` | 2–4 data cards populated strictly from `scene.items` citing verified `evidence_ids`. Zero fake placeholder metrics. |
+| `TakeawayCTAScene` | `TakeawayCTAScene.tsx` | Dedicated brand outro card with client logo, proposition takeaway, quickstart code bar, and official docs URL. |
+| `terminal` | `TerminalScene.jsx` | Content-fitted CLI terminal chrome, typing command (`$ ...`), stdout reveal. |
+| `code_reveal` / `code_transform` | `CodeRevealScene.jsx` | Syntax typewriter mounting, progressive line highlighting, and before/after diff morphing. |
+| `diagram` / `flowchart` | `DiagramScene.jsx` | Client-to-edge API request/response cards, HTTP status codes (`200 OK`, `503`), payload inspection. |
+| `comparison` | `ComparisonScene.jsx` | Dual-card split layout with clean domain-specific takeaway footers. |
+| `manim_scene` | `ManimScene.jsx` | 3Blue1Brown-style animations: equation morphs, calculus curves, vector fields, and wavepackets. |
 
 ---
 
@@ -167,44 +162,50 @@ export GEMINI_API_KEY="your_gemini_api_key"
 
 # Optional overrides:
 export WHISPER_DEVICE="cuda"   # or "cpu" (auto-detected)
-export EDGE_TTS_VOICE="en-US-ChristopherNeural"
+export EDGE_TTS_VOICE="en-US-AndrewNeural" # Senior engineer neural voice
 ```
 
 ### 3. Generate a Video Short
 
-#### A. Generate from Customer Documentation (DevTool Release)
+#### A. Generate from Project Profile (e.g. Inngest Widescreen)
 ```bash
-python3 generate_and_render.py \
-  --topic "Acme EdgeCache SDK v2 Release" \
-  --subject code \
-  --source-file examples/sample_devtool_release.md \
-  --length 35 \
-  --mock \
-  --output video/out/devtool_sdk_v2_demo.mp4
+.venv/bin/python generate_and_render.py \
+  --project projects/inngest_step_run.json \
+  --aspect-ratio 16:9 \
+  --output video/out/inngest_step_run_16_9.mp4
 ```
 
-#### B. Generate from Remote Documentation URL
+#### B. Generate Vertical Short (`9:16`) with Fast Frame Check
 ```bash
-python3 generate_and_render.py \
+.venv/bin/python generate_and_render.py \
+  --project projects/inngest_step_run.json \
+  --aspect-ratio 9:16 \
+  --frames 0-29
+```
+
+#### C. Generate from Customer Documentation URL
+```bash
+.venv/bin/python generate_and_render.py \
   --topic "FastAPI Asynchronous Endpoints" \
   --subject code \
   --source-url "https://fastapi.tiangolo.com/tutorial/first-steps/" \
+  --aspect-ratio 16:9 \
   --length 35
 ```
 
-#### C. Generate STEM Shorts
+#### D. Generate STEM Shorts
 ```bash
 # Electrical Power Grid Short (60 seconds)
-python3 generate_and_render.py --topic "Smart Grid Optimal Power Flow and Thevenin Equivalence" --subject electrical --length 60
+.venv/bin/python generate_and_render.py --topic "Smart Grid Optimal Power Flow and Thevenin Equivalence" --subject electrical --length 60
 
 # Quantum Physics Short (60 seconds)
-python3 generate_and_render.py --topic "Quantum Tunneling and Dirac Atomic Orbitals" --subject quantum_physics --length 60
+.venv/bin/python generate_and_render.py --topic "Quantum Tunneling and Dirac Atomic Orbitals" --subject quantum_physics --length 60
 
 # Chemistry Short (30 seconds)
-python3 generate_and_render.py --topic "SN1 vs SN2 Reaction Mechanisms" --subject chemistry --length 30
+.venv/bin/python generate_and_render.py --topic "SN1 vs SN2 Reaction Mechanisms" --subject chemistry --length 30
 
 # Math Short with Manim Sub-Renderer (15 seconds fast test)
-python3 generate_and_render.py --topic "Euler Identity and Complex Exponential Morph" --subject math --length 15 --fast-test
+.venv/bin/python generate_and_render.py --topic "Euler Identity and Complex Exponential Morph" --subject math --length 15 --fast-test
 ```
 
 ---
@@ -213,14 +214,16 @@ python3 generate_and_render.py --topic "Euler Identity and Complex Exponential M
 
 | Flag | Type | Description |
 |---|---|---|
-| `--topic` | `str` | **Required**. Topic for the short. |
+| `--project` | `str` | Path to `projects/<slug>.json` defining product, sources, brand, and profiles. |
+| `--aspect-ratio` | `str` | Aspect ratio: `16:9` (1920x1080 Widescreen) or `9:16` (1080x1920 Vertical). |
+| `--topic` | `str` | Topic for the video (if not using `--project`). |
 | `--subject` | `str` | Target domain (`code`, `math`, `physics`, `quantum_physics`, `mechanics`, `electrical`, `chemistry`, `ml`, `systems`). |
-| `--length` | `int` | Target duration in seconds: `15`, `30`, `35`, or `60` (default: `60`). |
+| `--length` | `int` | Target duration in seconds: `15`, `30`, `35`, or `60` (default: `30` or from project). |
 | `--source-file` | `str` | Local documentation or code file to extract facts from. |
 | `--source-url` | `str` | Public documentation or GitHub README URL to ingest. |
 | `--source-text` | `str` | Raw documentation text or code snippet to ingest. |
 | `--mock` | `flag` | Use deterministic mock generator instead of live Gemini API. |
-| `--frames` | `str` | Remotion frame range for fast benchmarks (e.g. `--frames 0-89`). |
+| `--frames` | `str` | Remotion frame range for fast benchmarks (e.g. `--frames 0-29`). |
 | `--fast-test` | `flag` | Fast 3-second render mode for quick visual checks. |
 | `--no-manim` | `flag` | Disable Stage 4.5 Manim Community pre-rendering. |
 | `--no-cache` | `flag` | Force fresh AI Director generation (bypasses script cache). |
@@ -234,22 +237,45 @@ python3 generate_and_render.py --topic "Euler Identity and Complex Exponential M
 
 ---
 
+## GitHub Webhook Automation
+
+The Studio API backend (`studio_api.py`) exposes an automated endpoint for GitHub release webhooks:
+
+```bash
+# Ingest release webhook payload and automatically trigger video generation
+curl -X POST http://localhost:8000/api/webhooks/github \
+  -H "Content-Type: application/json" \
+  -H "X-GitHub-Event: release" \
+  -d '{
+    "action": "published",
+    "release": {
+      "tag_name": "v2.4.0",
+      "name": "Durable Step Execution",
+      "body": "Introduced step.run() with memoized state and isolated retries."
+    },
+    "repository": {
+      "name": "inngest-js",
+      "html_url": "https://github.com/inngest/inngest-js"
+    }
+  }'
+```
+
+---
+
 ## Automated Test Suites
 
-The repository contains 230+ automated tests across pipeline stages, ingestion, API, and frontend rendering.
+The repository contains automated tests across pipeline stages, ingestion, API, and frontend rendering.
 
 ### Running Python Tests with Pytest
 ```bash
 # Run all tests:
-PYTHONPATH=. engine/.venv/bin/pytest -v
+.venv/bin/python -m pytest -v
 
 # Run targeted test suites:
-PYTHONPATH=. engine/.venv/bin/pytest tests/test_source_loader.py -v       # Ingestion & Fact Extraction
-PYTHONPATH=. engine/.venv/bin/pytest tests/test_phase_a_devtools.py -v    # DevTool Visual Primitives
-PYTHONPATH=. engine/.venv/bin/pytest tests/test_studio_api.py -v         # Studio API & Revisions
-PYTHONPATH=. engine/.venv/bin/pytest tests/test_checkpoint_01_02.py -v   # Segments & Mode A/B
-PYTHONPATH=. engine/.venv/bin/pytest tests/test_validation.py -v          # AST & Code Length Gates
-PYTHONPATH=. engine/.venv/bin/pytest tests/test_manim_bridge.py -v        # Manim Sub-Renderer
+.venv/bin/python -m pytest tests/test_validation.py -v         # Schema & Evidence Gates
+.venv/bin/python -m pytest tests/test_studio_api.py -v         # Studio API & Webhooks
+.venv/bin/python -m pytest tests/test_source_loader.py -v      # Ingestion & Fact Extraction
+.venv/bin/python -m pytest tests/test_milestone4.py -v         # Video Output ffprobe Validation
 ```
 
 ### Running Remotion Frame Smoke Tests

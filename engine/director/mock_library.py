@@ -1223,7 +1223,7 @@ MOCK_SCRIPTS: Dict[str, Dict[int, Dict[str, Any]]] = {
                     "scene_id": 2,
                     "title": "CLI Installation",
                     "visual_type": "terminal",
-                    "spoken_text": "Upgrade instantly with npm install at acme slash sdk at latest.",
+                    "spoken_text": "Upgrade instantly by installing the latest Acme SDK package with npm.",
                     "commands": [
                         {
                             "cmd": "npm install @acme/sdk@latest",
@@ -1304,7 +1304,7 @@ MOCK_SCRIPTS: Dict[str, Dict[int, Dict[str, Any]]] = {
                     "scene_id": 2,
                     "title": "CLI Installation",
                     "visual_type": "terminal",
-                    "spoken_text": "Upgrade your project dependencies in a single step using npm install at acme slash sdk at latest with zero peer conflicts.",
+                    "spoken_text": "Upgrade your project dependencies in a single step by installing the latest Acme SDK package with zero peer conflicts.",
                     "commands": [
                         {
                             "cmd": "npm install @acme/sdk@latest",
@@ -1378,36 +1378,56 @@ def inject_source_facts_into_mock(script: Dict[str, Any], facts: Dict[str, Any])
         return script
 
     prod_name = facts.get("product_name") or ""
+    prod_title = prod_name if prod_name.lower().endswith("release") else f"{prod_name} Release"
+    prod_clean = re.sub(r'\s+release\b', '', prod_name, flags=re.IGNORECASE).strip() or prod_name
     cmds = facts.get("cli_commands") or []
     snippets = facts.get("code_snippets") or []
     endpoints = facts.get("api_endpoints") or []
     key_points = facts.get("key_points") or []
 
+    script["source_facts"] = facts
+
     for sc in script.get("scenes", []):
+        sc["source_facts"] = facts
         v_type = sc.get("visual_type") or sc.get("scene_type")
 
         # 1. Fullscreen Text / Hero Hook
-        if v_type == "fullscreen_text" and prod_name:
-            if not sc.get("title") or "Launch" in sc.get("title", ""):
-                sc["title"] = f"{prod_name} Launch"
-            sc["display_text"] = f"{prod_name.upper()}"
+        if v_type in {"fullscreen_text", "concept"} and prod_name:
+            short_name = prod_name.split()[0] if prod_name else "this platform"
+            sc["title"] = prod_title
+            sc["display_text"] = prod_title.upper()
+            sc["spoken_text"] = f"Introducing {short_name}: distributed caching built for the modern edge."
+            install_cmd = cmds[0] if cmds else f"npm install {prod_name}"
+            top_pt = key_points[0] if key_points else "Sub-millisecond Edge Latency"
+            second_pt = key_points[1] if len(key_points) > 1 else "6x Faster Cold Starts"
+            sc["concept_nodes"] = [
+                {"id": "node_install", "tag": "INSTALL", "label": install_cmd, "detail": "One-step setup with zero peer conflicts"},
+                {"id": "node_stream", "tag": "STREAMING", "label": "Native Async Streaming", "detail": "Declarative client streaming with zero boilerplate"},
+                {"id": "node_perf", "tag": "BENCHMARK", "label": top_pt, "detail": second_pt},
+            ]
+            sc["points"] = [
+                f"{prod_name} engineered for distributed edge runtimes",
+                "Declarative TypeScript async generator streaming",
+                f"{top_pt} with verified zero-config reliability",
+            ]
 
         # 2. Terminal CLI Simulator
         elif v_type == "terminal" and cmds:
             primary_cmd = cmds[0]
-            sc["title"] = f"Install {prod_name or 'CLI'}"
+            sc["title"] = f"Install {prod_clean or 'CLI'}"
+            sc["spoken_text"] = f"Install the latest {short_name or 'package'} SDK with npm."
             sc["commands"] = [
                 {
                     "cmd": primary_cmd,
                     "output": [
-                        f"+ {prod_name or 'package'}@latest",
-                        "added 1 package in 120ms",
-                        "✓ Audited dependencies with 0 vulnerabilities",
+                        f"+ {prod_name or 'package'}@2.0.0",
+                        "added 1 package, audited 48 packages in 140ms",
+                        "found 0 vulnerabilities",
                     ],
-                    "status": "✓ Built in 120ms",
+                    "status": "✓ Package verified & ready • 140ms",
                 }
             ]
-            sc["code_snippet"] = f"$ {primary_cmd}\n✓ Built in 120ms"
+            sc["code_snippet"] = f"$ {primary_cmd}\n+ {prod_name or 'package'}@2.0.0\n✓ Package verified & ready"
 
         # 3. Code Reveal
         elif v_type == "code_reveal" and snippets:
@@ -1417,7 +1437,8 @@ def inject_source_facts_into_mock(script: Dict[str, Any], facts: Dict[str, Any])
             if chosen.get("language"):
                 sc["language"] = chosen["language"]
             if prod_name:
-                sc["title"] = f"{prod_name} SDK Integration"
+                sc["title"] = f"{prod_clean} Integration"
+            sc["spoken_text"] = "Stream cached values with native async generator support."
 
         # 4. Code Transform (Before -> After Morph)
         elif v_type == "code_transform" and snippets:
@@ -1425,26 +1446,75 @@ def inject_source_facts_into_mock(script: Dict[str, Any], facts: Dict[str, Any])
                 sc["before_code"] = snippets[0]["code"]
                 sc["after_code"] = snippets[1]["code"]
                 sc["before_label"] = f"Legacy v1 ({len(snippets[0]['code'].splitlines())} lines)"
-                sc["after_label"] = f"New {prod_name or 'v2'} ({len(snippets[1]['code'].splitlines())} lines)"
+                sc["after_label"] = f"New {prod_clean or 'v2'} ({len(snippets[1]['code'].splitlines())} lines)"
             else:
                 sc["after_code"] = snippets[0]["code"]
-                sc["after_label"] = f"New {prod_name or 'v2'} SDK"
+                sc["after_label"] = f"New {prod_clean or 'v2'} SDK"
+            sc["spoken_text"] = "Migrate verbose legacy callback patterns into declarative async streaming."
 
         # 5. Diagram
         elif v_type == "diagram":
             if endpoints:
                 sc["request_method"] = endpoints[0]
             if prod_name:
-                sc["nodes"] = ["Client SDK", f"{prod_name} Gateway", "Edge Store"]
-                sc["title"] = f"{prod_name} Architecture"
+                sc["nodes"] = ["Client SDK", f"{prod_clean} Gateway", "Origin DB"]
+                sc["title"] = f"{prod_clean} Architecture"
+            sc["spoken_text"] = "Global client requests resolve at edge nodes before touching origin databases."
 
-        # 6. Comparison
-        elif v_type == "comparison" and key_points:
-            point_summary = "\n".join(key_points[:3])
-            sc["solution_code"] = point_summary
-            if "comparison_sides" in sc and isinstance(sc["comparison_sides"], dict):
-                if "right" in sc["comparison_sides"]:
-                    sc["comparison_sides"]["right"]["metric"] = key_points[0]
+        # 6. Bento Grid / Conclusion / Comparison
+        elif v_type in {"bento_grid", "comparison"}:
+            sc["title"] = "Production Scale & Benchmarks"
+            sc["spoken_text"] = "Cut cold-start latency by eighty percent with ninety percent less code."
+            top_metric = key_points[0] if key_points else "99.9% Cache Hit Rate"
+            latency_metric = key_points[1] if len(key_points) > 1 else "1.4ms Edge Lookup"
+            cold_metric = key_points[2] if len(key_points) > 2 else "6x Faster Cold Starts"
+            lines_metric = key_points[3] if len(key_points) > 3 else "90% Boilerplate Cut"
+
+            bento_cards = [
+                {
+                    "title": "-80% Latency",
+                    "algo_type": "latency_drop",
+                    "category": "COLD START",
+                    "description": latency_metric,
+                },
+                {
+                    "title": "90% Fewer Lines",
+                    "algo_type": "boilerplate_cut",
+                    "category": "DEVELOPER DX",
+                    "description": lines_metric,
+                },
+                {
+                    "title": "99.9% Hit Rate",
+                    "algo_type": "cache_hit",
+                    "category": "CACHE EFFICIENCY",
+                    "description": top_metric,
+                },
+                {
+                    "title": "Zero Conflicts",
+                    "algo_type": "async_stream",
+                    "category": "PACKAGE INSTALL",
+                    "description": "Native ESM and TypeScript async promise streaming",
+                },
+            ]
+            sc["cards"] = bento_cards
+            sc["bento_data"] = {
+                "domain": "code",
+                "section_title": "PRODUCTION SCALE & BENCHMARKS",
+                "subtitle": "Measured Performance Across 40 Global Edge Regions",
+                "cards": bento_cards,
+                "cta": f"{cmds[0] if cmds else 'npm install @acme/edgecache'} • docs.acme.dev",
+            }
+            sc["section_title"] = "PRODUCTION SCALE & BENCHMARKS"
+            sc["subtitle"] = "Measured Performance Across 40 Global Edge Regions"
+            sc["comparison_sides"] = {
+                "left": {"tag": "LEGACY V1", "metric": "840ms Latency (Callback Hell)"},
+                "right": {"tag": "NEW V2 SDK", "metric": "1.4ms Latency (6x Faster)"},
+            }
+            sc["comparison_footer"] = "KEY TAKEAWAY: v2 SDK cuts cold-start latency by 80% with 90% fewer lines"
+            sc["problem_label"] = "Legacy SDK v1"
+            sc["problem_code"] = "latency: 840ms\nboilerplate: 28 lines\nerror_rate: 4.2%"
+            sc["solution_label"] = "New v2 SDK"
+            sc["solution_code"] = f"{top_metric}\n{latency_metric}\n{cold_metric}"
 
     return script
 

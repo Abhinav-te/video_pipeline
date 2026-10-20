@@ -730,7 +730,96 @@ class TestPolymorphicValidation(unittest.TestCase):
             f"Expected 4-word hook/outro to pass validation, got errors: {errors}",
         )
 
+    def test_banned_placeholder_tokens_fail_when_absent_from_source(self):
+        """
+        Verify that banned ML/generic placeholder tokens fail narrative validation
+        when they are absent from the source document.
+        """
+        plan = {
+            "title": "Acme EdgeCache SDK Release",
+            "subject": "devtools",
+            "source_text": "Acme EdgeCache provides global async streaming.",
+            "scenes": [
+                {
+                    "scene_id": 1,
+                    "title": "Hook",
+                    "narration": "Welcome to the edge cache release.",
+                    "visual_type": "fullscreen_text",
+                },
+                {
+                    "scene_id": 2,
+                    "title": "Architectures",
+                    "narration": "Here are our core system benchmarks.",
+                    "visual_type": "bento_grid",
+                    "cards": [
+                        {"title": "K-Means", "description": "Clustering algorithm"}
+                    ]
+                },
+            ],
+        }
+        is_valid, errors = validate_script_plan(plan)
+        self.assertFalse(is_valid)
+        self.assertTrue(any("k-means" in err.lower() for err in errors))
+
+    def test_banned_placeholder_tokens_pass_when_present_in_source(self):
+        """
+        Verify that ML tokens are permitted when the source document is legitimately
+        about those algorithms.
+        """
+        plan = {
+            "title": "Unsupervised Clustering Tutorial",
+            "subject": "ml",
+            "source_text": "In this guide we explore K-Means clustering and DBSCAN density analysis.",
+            "scenes": [
+                {
+                    "scene_id": 1,
+                    "title": "Hook",
+                    "narration": "Discover the foundations of spatial clustering.",
+                    "visual_type": "fullscreen_text",
+                },
+                {
+                    "scene_id": 2,
+                    "title": "Algorithms",
+                    "narration": "Compare K-Means partitioning against density clustering.",
+                    "visual_type": "bento_grid",
+                    "cards": [
+                        {"title": "K-Means", "description": "Centroid partitioning"}
+                    ]
+                },
+            ],
+        }
+        is_valid, errors = validate_script_plan(plan)
+        self.assertTrue(is_valid, f"Expected legitimate ML plan to pass, got: {errors}")
+
+    def test_unsanitized_cli_syntax_in_narration_fails(self):
+        """
+        Verify that raw un-sanitized CLI syntax (@scope/pkg, --flags, literal 'at ... slash')
+        fails narration validation.
+        """
+        plan = {
+            "title": "CLI Setup",
+            "subject": "code",
+            "scenes": [
+                {
+                    "scene_id": 1,
+                    "title": "Install",
+                    "narration": "Run npm install at acme slash sdk at latest right now.",
+                    "visual_type": "fullscreen_text",
+                },
+                {
+                    "scene_id": 2,
+                    "title": "Flag",
+                    "narration": "Pass the --save-dev flag to finish.",
+                    "visual_type": "fullscreen_text",
+                },
+            ],
+        }
+        is_valid, errors = validate_script_plan(plan)
+        self.assertFalse(is_valid)
+        self.assertTrue(any("cli flag" in err.lower() or "slash" in err.lower() for err in errors))
+
 
 if __name__ == "__main__":
     unittest.main()
+
 

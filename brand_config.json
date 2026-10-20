@@ -1,0 +1,14 @@
+{
+  "company_name": "Inngest",
+  "logo_text": "INNGEST",
+  "primary_color": "#6366F1",
+  "secondary_color": "#10B981",
+  "warning_color": "#F59E0B",
+  "danger_color": "#EF4444",
+  "bg_canvas": "#090A0F",
+  "bg_surface": "#11131C",
+  "font_sans": "Inter, system-ui, sans-serif",
+  "font_mono": "JetBrains Mono, monospace",
+  "docs_url_display": "inngest.com/docs/step-run"
+}
+

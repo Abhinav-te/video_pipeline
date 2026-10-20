@@ -92,6 +92,7 @@ def main():
     parser = argparse.ArgumentParser(description="V2 Video Engine: One-Click Pipeline")
     parser.add_argument("--topic", type=str, default=None, help="Topic for the video short")
     parser.add_argument("--length", type=int, choices=[15, 30, 35, 60], default=60, help="Target duration in seconds")
+    parser.add_argument("--project", type=str, default=None, help="Path to project configuration JSON file (e.g. projects/project_profile.json)")
     parser.add_argument("--subject", type=str, choices=["auto", "code", "devtools", "math", "physics", "systems", "ml", "chemistry", "quantum_physics", "mechanics", "electrical"], default="auto", help="Subject domain for video")
     parser.add_argument("--source-file", type=str, default=None, help="Path to source documentation, README, changelog, or code snippet")
     parser.add_argument("--source-url", type=str, default=None, help="Public documentation or GitHub README URL to ingest")
@@ -110,6 +111,8 @@ def main():
     parser.add_argument("--set-title", type=str, default=None, help="Mode A: New title for scene")
     parser.add_argument("--set-visual-json", type=str, default=None, help="Mode A: JSON dictionary of visual props")
     parser.add_argument("--set-narration", type=str, default=None, help="Mode B: New spoken narration for scene")
+    parser.add_argument("--set-evidence-id", type=str, default=None, help="Mode B: Evidence ID backing new narration")
+    parser.add_argument("--aspect-ratio", type=str, choices=["16:9", "9:16"], default=None, help="Aspect ratio: 16:9 widescreen or 9:16 vertical")
     args = parser.parse_args()
 
     # Dispatch to surgical scene revision engine if --revise-scene is present
@@ -123,6 +126,7 @@ def main():
             set_title=args.set_title,
             set_visual_json=args.set_visual_json,
             set_narration=args.set_narration,
+            set_evidence_id=args.set_evidence_id,
             output_path=args.output,
         )
         stage_success("REVISE", f"Revision complete! Video saved to {out_file}")
@@ -131,11 +135,33 @@ def main():
     if args.fast_test and not args.frames:
         args.frames = "0-89"
 
-    if args.topic is None:
-        stage_error("PIPELINE", "--topic is required.", exit_code=1)
-    if not args.topic.strip():
-        stage_error("PIPELINE", "--topic cannot be empty.", exit_code=1)
-    topic = args.topic.strip()
+    topic = (args.topic or "").strip()
+    aspect_ratio = args.aspect_ratio
+    if args.project:
+        proj_p = Path(args.project).resolve()
+        if not proj_p.exists():
+            stage_error("PIPELINE", f"Project file not found: {proj_p}", exit_code=1)
+        import json
+        with open(proj_p, "r", encoding="utf-8") as pf:
+            p_data = json.load(pf)
+        p_profile = p_data.get("project_profile", p_data)
+        topic = topic or p_profile.get("topic") or p_profile.get("product") or "Technical Feature"
+        if args.length == 60 and p_profile.get("duration_target_seconds"):
+            args.length = int(p_profile.get("duration_target_seconds"))
+        if args.subject == "auto" and p_profile.get("subject"):
+            args.subject = p_profile.get("subject")
+        if not aspect_ratio:
+            aspect_ratio = p_data.get("render_profile", {}).get("aspect_ratio") or p_profile.get("aspect_ratio")
+
+    if not aspect_ratio:
+        aspect_ratio = "16:9"
+
+    is_vertical = (aspect_ratio == "9:16")
+    render_width = 1080 if is_vertical else 1920
+    render_height = 1920 if is_vertical else 1080
+
+    if not topic:
+        stage_error("PIPELINE", "Either --topic or --project is required.", exit_code=1)
 
     run_id = args.run_id or generate_run_id()
 
@@ -153,13 +179,15 @@ def main():
 
     # Step 1: Execute Python Generation Subprocess
     cmd = [
-
         str(python_exec), str(gen_script),
         "--length", str(args.length),
-        "--topic", args.topic,
         "--subject", args.subject,
         "--run-id", run_id,
     ]
+    if topic:
+        cmd.extend(["--topic", topic])
+    if args.project:
+        cmd.extend(["--project", str(Path(args.project).resolve())])
     if args.no_cache:
         cmd.append("--no-cache")
     if args.no_manim:
@@ -193,6 +221,46 @@ def main():
 
     if data_file_path.stat().st_size == 0:
         stage_error("VALIDATION", f"Generated data file is empty: {data_file_path}")
+
+    # Inject chosen aspect ratio & dimensions into data payload
+    try:
+        with open(data_file_path, "r", encoding="utf-8") as df:
+            d_payload = json.load(df)
+        d_payload["aspect_ratio"] = aspect_ratio
+        if "render_profile" not in d_payload:
+            d_payload["render_profile"] = {}
+        d_payload["render_profile"]["aspect_ratio"] = aspect_ratio
+        d_payload["render_profile"]["width"] = render_width
+        d_payload["render_profile"]["height"] = render_height
+        with open(data_file_path, "w", encoding="utf-8") as df:
+            json.dump(d_payload, df, indent=2)
+    except Exception as exc:
+        print(f"[ENGINE:WARN] Failed to stamp aspect ratio into data payload: {exc}", file=sys.stderr)
+
+    # Step 1.4: Evidence Validation Gate (Phase 4)
+    stage_start("EVIDENCE_GATE", "Validating 100% claim backing and factual integrity...")
+    ev_pack_path = run_dir / "evidence_pack.json"
+    if ev_pack_path.exists():
+        try:
+            from validation.evidence_validator import validate_evidence_and_plan
+            import json
+            with open(ev_pack_path, "r", encoding="utf-8") as f:
+                ev_pack_data = json.load(f)
+            with open(data_file_path, "r", encoding="utf-8") as f:
+                data_json_payload = json.load(f)
+            val_report = validate_evidence_and_plan(ev_pack_data, data_json_payload)
+            with open(run_dir / "validation_report.json", "w", encoding="utf-8") as f:
+                json.dump(val_report.model_dump(), f, indent=2)
+            if not val_report.passed:
+                write_reflection_error(
+                    run_dir=run_dir,
+                    stage="evidence_gate",
+                    message=f"Evidence validation gate failed: {val_report.checks}",
+                )
+                stage_error("EVIDENCE_GATE", "Evidence validation gate failed. Review validation_report.json", exit_code=1)
+            stage_success("EVIDENCE_GATE", f"Evidence validation passed with {val_report.claim_coverage_pct}% claim coverage.")
+        except Exception as exc:
+            stage_error("EVIDENCE_GATE", f"Evidence validation execution failed: {exc}", exit_code=1)
 
     # Step 1.5: Stage 4.8 - Node.js TypeScript Zod Validation Gate
     stage_start("ZOD_GATE", f"Validating {data_file_path.name} against TypeScript Zod schema...")
@@ -280,6 +348,9 @@ def main():
             video_path=out_file_path,
             expected_audio_path=audio_file_path if (audio_file_path.exists() and not args.frames) else None,
             tolerance_sec=1.5,
+            aspect_ratio=aspect_ratio,
+            expected_width=render_width,
+            expected_height=render_height,
         )
     except Exception as exc:
         is_valid = False

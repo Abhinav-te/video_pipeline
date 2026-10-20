@@ -152,6 +152,11 @@ def auto_heal_timeline_payload(payload: Dict[str, Any]) -> Tuple[Dict[str, Any],
                 modified = True
                 
             prev_scene_start = float(sc.get("start_time", 0.0))
-            
+
+            # Strip null/None values so Zod schema validation passes cleanly
+            null_keys = [k for k, v in list(sc.items()) if v is None]
+            for k in null_keys:
+                del sc[k]
+                modified = True
     return payload, modified
 

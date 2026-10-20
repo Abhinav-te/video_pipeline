@@ -93,6 +93,96 @@ function main() {
     process.exit(1);
   }
 
+  // 2. Pre-Render Story & Narrative Consistency Gate
+  const bannedGenericTokens = [
+    'invariant algorithmic',
+    'boilerplate state',
+    'acme vector',
+  ];
+
+  const bannedMLTokens = [
+    'k-means',
+    'kmeans',
+    'dbscan',
+    't-sne',
+    'tsne',
+  ];
+
+  const sourceDoc = (
+    jsonData.source_text ||
+    jsonData.source_document ||
+    ''
+  ).toLowerCase();
+  const topicStr = (jsonData.topic || jsonData.title || '').toLowerCase();
+  const subjectStr = (jsonData.subject || '').toLowerCase();
+
+  const bannedTokens = [...bannedGenericTokens];
+  if (subjectStr !== 'ml') {
+    bannedTokens.push(...bannedMLTokens);
+  }
+
+  const narrativeErrors = [];
+
+  (jsonData.scenes || []).forEach((scene, idx) => {
+    const sceneId = scene.scene_id || scene.id || `scene_${idx + 1}`;
+    const sceneStr = JSON.stringify(scene).toLowerCase();
+
+    // Check banned placeholder tokens
+    for (const token of bannedTokens) {
+      if (sceneStr.includes(token)) {
+        if (!sourceDoc.includes(token) && !topicStr.includes(token)) {
+          narrativeErrors.push(
+            `Scene ${idx} (${sceneId}) contains banned placeholder token '${token}' not found in source document or topic.`
+          );
+        }
+      }
+    }
+
+    // Check spoken narration syntax
+    const narration = scene.spoken_text || scene.narration || scene.narration_text || '';
+    if (narration) {
+      const scopeMatch = narration.match(/@[a-zA-Z0-9_\-\./]+/);
+      if (scopeMatch) {
+        narrativeErrors.push(
+          `Scene ${idx} (${sceneId}) spoken narration contains raw package symbol '${scopeMatch[0]}'. Decouple spoken narration from visual syntax.`
+        );
+      }
+      const flagMatch = narration.match(/(?:^|\s)--[a-zA-Z0-9_\-]+/);
+      if (flagMatch) {
+        narrativeErrors.push(
+          `Scene ${idx} (${sceneId}) spoken narration contains raw CLI flag '${flagMatch[0].trim()}'. Spoken narration must be natural English.`
+        );
+      }
+      const slashMatch = narration.match(/\b(at\s+[a-zA-Z0-9_-]+\s+slash\s+[a-zA-Z0-9_-]+)\b/i);
+      if (slashMatch) {
+        narrativeErrors.push(
+          `Scene ${idx} (${sceneId}) spoken narration contains literal phonetic symbol '${slashMatch[0]}'.`
+        );
+      }
+    }
+  });
+
+  if (narrativeErrors.length > 0) {
+    const errorPayload = {
+      stage: 'narrative_gate',
+      scene_id: null,
+      field_path: 'scenes',
+      message: 'Pre-render narrative consistency check failed',
+      all_errors: narrativeErrors.map(msg => ({ path: 'scenes', message: msg })),
+      timestamp: new Date().toISOString(),
+    };
+
+    const errorFilePath = path.join(runDir, 'validation.error.json');
+    fs.writeFileSync(errorFilePath, JSON.stringify(errorPayload, null, 2));
+
+    console.error(`[NARRATIVE:ERROR] Story & fact consistency check failed:`);
+    narrativeErrors.forEach((msg) => {
+      console.error(`  • ${msg}`);
+    });
+    console.error(`[NARRATIVE:ERROR] Diagnostics written to: ${errorFilePath}`);
+    process.exit(1);
+  }
+
   const sceneCount = (jsonData.scenes && jsonData.scenes.length) || 0;
   console.log(`[ZOD:SUCCESS] Timeline validation passed for run '${jsonData.run_id}' (${sceneCount} scenes).`);
   process.exit(0);

@@ -5,7 +5,7 @@ import { DynamicBadgeIcon, SparklesIcon, WarningIcon, LightningIcon, ScaleIcon }
 
 export const resolveConceptMode = (scene) => {
   const domain = (scene?.domain || scene?.subject || scene?.choreography?.domain || '').toLowerCase();
-  const isNonML = ['math', 'quantum', 'physics', 'electrical', 'mechanic', 'chem'].some((d) => domain.includes(d));
+  const isNonML = ['math', 'quantum', 'physics', 'electrical', 'mechanic', 'chem', 'code', 'devtools', 'systems'].some((d) => domain.includes(d));
   if (isNonML) {
     return 'concept_card';
   }
@@ -36,11 +36,9 @@ export const resolveConceptMode = (scene) => {
     textContext.includes('waste') ||
     textContext.includes('gpu') ||
     textContext.includes('vram') ||
-    textContext.includes('latency') ||
     textContext.includes('hardware') ||
     textContext.includes('cost') ||
-    textContext.includes('hours') ||
-    textContext.includes('benchmark')
+    textContext.includes('hours')
   ) {
     return 'benchmark';
   }
@@ -63,7 +61,7 @@ export const resolveConceptMode = (scene) => {
  * Full-Screen 3-Part Vertical Stack (1540px Stage Height):
  *   1. Top Hero Title Card (260px tall) with SVG icon badge & 52px bold headline
  *   2. Center Context-Driven Visual Diagram (780px tall):
- *        • Head-to-Head Split Arena: K-Means linear failure vs Manifold density victory on non-convex shapes
+ *        • Head-to-Head Split Arena: linear boundary failure vs density victory on non-convex shapes
  *        • Compute & Latency Benchmark Comparison: GPU VRAM, O(n²) vs O(n log n), Latency bars
  *        • Data-Driven Multi-Stage Concept Card / Flow Pipeline: 100% dynamic for any STEM domain
  *        • Autoencoder Latent Space Manifold: only when autoencoder explicitly mentioned
@@ -82,41 +80,21 @@ export const ConceptHeroScene = ({
   // Deterministically select diagram mode based on scene context
   const conceptMode = resolveConceptMode(scene);
 
-  const arenaDefaultPoints = [
-    'K-Means assumes spherical clusters and Euclidean convex geometry',
-    'Density-based clustering links contiguous points regardless of curvature',
-    'Non-linear manifolds require geodesic or density connectivity',
+  const defaultPoints = [
+    scene?.title || 'Verified Developer Workflow',
+    scene?.spoken_text || scene?.narration || 'Official documentation specification',
+    scene?.display_text || 'Deterministic execution guarantees',
   ];
-
-  const benchmarkDefaultPoints = [
-    'Avoid burning GPU hours where classical algorithms converge in milliseconds',
-    'Memory footprint drops from gigabytes to single megabytes',
-    'Instant cold-start with zero heavy model weights to download or initialize',
-  ];
-
-  const autoencoderDefaultPoints = [
-    'Compresses high-dimensional noise into low-dimensional manifold',
-    'Bottleneck layer forces network to extract semantic invariant features',
-    'Reconstruction loss guarantees zero information loss on key signals',
-  ];
-
-  const conceptCardDefaultPoints = [
-    scene?.title ? `Mastering ${scene.title} core guarantees` : 'Deterministic execution with zero redundant operations',
-    'Invariant state transitions enforce optimal runtime complexity',
-    'Proven production foundation maximizing performance and correctness',
-  ];
-
-  const defaultPoints = conceptMode === 'arena'
-    ? arenaDefaultPoints
-    : (conceptMode === 'benchmark'
-        ? benchmarkDefaultPoints
-        : (conceptMode === 'autoencoder' ? autoencoderDefaultPoints : conceptCardDefaultPoints));
 
   const points = (scene?.points && scene.points.length > 0)
     ? scene.points
     : (scene?.bullets && scene.bullets.length > 0
         ? scene.bullets
-        : (scene?.takeaways && scene.takeaways.length > 0 ? scene.takeaways : defaultPoints));
+        : (scene?.takeaways && scene.takeaways.length > 0
+            ? scene.takeaways
+            : (scene?.items && scene.items.length > 0
+                ? scene.items.map(it => it.detail || it.title || it.label)
+                : defaultPoints)));
   // points.map progressive reveals for key takeaways
 
   // Pulse animation for latent bottleneck and architecture signal lines
@@ -829,11 +807,19 @@ export const ConceptHeroScene = ({
                   gap: '16px',
                 }}
               >
-                {(scene?.concept_nodes && scene.concept_nodes.length > 0 ? scene.concept_nodes : [
-                  { id: 'node_1', tag: 'INPUT / VECTOR', label: scene?.title ? `${scene.title} Feature Space` : 'Raw Input Vector', detail: 'Bounded feature distribution and topological boundary' },
-                  { id: 'node_2', tag: 'KERNEL / MECHANISM', label: 'Deterministic Invariant Transform', detail: 'Mathematical reduction enforcing zero redundant state transitions' },
-                  { id: 'node_3', tag: 'OUTPUT / CONVERGENCE', label: 'Guaranteed Optimal State', detail: 'Sub-millisecond latency with verified structural correctness' },
-                ]).slice(0, 3).map((node, nIdx) => {
+                {(scene?.concept_nodes && scene.concept_nodes.length > 0 ? scene.concept_nodes : (
+                  scene?.items && scene.items.length > 0
+                    ? scene.items.map((it, i) => ({
+                        id: `node_${i + 1}`,
+                        tag: it.tag || `STEP 0${i + 1}`,
+                        label: it.label || it.title || `Workflow Node 0${i + 1}`,
+                        detail: it.detail || it.subtitle || '',
+                      }))
+                    : [
+                        { id: 'node_1', tag: 'NODE 01', label: scene?.title || 'Initial Execution', detail: scene?.spoken_text || 'Execution checkpoint' },
+                        { id: 'node_2', tag: 'NODE 02', label: 'State Transition', detail: 'Memoized recovery handler' },
+                      ]
+                )).slice(0, 3).map((node, nIdx) => {
                   const nodeColors = ['#f59e0b', '#38bdf8', '#10b981'];
                   const c = nodeColors[nIdx % nodeColors.length];
                   return (

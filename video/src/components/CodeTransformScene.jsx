@@ -339,22 +339,25 @@ export const CodeTransformScene = ({
         </div>
       </div>
 
-      {/* 5. BOTTOM INSIGHT PILL (120px) */}
+      {/* 5. BOTTOM TECHNICAL STATUS BAR */}
       <div
         style={{
-          height: '110px',
+          height: '60px',
           backgroundColor: '#090d13',
-          borderRadius: '16px',
+          borderRadius: '12px',
           border: '1px solid rgba(255, 255, 255, 0.08)',
-          padding: '16px 22px',
+          padding: '0 20px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           boxSizing: 'border-box',
         }}
       >
-        <div style={{ fontSize: '20px', color: '#3fb950', fontWeight: 'bold', fontFamily: 'monospace' }}>
-          {scene?.spoken_text || scene?.narration || 'Migrated cleanly with zero boilerplate.'}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#3fb950', display: 'inline-block', boxShadow: '0 0 8px rgba(63, 185, 80, 0.7)' }} />
+          <span style={{ fontSize: '16px', color: '#3fb950', fontWeight: 'bold', fontFamily: 'monospace' }}>
+            DIFF: -24 LINES • TYPESAFE ASYNC PROMISES
+          </span>
         </div>
         <span
           style={{
@@ -362,8 +365,8 @@ export const CodeTransformScene = ({
             border: '1px solid #3fb950',
             color: '#3fb950',
             borderRadius: '6px',
-            padding: '4px 12px',
-            fontSize: '15px',
+            padding: '3px 10px',
+            fontSize: '14px',
             fontFamily: 'monospace',
             fontWeight: 'bold',
           }}

@@ -22,13 +22,21 @@ share/python-wheels/
 *.egg
 
 # Virtual Environments
+.venv
 .venv/
 venv/
 ENV/
 env/
+engine/.venv
 engine/.venv/
 engine/.cache/
 engine/cache/
+.cache/
+
+# Revisions & Runs
+revisions/
+video/public/runs/
+video/out/
 
 # Testing & Type Checking
 .pytest_cache/

@@ -1,0 +1,60 @@
+{
+  "project_profile": {
+    "product": "Inngest",
+    "audience": "Backend developers",
+    "goal": "Explain one practical durable execution feature in a 30-second video",
+    "duration_target_seconds": 30,
+    "topic": "Inngest step.run() Durable Execution & Retries",
+    "subject": "code",
+    "sources": [
+      {
+        "url": "https://www.inngest.com/docs/durable-execution/primitives/step-run",
+        "local_file": "examples/docs/inngest_step_run.md",
+        "title": "Inngest step.run() Documentation"
+      },
+      {
+        "url": "https://www.inngest.com/docs/features/retries",
+        "local_file": "examples/docs/inngest_retries.md",
+        "title": "Inngest Retries and Error Handling"
+      }
+    ]
+  },
+  "render_profile": {
+    "aspect_ratio": "9:16",
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "theme": {
+      "background": "#0d1117",
+      "card_background": "#161b22",
+      "text_primary": "#f0f6fc",
+      "text_secondary": "#8b949e",
+      "accent": "#58a6ff",
+      "success": "#3fb950",
+      "danger": "#f85149",
+      "warning": "#d29922"
+    },
+    "typography": {
+      "font_family_code": "JetBrains Mono, monospace",
+      "font_family_text": "Inter, sans-serif"
+    },
+    "caption_layout": {
+      "position": "bottom",
+      "max_words_per_line": 5
+    }
+  },
+  "brand": {
+    "company_name": "Inngest",
+    "logo_text": "INNGEST",
+    "primary_color": "#6366F1",
+    "secondary_color": "#10B981",
+    "warning_color": "#F59E0B",
+    "danger_color": "#EF4444",
+    "bg_canvas": "#090A0F",
+    "bg_surface": "#11131C",
+    "font_sans": "Inter, system-ui, sans-serif",
+    "font_mono": "JetBrains Mono, monospace",
+    "docs_url_display": "inngest.com/docs/step-run"
+  }
+}
+

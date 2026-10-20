@@ -1,0 +1,42 @@
+{
+  "project_profile": {
+    "product": "Stripe API",
+    "audience": "Backend & payments engineers",
+    "goal": "Explain how to safely retry POST requests after network timeouts without double-charging customers in a 30-second video",
+    "duration_target_seconds": 30,
+    "topic": "Stripe API Idempotent Requests & Safe Retries",
+    "subject": "code",
+    "sources": [
+      {
+        "url": "https://docs.stripe.com/api/idempotent_requests",
+        "local_file": "examples/docs/stripe_idempotency.md",
+        "title": "Stripe API Idempotent Requests Documentation"
+      }
+    ]
+  },
+  "render_profile": {
+    "aspect_ratio": "9:16",
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "theme": {
+      "background": "#0d1117",
+      "card_background": "#161b22",
+      "text_primary": "#f0f6fc",
+      "text_secondary": "#8b949e",
+      "accent": "#635bff",
+      "success": "#3fb950",
+      "danger": "#f85149",
+      "warning": "#d29922"
+    },
+    "typography": {
+      "font_family_code": "JetBrains Mono, monospace",
+      "font_family_text": "Inter, sans-serif"
+    },
+    "caption_layout": {
+      "position": "bottom",
+      "max_words_per_line": 5
+    }
+  }
+}
+

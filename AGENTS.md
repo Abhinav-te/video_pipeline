@@ -1,64 +1,60 @@
-# Agent Instructions: Video Pipeline Engine — Phase A.2 (Zero-Crash React Reliability, Customer Source/URL Ingestion & Final Git Commit)
+# AGENTS.md — Documentation-Driven B2B Technical Video Engine (`~/video_gen`)
 
-## SPEED & EXECUTION RULES (CRITICAL)
-1. **DO NOT scan `video/public/runs/`, `video/out/`, `node_modules/`, or `.venv/`.**
-2. **NEVER run `npx tsc` (which downloads the wrong `tsc@2.0.4` npm package).** Use Node scripts or `npx remotion render ... --frames=0-1` to verify React components.
-3. **Keep test suite execution fast (< 30 seconds).**
+## 1. Core Architectural Philosophy
+We are building a **Documentation-Driven Technical Video Production Engine**.
+- **The Golden Rule:** Never ask the AI to invent a tutorial about a topic. The engine must ingest official documentation, extract a source-linked `EvidencePack`, select a verifiable developer workflow, and compile it into a synchronized Remotion + Manim video where every claim, code snippet, and animation event is backed by an `evidence_id`.
+- **Zero Company Hardcoding:** Inngest (and any future product) is strictly a data input passed via `projects/<slug>.json`. NEVER write `if company == "Inngest"` or hardcode product-specific strings, fallbacks, or fake metrics in `engine/` or `video/src/`.
+- **Three-Artifact Separation:** Every run strictly separates:
+  1. `project_profile.json` (company, audience, goal, duration, official source URLs/files).
+  2. `evidence_pack.json` & `scene_plan.json` (retrieved sources, atomic evidence records, scored workflow candidates, and evidence-linked scene graph).
+  3. `render_profile.json` (typography, dark theme color tokens, `9:16` or `16:9` aspect ratio, caption layout).
 
----
+## 2. Strict Execution & Directory Guardrails (MUST FOLLOW)
+1. **Python Interpreter:** ALWAYS use `.venv/bin/python` (never bare `python3`).
+2. **Forbidden Scan Directories:** NEVER glob, grep, index, or scan `video/public/runs/`, `video/out/`, `revisions/`, `node_modules/`, or `.venv/`.
+3. **Fast Render Gate:** When testing Remotion components or timeline changes, ALWAYS test with `--frames=0-29` or `npx remotion still` first. Never run full multi-scene renders until schema and frame checks pass.
+4. **Never Trust Exit Code 0 Alone:** Always verify `validate_timeline.mjs`, `evidence_validator.py`, `ffprobe` duration/timescale (`1/90000`), and extracted midpoint keyframes.
 
-## Objective 1: Eliminate React Error #130 & Enforce Component Export Contracts
+## 3. Universal Evidence & Scene Plan Contracts
+### 3.1 Evidence Record Schema (`evidence_pack.json`)
+Every extracted fact must follow this structure:
+- `id`: Unique string (e.g., `"ev_step_run_01"`)
+- `kind`: `"concept" | "developer_action" | "behavior" | "failure_behavior" | "limitation" | "code_evidence" | "metric"`
+- `claim`: Concise factual statement directly supported by the source
+- `source_url`: Exact URL or file path of the source document
+- `source_section`: Heading or section title
+- `excerpt`: Verbatim quote or code snippet from the source
+- `retrieved_at`: ISO-8601 timestamp
+- `content_hash`: SHA-256 of the normalized source section
+- `confidence`: `"source_supported" | "inferred_needs_review"`
 
-During `devtool_sdk_v2_demo.mp4`, Remotion crashed at frame 137 (Scene 2) with `Minified React error #130 (... got: undefined)`.
-1. **Audit All Imports/Exports in `video/src/CodingShort.jsx` and `video/src/components/`**:
-   - Inspect every `import` in `CodingShort.jsx` and every component in `video/src/components/` (`CodeRevealScene`, `CodeTransformScene`, `TerminalScene`, `DiagramScene`, `ComparisonScene`, `ManimScene`, `MathScene`, `GraphScene`, `BentoGridScene`, etc.).
-   - Ensure every component file exports BOTH a named export AND `export default` (e.g., `export { TerminalScene }; export default TerminalScene;`) so neither default nor named imports can ever resolve to `undefined`!
-   - Check every child tag or icon inside `video/src/components/*.jsx` to ensure no `undefined` sub-component is ever rendered as `<UndefinedComponent />`.
-2. **Add `<SceneErrorBoundary>` & Safe Component Router in `CodingShort.jsx`**:
-   - Wrap the scene switcher in a React class `SceneErrorBoundary` and verify `typeof TargetComponent === "function"` before rendering so an invalid element type is structurally impossible.
-3. **Multi-Scene Frame Verification Gate**:
-   - Render 1 frame from the middle of EVERY scene (`--frames=<midFrame>-<midFrame>`) of the 6-scene DevTool run (`fullscreen_text`, `terminal`, `code_transform`, `code_reveal`, `diagram`, `comparison`) to prove all 6 scene types render in Chromium with zero React errors!
+### 3.2 Universal Scene Vocabulary (`video/src/`)
+The scene planner may ONLY emit supported generic visual primitives:
+- `show_code` / `highlight_code` (`CodeReveal` / `CodeTransform`): Real documented code only; active lines highlighted, context lines readable (`opacity: 0.55`), content-fitted container height.
+- `workflow_state_transition` (`WorkflowStateTransition` / `Diagram`): Generic state-machine node graph (`entities: string[]`, `events: {target, action: "start" | "succeed" | "fail" | "retry" | "reuse_cached", label}[]`).
+- `show_terminal` (`Terminal`): Content-fitted CLI execution + stdout reveal.
+- `show_request_response` (`ApiFlow`): Client -> Gateway/Endpoint -> Response payload inspection.
+- `show_metric` / `takeaway_cta` (`BentoGrid` / `FullscreenText`): Only renders metrics that cite a valid `evidence_id` + official docs URL/CTA.
 
----
+## 4. Validation & Studio Rules
+1. **Evidence Citation Gate:** Every scene narration segment and every visual metric/claim must include `evidence_ids: string[]` referencing valid IDs in `evidence_pack.json`. Unbacked numerical claims are rejected before rendering.
+2. **Nuance & Limitation Gate:** If `evidence_pack.json` contains a `limitation` record for the chosen workflow (e.g., external side effects requiring idempotency on retry), the script/visuals must not contradict it.
+3. **Spoken Narration vs. Visual Syntax:** `narration[].text` must be natural spoken English (e.g., "Wrap the operation in step dot run")—never raw CLI/URL punctuation. Remove duplicate narration prose footers inside visual cards so they do not collide with Remotion captions.
+4. **Studio Traceability:** `studio_api.py` and `studio_ui/index.html` must expose each scene's linked `evidence_ids`, source excerpts, and validation warnings alongside Mode A (Visual) and Mode B (Narration) surgical revision controls.
 
-## Objective 2: Customer Content & Internet Documentation Ingestion (`engine/ingestion/source_loader.py`)
-
-Build `engine/ingestion/source_loader.py` so the pipeline can ingest real developer-tool material provided by customers or fetched from documentation URLs:
-
-1. **Supported Input Modes (`generate_and_render.py`, `engine/generate.py`, `studio_api.py`)**:
-   - `--source-file <path>`: Reads local `.md`, `.txt`, `.py`, `.ts`, `.js`, `.json`, or `.html` files.
-   - `--source-url <url>`: Fetches any public documentation URL or GitHub README/release page (`urllib.request` with clean User-Agent + timeout), strips HTML tags (`<script>`, `<style>`, `<nav>`, `<header>`, `<footer>`), and preserves headings, paragraphs, and `<pre><code>` blocks as clean Markdown.
-   - `--source-text "<string>"`: Direct raw text/markdown input (used by the Local Studio UI).
-2. **Ground-Truth Fact & Code Extractor (`extract_source_facts(raw_text: str) -> dict`)**:
-   - Automatically parses the customer's document to extract:
-     - `product_name` / `title` (from H1/H2 or package name)
-     - `cli_commands`: Extracted `$ ...`, `npm ...`, `npx ...`, `pip ...`, `uv ...`, `curl ...`, `docker ...` commands.
-     - `code_snippets`: Extracted fenced code blocks (```` ```ts ... ``` ````) with language tags, split cleanly into short displayable lines (`<= 46 chars` per line, `<= 12 lines` per block).
-     - `key_points`: Extracted bullet points, API endpoints (`GET /v1/...`, `POST /v1/...`), and benchmark numbers.
-3. **End-to-End Propagation (Both Live Gemini Director AND `--mock` Mode)**:
-   - Pass the extracted `source_facts` into `engine/director/script.py` AND `engine/director/mock_library.py` + `choreographer.py`!
-   - **Crucial Reliability Rule**: Even when running in `--mock` mode (or if the LLM omits a code block), if the user passed `--source-file`, `--source-url`, or `--source-text`, populate the `terminal`, `code_reveal`, `code_transform`, and `diagram` scenes directly with the **actual CLI commands, code blocks, and product facts extracted from the customer's source document**!
-4. **Update Local Production Studio UI (`studio_ui/index.html` & `studio_api.py`)**:
-   - In the `+ NEW VIDEO PROJECT` panel in `studio_ui/index.html`, provide:
-     - **Source URL input** (`https://...` docs or GitHub README link)
-     - **Source Material / Docs / Code textarea** (paste customer README, changelog, or SDK code directly)
-   - Display the ingested `source_facts` summary inside the Studio project inspector so the operator can see which customer facts were used.
-
----
-
-## Objective 3: Verify End-to-End, Clean Up & Commit Everything to Git
-
-1. Create a sample customer DevTool brief at `examples/sample_devtool_release.md` (e.g., an SDK release document with a CLI install command, a v1-vs-v2 code migration snippet, and an API architecture flow).
-2. Run a full end-to-end verification render using that customer document:
-   ```bash
-   python3 generate_and_render.py \
-     --topic "Acme EdgeCache SDK v2 Release" \
-     --subject code \
-     --source-file examples/sample_devtool_release.md \
-     --length 35 \
-     --mock \
-     --output video/out/devtool_sdk_v2_demo.mp4
-   ```
-3. Confirm `devtool_sdk_v2_demo.mp4` renders all frames (`0` through `end`) with **zero React #130 errors**, passes `ffprobe` and post-render validation, and displays the customer's actual CLI commands and code from `examples/sample_devtool_release.md`.
-4. Run all Python unit tests (`PYTHONPATH=. pytest`) and Node validation tests.
-5. Stage and commit all source changes cleanly to Git (`git status` clean, ignoring temporary run/out artifacts).
+## 5. Premium B2B Design System, Multi-Aspect Ratio & Audio Rules
+1. **ZERO Hardcoded Text in React JSX (`video/src/components/`):**
+   - React components (`FullscreenText.tsx`, `BentoGrid.tsx`, `CodeReveal.tsx`, `WorkflowStateTransition.tsx`, `Terminal.tsx`) must NEVER contain fallback strings like `"Single-step package install"`, `"Declarative Async Pipeline"`, `"Sub-Millisecond Edge Scale"`, `"90% Less Boilerplate"`, `"1.4ms"`, `"Invariant state transitions"`, or hardcoded `"⚠️ ANTI-PATTERN"` badges.
+   - 100% of titles, subtitles, badges, metrics, and cards MUST come from the `scene` props generated from `evidence_pack.json`.
+2. **Never Leak TTS Phonetics Into Visual Titles:**
+   - Visual titles and code must always render real technical syntax (`step.run()`, `@acme/sdk`, `POST /v1/charges`).
+   - Phonetic normalizations (`"step dot run"`) apply ONLY to the string passed to TTS audio synthesis—NEVER mutate visual titles or captions!
+3. **Neural-Only Audio Policy (Ban `espeak`):**
+   - NEVER use `espeak`, `espeak-ng`, `pyttsx3`, or sine-wave audio fallbacks.
+   - Always synthesize voiceovers using Neural TTS (`edge-tts` with `en-US-AndrewNeural` / `en-US-BrianNeural` or local `kokoro` ONNX/PyTorch) and apply FFmpeg broadcast loudness normalization (`af="loudnorm=I=-16:TP=-1.5:LRA=11"`).
+4. **Multi-Aspect Ratio Architecture (`16:9` Widescreen & `9:16` Vertical):**
+   - Support `--aspect-ratio 16:9` (`1920x1080`, default for B2B docs/YouTube/landing pages) and `--aspect-ratio 9:16` (`1080x1920`, for vertical social feeds).
+   - In `16:9`, use full widescreen layouts (split-screen code + state trace, wide IDE viewport, horizontal span waterfall) with bottom cinema captions.
+5. **Client Brand Configuration (`brand_config.json`) & GitHub Webhook Automation:**
+   - Every project loads a `brand_config.json` (or `brand` block in `project_profile.json`) mapping client hex colors (`primary_color`, `secondary_color`, `bg_dark`, `surface_card`), typography (`font_sans`, `font_mono`), company name, and logo badge directly into Remotion via `BrandContext`.
+   - `studio_api.py` exposes `POST /api/webhooks/github` to ingest GitHub `release` webhook payloads and trigger automated video generation.

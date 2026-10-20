@@ -681,45 +681,102 @@ def synthesize_domain_bento_data(scene: Dict[str, Any], domain: str) -> Dict[str
                 },
             ],
         }
-    elif domain == "code":
+    elif domain in {"code", "devtools", "systems"}:
+        facts = scene.get("source_facts") or {}
+        key_points = facts.get("key_points") or []
+        cmds = facts.get("cli_commands") or []
+        prod_name = facts.get("product_name") or "Runtime"
+
+        if scene.get("items"):
+            cards = [
+                {
+                    "title": it.get("title", "VERIFIED"),
+                    "value": it.get("value", "GUARANTEED"),
+                    "category": it.get("tag", "EVIDENCE"),
+                    "description": it.get("subtitle", it.get("detail", "")),
+                }
+                for it in scene["items"]
+            ]
+        elif key_points:
+            top_metric = key_points[0] if key_points else "Verified Performance"
+            latency_metric = key_points[1] if len(key_points) > 1 else "Optimized Execution"
+            cold_metric = key_points[2] if len(key_points) > 2 else "Zero Cold Starts"
+            lines_metric = key_points[3] if len(key_points) > 3 else "Clean Architecture"
+            cards = [
+                {
+                    "title": "Low Latency",
+                    "algo_type": "latency_drop",
+                    "category": "PERFORMANCE",
+                    "description": latency_metric,
+                },
+                {
+                    "title": "Clean DX",
+                    "algo_type": "boilerplate_cut",
+                    "category": "DEVELOPER DX",
+                    "description": lines_metric,
+                },
+                {
+                    "title": "State Guarantee",
+                    "algo_type": "cache_hit",
+                    "category": "RELIABILITY",
+                    "description": top_metric,
+                },
+                {
+                    "title": "Deterministic",
+                    "algo_type": "async_stream",
+                    "category": "EXECUTION",
+                    "description": "Zero redundant computations on transient recovery",
+                },
+            ]
+        else:
+            cards = scene.get("cards") or [
+                {
+                    "title": "Durable Memory",
+                    "algo_type": "latency",
+                    "category": "STATE GUARANTEE",
+                    "description": "Completed step outputs memoized across retries",
+                },
+                {
+                    "title": "Isolated Retries",
+                    "algo_type": "boilerplate",
+                    "category": "FAULT TOLERANCE",
+                    "description": "Only failed operations re-execute with exponential backoff",
+                },
+                {
+                    "title": "Idempotent Side Effects",
+                    "algo_type": "dependencies",
+                    "category": "CORRECTNESS",
+                    "description": "External mutations safely wrapped in deterministic step closures",
+                },
+            ]
+
         return {
             "domain": "code",
-            "section_title": scene.get("section_title") or "SOFTWARE ARCHITECTURE & ALGORITHMS",
-            "subtitle": scene.get("subtitle") or "COMPLEXITY & DESIGN MATRIX",
-            "cards": scene.get("cards") or [
-                {
-                    "title": "Hash Tables & Sets",
-                    "algo_type": "hash_table",
-                    "category": "FAST LOOKUP",
-                    "description": "O(1) average lookup • Immutable hash keys prevent collision",
-                },
-                {
-                    "title": "Stream Generators",
-                    "algo_type": "generator",
-                    "category": "MEMORY EFFICIENCY",
-                    "description": "O(1) memory yield • Lazy iterator streaming on demand",
-                },
-                {
-                    "title": "Binary Heaps",
-                    "algo_type": "heap",
-                    "category": "PRIORITY QUEUES",
-                    "description": "O(log n) insert and pop • Optimal priority scheduling",
-                },
-                {
-                    "title": "Dynamic Programming",
-                    "algo_type": "dp",
-                    "category": "OPTIMIZATION",
-                    "description": "Memoized overlapping subproblems • Optimal substructure",
-                },
-            ],
+            "section_title": scene.get("section_title") or "PRODUCTION SCALE & BENCHMARKS",
+            "subtitle": scene.get("subtitle") or "Measured Performance Across 40 Global Edge Regions",
+            "cards": cards,
+            "cta": f"{cmds[0] if cmds else 'npm install'} • docs.{prod_name.lower().replace(' ', '')}.dev",
         }
-    else:  # ml (default)
-        return {
-            "domain": "ml",
-            "section_title": scene.get("section_title") or "MACHINE LEARNING ARCHITECTURES",
-            "subtitle": scene.get("subtitle") or "UNSUPERVISED ML ALGORITHMS",
-            "cards": scene.get("cards") or synthesize_ml_bento_cards(scene),
-        }
+    else:  # fallback
+        if "ml" in domain:
+            return {
+                "domain": "ml",
+                "section_title": scene.get("section_title") or "MACHINE LEARNING ARCHITECTURES",
+                "subtitle": scene.get("subtitle") or "UNSUPERVISED ML ALGORITHMS",
+                "cards": scene.get("cards") or synthesize_ml_bento_cards(scene),
+            }
+        else:
+            return {
+                "domain": "code",
+                "section_title": scene.get("section_title") or "SYSTEMS ARCHITECTURE & PERFORMANCE",
+                "subtitle": scene.get("subtitle") or "RELIABILITY & SCALE BENCHMARKS",
+                "cards": scene.get("cards") or [
+                    {"title": "Low Latency", "algo_type": "latency", "category": "SPEED", "description": "Sub-millisecond edge response times"},
+                    {"title": "High Throughput", "algo_type": "throughput", "category": "CAPACITY", "description": "Linear scale across concurrent connections"},
+                    {"title": "Zero Overhead", "algo_type": "memory", "category": "EFFICIENCY", "description": "Minimal memory footprint with zero garbage collection spikes"},
+                    {"title": "Reliability", "algo_type": "reliability", "category": "AVAILABILITY", "description": "Fault-tolerant architecture with automated failover"},
+                ],
+            }
 
 
 def synthesize_domain_graph_data(scene: Dict[str, Any], domain: str) -> Dict[str, Any]:
@@ -1258,11 +1315,20 @@ def synthesize_concept_card(scene: Dict[str, Any], domain: str = "auto") -> Dict
                     "Linear force and rotational moment sums resolve to zero",
                     "Maximum internal bending and shear stresses remain strictly bounded",
                 ]
+            elif "code" in dom or "dev" in dom or "system" in dom:
+                facts = scene.get("source_facts") or {}
+                prod = facts.get("product_name") or title
+                pts = facts.get("key_points") or []
+                points = [
+                    f"{prod} engineered for high-performance edge runtimes",
+                    "Declarative client streaming with native async generators",
+                    pts[0] if pts else "Sub-millisecond lookup latency across distributed nodes",
+                ]
             else:
                 points = [
                     f"Core mechanism: {title} establishes deterministic invariant execution",
-                    "Reduces algorithmic complexity and prevents edge-case regressions",
-                    "Proven mathematical and architectural foundation in production environments",
+                    "Reduces computational latency and prevents edge-case regressions",
+                    "Proven software architectural foundation in production environments",
                 ]
 
     # 2. Dynamic Concept Nodes (100% domain-aware)
@@ -1305,11 +1371,21 @@ def synthesize_concept_card(scene: Dict[str, Any], domain: str = "auto") -> Dict
                 {"id": "node_kernel", "tag": "KINETICS", "label": scene.get("kernel_label") or title, "detail": "Activation energy barrier and transition state geometry"},
                 {"id": "node_output", "tag": "YIELD", "label": scene.get("output_label") or "Stereo Product", "detail": "Thermodynamic product yield and inversion outcome"},
             ]
+        elif "code" in dom or "dev" in dom or "system" in dom or scene.get("source_facts"):
+            facts = scene.get("source_facts") or {}
+            prod = facts.get("product_name") or title
+            cmds = facts.get("cli_commands") or []
+            pts = facts.get("key_points") or []
+            concept_nodes = [
+                {"id": "node_setup", "tag": "SETUP", "label": cmds[0] if cmds else f"Install {prod}", "detail": "One-step package installation with zero peer conflicts"},
+                {"id": "node_stream", "tag": "STREAMING", "label": "Declarative Async API", "detail": "Native async promise streaming with zero boilerplate"},
+                {"id": "node_scale", "tag": "SCALE", "label": pts[0] if pts else "Edge Performance", "detail": pts[1] if len(pts) > 1 else "Sub-millisecond distributed lookup"},
+            ]
         else:
             concept_nodes = [
-                {"id": "node_input", "tag": "INPUT", "label": scene.get("input_label") or f"{kw1} Vector", "detail": "Input feature distribution & parameter state"},
-                {"id": "node_kernel", "tag": "KERNEL", "label": scene.get("kernel_label") or title, "detail": "Invariant algorithmic transform & execution pipeline"},
-                {"id": "node_output", "tag": "OUTPUT", "label": scene.get("output_label") or f"{kw3} State", "detail": "Deterministic convergence & verified correctness"},
+                {"id": "node_input", "tag": "INPUT", "label": scene.get("input_label") or f"{title} Payload", "detail": "Structured client request parameters and state"},
+                {"id": "node_kernel", "tag": "ENGINE", "label": scene.get("kernel_label") or "Execution Pipeline", "detail": "Deterministic asynchronous event loop processing"},
+                {"id": "node_output", "tag": "OUTPUT", "label": scene.get("output_label") or "Verified Response", "detail": "Low-latency distributed delivery with verified correctness"},
             ]
 
     return {
@@ -1720,8 +1796,8 @@ def choreograph_scenes(
             else:
                 scene_type = "neural_code_split"
 
-        # General rule: Bento grid can NEVER appear before the final scene in full scripts!
-        if num_scenes >= 5 and scene_type == "bento_grid" and i < num_scenes - 1:
+        # General rule: Bento grid can NEVER appear before the final scene in STEM scripts!
+        if num_scenes >= 5 and scene_type == "bento_grid" and i < num_scenes - 1 and active_domain not in ("code", "devtools"):
             if is_electrical:
                 scene_type = "electrical_grid"
                 modes = ["kvl_kcl_mesh", "thevenin_equivalence", "smart_grid_opf"]
@@ -2004,13 +2080,32 @@ def choreograph_scenes(
             }
 
         # 7. Code Reveal & Terminal
-        elif scene_type in {"code_reveal", "terminal"}:
+        elif scene_type in {"code_reveal", "terminal", "show_code", "highlight_code", "show_terminal"}:
             choreography["layout_mode"] = "stepped"
-            lines = (scene.get("code_snippet") or "").split("\n")
+            lines = (scene.get("code_snippet") or scene.get("code") or "").split("\n")
             line_count = max(1, len(lines))
             choreography["step_activation_frames"] = [
                 scene_start_frame + l_idx * 4 for l_idx in range(line_count)
             ]
+
+        # 7b. Workflow State Transition
+        elif scene_type in {"workflow_state_transition", "workflow_transition"}:
+            choreography["layout_mode"] = "workflow_state_transition"
+
+        # 7c. API Flow & Request/Response
+        elif scene_type in {"show_request_response", "api_flow"}:
+            choreography["layout_mode"] = "api_flow"
+
+        # 7d. Takeaway CTA & Fullscreen Text
+        elif scene_type in {"takeaway_cta", "fullscreen_text"}:
+            choreography["layout_mode"] = "takeaway_cta"
+            choreography["hero_reveal_frame"] = scene_start_frame + 6
+            pts = scene.get("points") or scene.get("bullets") or scene.get("takeaways") or []
+            if not pts and scene.get("call_to_action"):
+                pts = [scene["call_to_action"]]
+            scene["points"] = pts
+            scene["bullets"] = pts
+            scene["takeaways"] = pts
 
         # 8. Code Transform & Comparison
         elif scene_type in {"code_transform", "comparison"}:
@@ -2117,7 +2212,7 @@ def choreograph_scenes(
             title_lower = str(scene.get("title") or scene.get("display_text", "")).lower()
             corpus = f"{spoken_lower} {title_lower}"
 
-            is_non_ml = active_domain in ("math", "quantum_physics", "physics", "electrical", "mechanics", "chemistry")
+            is_non_ml = active_domain in ("math", "quantum_physics", "physics", "electrical", "mechanics", "chemistry", "code", "devtools")
 
             if not is_non_ml and any(k in corpus for k in ["autoencoder", "auto-encoder", "latent space", "bottleneck layer", "reconstruction loss"]):
                 diagram_mode = "autoencoder"
@@ -2174,7 +2269,7 @@ def choreograph_scenes(
     # 1. Bento Grid must appear AT MOST ONCE in the entire video, strictly on the final scene.
     # 2. Never allow identical visual_type + sub_mode consecutively.
     num_enriched = len(enriched_scenes)
-    if num_enriched >= 5:
+    if num_enriched >= 5 and active_domain not in ("code", "devtools"):
         for idx in range(num_enriched - 1):
             if enriched_scenes[idx].get("visual_type") == "bento_grid" or enriched_scenes[idx].get("scene_type") == "bento_grid":
                 if active_domain == "electrical":
@@ -2211,25 +2306,26 @@ def choreograph_scenes(
             enriched_scenes[-1]["section_title"] = b_payload.get("section_title")
             enriched_scenes[-1]["subtitle"] = b_payload.get("subtitle")
 
-    for idx in range(1, num_enriched):
-        curr_v = enriched_scenes[idx].get("visual_type")
-        prev_v = enriched_scenes[idx - 1].get("visual_type")
-        curr_m = enriched_scenes[idx].get("sub_mode")
-        prev_m = enriched_scenes[idx - 1].get("sub_mode")
-        if curr_v == prev_v:
-            if curr_v in {"electrical_grid", "mechanics_fbd", "quantum_sim", "chemistry_reaction"} and curr_m == prev_m:
-                if curr_v == "electrical_grid":
-                    modes = ["kvl_kcl_mesh", "thevenin_equivalence", "smart_grid_opf"]
-                elif curr_v == "mechanics_fbd":
-                    modes = ["beam_weight_distribution", "inclined_plane_fbd", "axle_center_of_mass"]
-                elif curr_v == "quantum_sim":
-                    modes = ["schrodinger_tunneling", "heisenberg_uncertainty", "dirac_atomic_orbitals"]
-                else:
-                    modes = ["sn2_concerted", "steric_blockade", "sn1_ionization", "sn1_racemic"]
-                nxt_idx = (modes.index(curr_m) + 1) % len(modes) if curr_m in modes else 1
-                enriched_scenes[idx]["sub_mode"] = modes[nxt_idx]
-            elif curr_v not in {"electrical_grid", "mechanics_fbd", "quantum_sim", "chemistry_reaction"} and idx < num_enriched - 1:
-                enriched_scenes[idx]["visual_type"] = "function_graph" if curr_v != "function_graph" else "math_equation"
+    if active_domain not in ("code", "devtools"):
+        for idx in range(1, num_enriched):
+            curr_v = enriched_scenes[idx].get("visual_type")
+            prev_v = enriched_scenes[idx - 1].get("visual_type")
+            curr_m = enriched_scenes[idx].get("sub_mode")
+            prev_m = enriched_scenes[idx - 1].get("sub_mode")
+            if curr_v == prev_v:
+                if curr_v in {"electrical_grid", "mechanics_fbd", "quantum_sim", "chemistry_reaction"} and curr_m == prev_m:
+                    if curr_v == "electrical_grid":
+                        modes = ["kvl_kcl_mesh", "thevenin_equivalence", "smart_grid_opf"]
+                    elif curr_v == "mechanics_fbd":
+                        modes = ["beam_weight_distribution", "inclined_plane_fbd", "axle_center_of_mass"]
+                    elif curr_v == "quantum_sim":
+                        modes = ["schrodinger_tunneling", "heisenberg_uncertainty", "dirac_atomic_orbitals"]
+                    else:
+                        modes = ["sn2_concerted", "steric_blockade", "sn1_ionization", "sn1_racemic"]
+                    nxt_idx = (modes.index(curr_m) + 1) % len(modes) if curr_m in modes else 1
+                    enriched_scenes[idx]["sub_mode"] = modes[nxt_idx]
+                elif curr_v not in {"electrical_grid", "mechanics_fbd", "quantum_sim", "chemistry_reaction"} and idx < num_enriched - 1:
+                    enriched_scenes[idx]["visual_type"] = "function_graph" if curr_v != "function_graph" else "math_equation"
 
     # Step 4: For STEM domains, ensure at least 50% of body scenes (3 to 5 scenes)
     # are assigned to use compiled Manim video layers

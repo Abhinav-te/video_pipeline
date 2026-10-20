@@ -73,19 +73,19 @@ const CodeLine = ({
     );
   }
 
-  // Spotlight line styles
+  // Spotlight line styles: keep non-spotlighted lines readable context
   const isLineActive = isHighlighted || !hasActiveSpotlight;
-  const lineOpacity = isLineActive ? 1.0 : 0.38;
+  const lineOpacity = isLineActive ? 1.0 : 0.55;
 
   return (
     <div
       style={{
         display: 'flex',
         alignItems: 'baseline',
-        lineHeight: '1.5',
+        lineHeight: '1.45',
         fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
         fontSize: `${fontSize}px`,
-        color: isLineActive ? '#f1f5f9' : '#64748b',
+        color: isLineActive ? '#f1f5f9' : '#94a3b8',
         boxSizing: 'border-box',
         transform: 'none',
         backfaceVisibility: 'hidden',
@@ -196,16 +196,18 @@ export const CodeRevealScene = ({
         border: '1.5px solid rgba(255, 255, 255, 0.12)',
         boxShadow: '0 32px 64px -16px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.06)',
         width: '960px',
-        height: '1540px',
+        height: 'fit-content',
+        maxHeight: '1240px',
         overflow: 'hidden',
         boxSizing: 'border-box',
         transform: 'none',
         backfaceVisibility: 'hidden',
         position: 'relative',
-        padding: '32px 32px',
+        padding: '26px 28px',
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'space-between',
+        justifyContent: 'flex-start',
+        margin: 'auto 0',
       }}
     >
       {/* 1. TOP TERMINAL HEADER BAR (110px) */}
@@ -273,17 +275,17 @@ export const CodeRevealScene = ({
         ) : null}
       </div>
 
-      {/* 2. CODE AREA (1020px) */}
+      {/* 2. CODE AREA (IDE BUFFER) */}
       <div
         style={{
           flex: 1,
-          margin: '18px 0',
-          padding: '24px 20px',
+          margin: '14px 0',
+          padding: '20px 20px',
           boxSizing: 'border-box',
           display: 'flex',
           flexDirection: 'column',
-          justifyContent: lines.length <= 6 ? 'flex-start' : 'space-around',
-          gap: lines.length <= 6 ? '20px' : '8px',
+          justifyContent: 'flex-start',
+          gap: '6px',
           backgroundColor: '#0d1117',
           borderRadius: '18px',
           border: '1px solid rgba(255, 255, 255, 0.06)',
@@ -330,15 +332,15 @@ export const CodeRevealScene = ({
         })}
       </div>
 
-      {/* 3. BOTTOM TERMINAL EXECUTION CONSOLE (320px) */}
+      {/* 3. BOTTOM TERMINAL EXECUTION CONSOLE */}
       <div
         style={{
-          height: '320px',
+          height: '92px',
           backgroundColor: '#090d13',
-          borderRadius: '20px',
+          borderRadius: '16px',
           border: '1.5px solid rgba(88, 166, 255, 0.3)',
           boxShadow: '0 16px 32px rgba(0, 0, 0, 0.6)',
-          padding: '22px 26px',
+          padding: '16px 22px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
@@ -348,36 +350,23 @@ export const CodeRevealScene = ({
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <CodeIcon size={22} color="#58a6ff" />
-            <span style={{ fontSize: '20px', color: '#58a6ff', fontWeight: 900, letterSpacing: '1px' }}>
+            <CodeIcon size={20} color="#58a6ff" />
+            <span style={{ fontSize: '18px', color: '#58a6ff', fontWeight: 900, letterSpacing: '1px' }}>
               STDOUT • EXECUTION ENVIRONMENT
             </span>
           </div>
-          <span style={{ fontSize: '16px', color: '#56d364', fontWeight: 'bold' }}>
+          <span style={{ fontSize: '15px', color: '#56d364', fontWeight: 'bold' }}>
             {consoleBadge}
           </span>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '16px' }}>
           <div style={{ color: '#8b949e' }}>
             {consoleCommand}
           </div>
           <div style={{ color: '#56d364', fontWeight: 'bold' }}>
             {consoleStatus}
           </div>
-        </div>
-
-        <div
-          style={{
-            padding: '10px 16px',
-            backgroundColor: 'rgba(88, 166, 255, 0.1)',
-            borderRadius: '10px',
-            border: '1px solid rgba(88, 166, 255, 0.25)',
-            fontSize: '18px',
-            color: '#c9d1d9',
-          }}
-        >
-          {scene?.spoken_text || scene?.narration || 'Execution finishes in optimal asymptotic bounds.'}
         </div>
       </div>
     </div>

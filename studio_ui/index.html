@@ -100,9 +100,9 @@
               <input type="text" id="gen-topic" required placeholder="e.g. Calculus: Fundamental Theorem" class="w-full bg-gray-900 border border-gray-700 rounded px-2.5 py-1.5 text-gray-100 placeholder-gray-500 focus:outline-none focus:border-blue-500">
             </div>
 
-            <div class="grid grid-cols-2 gap-2">
+            <div class="grid grid-cols-3 gap-2">
               <div>
-                <label class="block text-gray-400 mb-1">Domain / Subject</label>
+                <label class="block text-gray-400 mb-1">Domain</label>
                 <select id="gen-subject" class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-gray-100 focus:outline-none focus:border-blue-500">
                   <option value="math">math</option>
                   <option value="code">code</option>
@@ -125,6 +125,14 @@
                   <option value="30">30 seconds</option>
                   <option value="35" selected>35 seconds</option>
                   <option value="60">60 seconds</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-gray-400 mb-1">Aspect Ratio</label>
+                <select id="gen-aspect-ratio" class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-gray-100 focus:outline-none focus:border-blue-500">
+                  <option value="16:9" selected>16:9 Widescreen</option>
+                  <option value="9:16">9:16 Vertical</option>
                 </select>
               </div>
             </div>
@@ -912,6 +920,7 @@ Connecting to Studio Terminal...
       const topic = document.getElementById('gen-topic').value;
       const subject = document.getElementById('gen-subject').value;
       const length = parseInt(document.getElementById('gen-length').value, 10);
+      const aspect_ratio = document.getElementById('gen-aspect-ratio')?.value || '16:9';
       const mock = document.getElementById('gen-mock').checked;
       const source_text = document.getElementById('gen-source-text')?.value || '';
       const source_url = document.getElementById('gen-source-url')?.value || '';
@@ -925,7 +934,7 @@ Connecting to Studio Terminal...
         const res = await fetch('/api/projects/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ topic, subject, length, mock, source_text, source_url })
+          body: JSON.stringify({ topic, subject, length, aspect_ratio, mock, source_text, source_url })
         });
 
         if (!res.ok) {

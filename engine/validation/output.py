@@ -100,6 +100,9 @@ def validate_video_output(
     expected_duration: Optional[float] = None,
     tolerance_sec: float = DEFAULT_DURATION_TOLERANCE_SEC,
     min_size_bytes: int = DEFAULT_MIN_SIZE_BYTES,
+    expected_width: Optional[int] = None,
+    expected_height: Optional[int] = None,
+    aspect_ratio: Optional[str] = None,
 ) -> Tuple[bool, List[str], Dict[str, Any]]:
     """
     Validates a post-render video file against Remotion specifications.
@@ -185,10 +188,22 @@ def validate_video_output(
         height = v_stream.get("height")
         metadata["width"] = width
         metadata["height"] = height
-        if width != REQUIRED_WIDTH or height != REQUIRED_HEIGHT:
+
+        req_w = expected_width
+        req_h = expected_height
+        if req_w is None or req_h is None:
+            if aspect_ratio == "16:9":
+                req_w, req_h = 1920, 1080
+            elif aspect_ratio == "9:16":
+                req_w, req_h = 1080, 1920
+            else:
+                req_w, req_h = REQUIRED_WIDTH, REQUIRED_HEIGHT
+
+        if width != req_w or height != req_h:
+            ratio_label = "16:9 widescreen" if (req_w, req_h) == (1920, 1080) else "9:16 vertical short"
             errors.append(
                 f"Invalid video dimensions: {width}x{height}. "
-                f"Expected {REQUIRED_WIDTH}x{REQUIRED_HEIGHT} (9:16 vertical short)."
+                f"Expected {req_w}x{req_h} ({ratio_label})."
             )
 
         r_fps = _parse_fps(v_stream.get("r_frame_rate"))
@@ -276,6 +291,9 @@ def validate_video_or_raise(
     expected_duration: Optional[float] = None,
     tolerance_sec: float = DEFAULT_DURATION_TOLERANCE_SEC,
     min_size_bytes: int = DEFAULT_MIN_SIZE_BYTES,
+    expected_width: Optional[int] = None,
+    expected_height: Optional[int] = None,
+    aspect_ratio: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Validates video output and raises OutputValidationError on any failure."""
     is_valid, errors, metadata = validate_video_output(
@@ -284,6 +302,9 @@ def validate_video_or_raise(
         expected_duration=expected_duration,
         tolerance_sec=tolerance_sec,
         min_size_bytes=min_size_bytes,
+        expected_width=expected_width,
+        expected_height=expected_height,
+        aspect_ratio=aspect_ratio,
     )
     if not is_valid:
         raise OutputValidationError(errors, metadata)

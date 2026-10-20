@@ -114,6 +114,8 @@ class GenerateRequest(BaseModel):
     source_text: Optional[str] = Field(None, description="Raw markdown, code, documentation, or changelog text")
     source_file: Optional[str] = Field(None, description="Path to source documentation file")
     source_url: Optional[str] = Field(None, description="Public documentation or GitHub README URL to ingest")
+    aspect_ratio: Optional[str] = Field("16:9", description="Video aspect ratio: 16:9 widescreen or 9:16 vertical")
+    project: Optional[str] = Field(None, description="Path to project config file")
     sync: bool = Field(False, description="Run synchronously instead of background thread")
 
 
@@ -249,6 +251,29 @@ def get_project_state(run_id: str) -> Dict[str, Any]:
                 "created_at": snap_time,
             })
 
+    # Evidence Pack & Validation Report
+    evidence_pack_file = run_dir / "evidence_pack.json"
+    evidence_pack_payload: Dict[str, Any] = {}
+    evidence_records_by_id: Dict[str, Any] = {}
+    if evidence_pack_file.exists():
+        try:
+            with open(evidence_pack_file, "r", encoding="utf-8") as f:
+                evidence_pack_payload = json.load(f)
+                for r in evidence_pack_payload.get("records", []):
+                    if isinstance(r, dict) and r.get("id"):
+                        evidence_records_by_id[r["id"]] = r
+        except Exception:
+            pass
+
+    validation_report_file = run_dir / "validation_report.json"
+    validation_report: Dict[str, Any] = {}
+    if validation_report_file.exists():
+        try:
+            with open(validation_report_file, "r", encoding="utf-8") as f:
+                validation_report = json.load(f)
+        except Exception:
+            pass
+
     # Resolved Scene Assets
     resolved_scenes: List[Dict[str, Any]] = []
     manifest_scenes = manifest.get("scenes", {})
@@ -305,6 +330,13 @@ def get_project_state(run_id: str) -> Dict[str, Any]:
                     "end": round(float(w.get("end", w_st + 0.3)), 2),
                 })
 
+        ev_ids = sc.get("evidence_ids") or []
+        linked_records = [
+            evidence_records_by_id[eid]
+            for eid in ev_ids
+            if eid in evidence_records_by_id
+        ]
+
         resolved_scenes.append({
             "scene_id": sid,
             "title": sc.get("title", f"Scene {sid}"),
@@ -323,6 +355,8 @@ def get_project_state(run_id: str) -> Dict[str, Any]:
             "has_audio": has_aud,
             "words": sc_words,
             "raw_scene": sc,
+            "evidence_ids": ev_ids,
+            "evidence_records": linked_records,
         })
 
     diagnostics = {
@@ -332,6 +366,8 @@ def get_project_state(run_id: str) -> Dict[str, Any]:
         "snapshots_count": len(snapshots),
         "manim_verified": any(s["has_manim_asset"] for s in resolved_scenes),
         "validation_status": "OK" if master_video_url else "NEEDS_RENDER",
+        "validation_report_status": validation_report.get("passed", False),
+        "claim_coverage_pct": validation_report.get("claim_coverage_pct", 100.0 if not validation_report else 0.0),
     }
 
     return {
@@ -349,6 +385,8 @@ def get_project_state(run_id: str) -> Dict[str, Any]:
         "scenes_resolved": resolved_scenes,
         "diagnostics": diagnostics,
         "source_facts": data_payload.get("source_facts", {}),
+        "evidence_pack": evidence_pack_payload,
+        "validation_report": validation_report,
     }
 
 
@@ -493,6 +531,14 @@ def get_project(run_id: str):
     return get_project_state(run_id)
 
 
+@app.get("/api/runs/{run_id}", summary="Get Full Run State with Evidence Citations")
+def get_run(run_id: str):
+    """
+    Returns full run state including evidence_pack, validation_report, and evidence-linked scenes.
+    """
+    return get_project_state(run_id)
+
+
 def _run_generator_job(job_id: str, run_id: str, req: GenerateRequest):
     """Worker function for async generation."""
     python_exec = ENGINE_DIR / ".venv" / "bin" / "python"
@@ -521,6 +567,10 @@ def _run_generator_job(job_id: str, run_id: str, req: GenerateRequest):
         cmd.extend(["--source-file", req.source_file])
     if req.source_url:
         cmd.extend(["--source-url", req.source_url])
+    if req.aspect_ratio:
+        cmd.extend(["--aspect-ratio", req.aspect_ratio])
+    if req.project:
+        cmd.extend(["--project", req.project])
 
     log_terminal(f"🚀 Starting generation job {job_id} for '{req.topic}' -> {run_id}")
     JOBS[job_id]["status"] = "running"
@@ -801,6 +851,64 @@ def export_project(run_id: str, req: ExportRequest):
         "filename": clean_name,
         "size_bytes": export_path.stat().st_size,
         "exported_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    }
+
+
+# ---------------------------------------------------------------------------
+# GitHub Release Webhook Automation (Rule 5.5)
+# ---------------------------------------------------------------------------
+@app.post("/api/webhooks/github", summary="GitHub Release Webhook Receiver")
+async def github_webhook(payload: Dict[str, Any]):
+    """
+    Ingests GitHub webhook payloads (specifically release events).
+    Extracts repository name, release tag_name, body, and HTML URL,
+    and triggers automated video generation.
+    """
+    action = payload.get("action", "")
+    release = payload.get("release", {})
+    repo = payload.get("repository", {})
+
+    repo_name = repo.get("name", "Product")
+    tag_name = release.get("tag_name", "latest")
+    body = release.get("body", "")
+    html_url = release.get("html_url", "")
+
+    topic = f"{repo_name} {tag_name} Release Overview"
+    job_id = f"gh_{uuid.uuid4().hex[:8]}"
+    run_id = f"run_gh_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+    JOBS[job_id] = {
+        "job_id": job_id,
+        "run_id": run_id,
+        "status": "queued",
+        "topic": topic,
+        "logs": [],
+        "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    }
+
+    req = GenerateRequest(
+        topic=topic,
+        subject="devtools",
+        length=30,
+        source_text=body if body else f"Release {tag_name} for {repo_name}.",
+        source_url=html_url,
+        aspect_ratio="16:9",
+    )
+
+    thread = threading.Thread(
+        target=_run_generator_job,
+        args=(job_id, run_id, req),
+        daemon=True,
+    )
+    thread.start()
+
+    log_terminal(f"🔔 Ingested GitHub Release webhook for {repo_name} {tag_name} -> Job {job_id}")
+    return {
+        "status": "queued",
+        "job_id": job_id,
+        "run_id": run_id,
+        "topic": topic,
+        "action": action,
     }
 
 

@@ -22,7 +22,7 @@ ENGINE_DIR = REPO_DIR / "engine"
 if str(ENGINE_DIR) not in sys.path:
     sys.path.insert(0, str(ENGINE_DIR))
 
-from engine.audio.tts_whisper import generate_voice, extract_word_timings
+from engine.audio.tts_whisper import generate_voice, extract_word_timings, sanitize_spoken_narration, master_audio
 from engine.timeline.beats import align_script_tokens_to_whisper
 
 
@@ -53,7 +53,7 @@ async def synthesize_scene_audio_async(
     narration_text: str,
     scene_dir: Path,
     revision: int = 1,
-    voice_id: str = "en-US-ChristopherNeural",
+    voice_id: str = "en-US-AndrewNeural",
 ) -> Tuple[Path, float, List[Dict[str, Any]]]:
     """
     Synthesizes audio for a single scene and extracts Whisper word timestamps.
@@ -63,11 +63,10 @@ async def synthesize_scene_audio_async(
     scene_dir.mkdir(parents=True, exist_ok=True)
     audio_path = scene_dir / f"audio_v{revision}.mp3"
 
-    text = (narration_text or "").strip()
-    if not text:
-        text = "Next concept."
+    raw_text = (narration_text or "").strip()
+    text = raw_text if raw_text else "Next concept."
 
-    await generate_voice(text, str(audio_path), allow_offline_fallback=True)
+    await generate_voice(text, str(audio_path), voice=voice_id)
 
     dur = get_audio_duration(audio_path)
     if dur <= 0.0:
@@ -97,7 +96,7 @@ def synthesize_scene_audio(
     narration_text: str,
     scene_dir: Path,
     revision: int = 1,
-    voice_id: str = "en-US-ChristopherNeural",
+    voice_id: str = "en-US-AndrewNeural",
 ) -> Tuple[Path, float, List[Dict[str, Any]]]:
     """Synchronous wrapper for synthesize_scene_audio_async."""
     return asyncio.run(
@@ -147,13 +146,15 @@ def concatenate_scene_audios(
         "-safe", "0",
         "-i", str(concat_list_path),
         "-c:a", "libmp3lame",
-        "-ar", "44100",
-        "-q:a", "2",
+        "-ar", "48000",
+        "-ac", "2",
+        "-b:a", "192k",
         str(output_master_audio),
     ]
 
     try:
         subprocess.run(cmd, capture_output=True, check=True)
+        master_audio(output_master_audio)
     finally:
         if concat_list_path.exists():
             concat_list_path.unlink(missing_ok=True)
