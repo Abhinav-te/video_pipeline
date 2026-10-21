@@ -1,30 +1,26 @@
 import React from 'react';
 import { HookScene } from './HookScene';
 import { CodeSpotlightScene } from './CodeSpotlightScene';
-import { WorkflowTraceScene } from './WorkflowTraceScene';
+import { WorkflowStateTransition } from './WorkflowStateTransition';
 import { EvidenceBentoScene } from './EvidenceBentoScene';
 import { TakeawayCTAScene } from './TakeawayCTAScene';
-import { WorkflowStateTransition } from './WorkflowStateTransition';
 import { CodeRevealScene } from './CodeRevealScene';
 import { CodeTransformScene } from './CodeTransformScene';
 import { TerminalScene } from './TerminalScene';
 import { DiagramScene } from './DiagramScene';
-import { BentoGridScene } from './BentoGridScene';
-import { ConceptHeroScene } from './ConceptHeroScene';
+import { ComparisonScene } from './ComparisonScene';
 
 export {
   HookScene,
   CodeSpotlightScene,
-  WorkflowTraceScene,
+  WorkflowStateTransition,
   EvidenceBentoScene,
   TakeawayCTAScene,
-  WorkflowStateTransition,
   CodeRevealScene,
   CodeTransformScene,
   TerminalScene,
   DiagramScene,
-  BentoGridScene,
-  ConceptHeroScene,
+  ComparisonScene,
 };
 
-export default WorkflowTraceScene;
+export default WorkflowStateTransition;

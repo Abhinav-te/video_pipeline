@@ -56,10 +56,6 @@ from engine.renderer.segment_stitcher import (
     render_dirty_segments,
     stitch_segments,
 )
-from engine.renderer.manim_compiler import (
-    resolve_scene_manim_template,
-    render_scene_to_file,
-)
 from engine.validation.output import validate_video_output
 
 
@@ -189,8 +185,16 @@ def execute_revision(
                 })
             else:
                 s_info = manifest["scenes"].get(str(sid), {})
-                rel_audio = s_info.get("audio_file") or f"scenes/{sid}/audio_v1.mp3"
-                s_audio_path = run_dir / rel_audio
+                rel_audio = s_info.get("audio_file")
+                if rel_audio and (run_dir / rel_audio).exists():
+                    s_audio_path = run_dir / rel_audio
+                elif (run_dir / "scenes" / str(sid) / "audio_v1.wav").exists():
+                    s_audio_path = run_dir / "scenes" / str(sid) / "audio_v1.wav"
+                elif (run_dir / "scenes" / str(sid) / "audio_v1.mp3").exists():
+                    s_audio_path = run_dir / "scenes" / str(sid) / "audio_v1.mp3"
+                else:
+                    s_audio_path = run_dir / "scenes" / str(sid) / "audio_v1.wav"
+
                 # If per-scene audio doesn't exist yet, generate it
                 if not s_audio_path.exists():
                     s_text = sc.get("spoken_text") or sc.get("narration") or "Next step."
@@ -219,30 +223,21 @@ def execute_revision(
                     "words": s_words,
                 })
 
-        # Concatenate audio into master audio.mp3
-        master_audio_path = run_dir / "audio.mp3"
+        # Concatenate audio into master audio.wav & audio.mp3
+        master_audio_path = run_dir / "audio.wav"
         updated_scenes_meta, master_words = concatenate_scene_audios(
             scene_items=scene_audio_items,
             output_master_audio=master_audio_path,
         )
 
         # Update scene timings & words in data_payload
+        from engine.timeline.timeline_mapper import chunk_caption_words
         for idx, sc in enumerate(scenes):
             sc["start_time"] = updated_scenes_meta[idx]["start_time"]
             sc["end_time"] = updated_scenes_meta[idx]["end_time"]
             sc["duration"] = updated_scenes_meta[idx]["duration"]
         data_payload["words"] = master_words
-
-        # If target scene has a Manim clip, recompile Manim to match new duration
-        if target_scene.get("manim_asset_url") or target_scene.get("manim_video_src"):
-            out_manim = run_dir / "assets" / f"manim_{target_id}_v{new_rev}.mp4"
-            template, params = resolve_scene_manim_template(target_scene, subject=subject)
-            params["duration"] = new_scene_dur
-            print(f"[REVISE:MANIM] Recompiling Manim for Scene {target_id} ({template}, {new_scene_dur:.2f}s) -> {out_manim.name}", flush=True)
-            ok = render_scene_to_file(template, params, out_manim)
-            if ok:
-                target_scene["manim_asset_url"] = f"runs/{run_id}/assets/{out_manim.name}"
-                target_scene["manim_video_src"] = f"runs/{run_id}/assets/{out_manim.name}"
+        data_payload["caption_chunks"] = chunk_caption_words(master_words)
 
     # =========================================================================
     # MODE A: VISUAL-ONLY REVISION
@@ -255,7 +250,7 @@ def execute_revision(
             print(f"[REVISE:VISUAL] Set visual_type for Scene {target_id}: '{v_type}'", flush=True)
 
             if v_type == "comparison":
-                from engine.timeline.choreographer import COMPARISON_FOOTERS
+                from engine.timeline.timeline_mapper import COMPARISON_FOOTERS
                 domain_footer = COMPARISON_FOOTERS.get(subject, "KEY TAKEAWAY: Evaluating trade-offs across both analytical regimes")
                 target_scene["comparison_footer"] = domain_footer
                 if subject == "math":
@@ -290,22 +285,6 @@ def execute_revision(
                     print(f"[REVISE:VISUAL] Applied visual props JSON to Scene {target_id}: {list(props.keys())}", flush=True)
             except Exception as exc:
                 raise ValueError(f"Failed to parse --set-visual-json: {exc}")
-
-        # Check if new visual type requires Manim
-        v_type = target_scene.get("visual_type") or target_scene.get("scene_type")
-        needs_manim = v_type in ("math_equation", "function_graph", "manim_scene", "quantum_sim", "physics_sim", "electrical_grid", "mechanics_fbd")
-        if needs_manim and subject in ("math", "quantum_physics", "physics", "mechanics", "electrical"):
-            out_manim = run_dir / "assets" / f"manim_{target_id}_v{new_rev}.mp4"
-            template, params = resolve_scene_manim_template(target_scene, subject=subject)
-            print(f"[REVISE:MANIM] Compiling Manim for Scene {target_id} ({template}) -> {out_manim.name}", flush=True)
-            ok = render_scene_to_file(template, params, out_manim)
-            if ok:
-                target_scene["manim_asset_url"] = f"runs/{run_id}/assets/{out_manim.name}"
-                target_scene["manim_video_src"] = f"runs/{run_id}/assets/{out_manim.name}"
-        else:
-            # If changed to non-Manim scene (e.g. comparison or concept), clear Manim video references
-            target_scene.pop("manim_asset_url", None)
-            target_scene.pop("manim_video_src", None)
 
     # Evidence Validation Gate during revision
     ev_pack_path = run_dir / "evidence_pack.json"

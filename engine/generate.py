@@ -32,7 +32,7 @@ from timeline.beats import (
     merge_excess_scenes,
 )
 from timeline.enhancer import enhance_scenes
-from timeline.choreographer import choreograph_scenes
+from timeline.timeline_mapper import choreograph_scenes, map_scene_timeline, chunk_caption_words
 from config.brand_config import load_brand_config
 
 
@@ -800,45 +800,54 @@ def main():
             )
 
         # ---------------------------------------------------------------
-        # Step 2 — Build narration
+        # Step 2 & 3 — Synthesize Per-Scene Audio & Master Concat
         # ---------------------------------------------------------------
 
-        narration = build_spoken_text(script)
-        word_count = len(narration.split())
-        log(f"🗣️ Narration: {word_count} words")
+        scenes_raw = script.get("scenes", [])
+        stage_start("AUDIO", f"Synthesizing per-scene neural audio for {len(scenes_raw)} scenes...")
+        from engine.audio.scene_audio import synthesize_scene_audio_async, concatenate_scene_audios
+        from engine.timeline.timeline_mapper import map_scene_timeline, chunk_caption_words
 
-        # ---------------------------------------------------------------
-        # Step 3 — Edge-TTS
-        # ---------------------------------------------------------------
-
-        asyncio.run(generate_audio(narration, audio_file))
-
-        # ---------------------------------------------------------------
-        # Step 4 — Whisper & Timeline
-        # ---------------------------------------------------------------
-
-        timed_scenes, words = generate_timeline(script, audio_file)
-
-        # ---------------------------------------------------------------
-        # Step 4.5 — Stage 4.5 Headless Manim Pre-Compiler Bridge
-        # ---------------------------------------------------------------
-
-        enable_manim = not getattr(args, "no_manim", False)
-        if args.subject in ("code", "devtools") or script.get("subject") in ("code", "devtools"):
-            enable_manim = False
-        try:
-            try:
-                from engine.renderer.manim_compiler import compile_manim_scenes
-            except ModuleNotFoundError:
-                from renderer.manim_compiler import compile_manim_scenes
-            timed_scenes = compile_manim_scenes(
-                timed_scenes,
-                run_dir=run_dir,
-                enable_manim=enable_manim,
-                max_clips=5,
+        scene_audio_items = []
+        for s_idx, sc in enumerate(scenes_raw):
+            sid = sc.get("scene_id", s_idx + 1)
+            s_text = sc.get("spoken_text") or sc.get("narration") or "Next concept."
+            s_dir = run_dir / "scenes" / str(sid)
+            s_wav, s_dur, s_words = asyncio.run(
+                synthesize_scene_audio_async(
+                    narration_text=s_text,
+                    scene_dir=s_dir,
+                    revision=1,
+                )
             )
-        except Exception as exc:
-            log(f"[MANIM:WARN] Manim compiler encountered an unexpected error: {exc}. Continuing with Remotion SVG fallbacks.")
+            scene_audio_items.append({
+                "scene_id": sid,
+                "audio_path": s_wav,
+                "duration": s_dur,
+                "words": s_words,
+            })
+
+        # Concatenate audio into master audio.wav and audio.mp3
+        master_audio_wav = run_dir / "audio.wav"
+        updated_scenes_meta, master_words = concatenate_scene_audios(
+            scene_items=scene_audio_items,
+            output_master_audio=master_audio_wav,
+        )
+        audio_file = run_dir / "audio.mp3"
+        stage_success("AUDIO", f"Master audio generated: {audio_file.name} ({updated_scenes_meta[-1]['end_time']:.2f}s)")
+
+        # ---------------------------------------------------------------
+        # Step 4 — Deterministic Timeline Mapping & Subtitle Chunking
+        # ---------------------------------------------------------------
+
+        stage_start("TIMELINE", "Mapping scene timeline and chunking subtitles...")
+        timed_scenes, words, caption_chunks = map_scene_timeline(
+            scenes=scenes_raw,
+            scene_audio_results=scene_audio_items,
+            domain=script.get("subject") or script.get("domain") or "code",
+            fps=30,
+        )
+        stage_success("TIMELINE", f"Timeline mapped ({len(timed_scenes)} scenes, {len(words)} words, {len(caption_chunks)} caption chunks)")
 
         # ---------------------------------------------------------------
         # Step 5 — Final JSON Payload & Atomic Write
@@ -855,6 +864,7 @@ def main():
             validation_report=val_report,
             project_profile=project_profile,
         )
+        payload["caption_chunks"] = caption_chunks
 
         write_data_file(payload, data_file)
 
@@ -890,7 +900,8 @@ def main():
             stage_error("TIMELINE", "Final data.json contains no Whisper words.")
 
         expected_audio_rel = f"runs/{run_id}/audio.mp3"
-        if verification_data.get("audio_file") != expected_audio_rel:
+        expected_audio_rel_wav = f"runs/{run_id}/audio.wav"
+        if verification_data.get("audio_file") not in {expected_audio_rel, expected_audio_rel_wav}:
             stage_error(
                 "TIMELINE",
                 f"Final JSON audio_file does not match expected path:\n"

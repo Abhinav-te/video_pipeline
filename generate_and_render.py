@@ -161,6 +161,8 @@ def main():
     render_height = 1920 if is_vertical else 1080
 
     if not topic:
+        if args.topic is not None and not args.topic.strip():
+            stage_error("PIPELINE", "--topic cannot be empty.", exit_code=1)
         stage_error("PIPELINE", "Either --topic or --project is required.", exit_code=1)
 
     run_id = args.run_id or generate_run_id()
@@ -341,7 +343,7 @@ def main():
     # Step 5: Stage 6 - Post-Render Output Validation
     stage_start("OUTPUT_VALIDATION", f"Inspecting rendered video: {out_file_path.name}")
 
-    audio_file_path = run_dir / "audio.mp3"
+    audio_file_path = run_dir / "audio.wav" if (run_dir / "audio.wav").exists() else run_dir / "audio.mp3"
 
     try:
         is_valid, errors, meta = validate_video_output(

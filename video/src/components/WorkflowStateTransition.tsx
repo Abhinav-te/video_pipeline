@@ -1,395 +1,475 @@
 import React from 'react';
-import { useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
-import { SceneBadge } from './SceneBadge';
-import { LayersIcon, SparklesIcon, CheckIcon, WarningIcon, LightningIcon } from './SvgIcons';
+import { useCurrentFrame, useVideoConfig } from 'remotion';
+import { useBrand } from '../context/BrandContext';
+import { LayersIcon } from './SvgIcons';
 
 export interface WorkflowEntity {
   id: string;
   label: string;
   sub_label?: string;
-  status?: string;
 }
 
 export interface WorkflowEvent {
   target: string;
   action: 'start' | 'succeed' | 'saved_state' | 'fail' | 'retry' | 'recover';
   label?: string;
-  time_offset?: number;
+  at_word?: string;
+  timestamp_sec?: number;
+  elapsed?: string | number;
+  evidence_id?: string;
 }
 
 export interface WorkflowStateTransitionProps {
   scene: {
     title?: string;
+    subtitle?: string;
     entities?: WorkflowEntity[];
     events?: WorkflowEvent[];
     start_time?: number;
     end_time?: number;
     badge?: any;
     emphasis_word?: string;
+    proof_card?: {
+      title?: string;
+      body?: string;
+      tag?: string;
+    };
+    callout?: {
+      title?: string;
+      body?: string;
+      tag?: string;
+    };
+    takeaway?: string;
   };
-  words?: any[];
   sceneStartFrame?: number;
-  nextSceneStartTime?: number | null;
+  isWidescreen?: boolean;
 }
 
-/**
- * Universal WorkflowStateTransition Scene Primitive.
- * Animates developer state machine transitions with zero company hardcoding.
- */
 export const WorkflowStateTransition: React.FC<WorkflowStateTransitionProps> = ({
   scene,
   sceneStartFrame = 0,
-  nextSceneStartTime = null,
+  isWidescreen = false,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const brand = useBrand();
 
-  const sceneStart = scene?.start_time || 0;
-  const sceneEnd = nextSceneStartTime || scene?.end_time || (sceneStart + 5);
-  const sceneDurationFrames = Math.max(90, Math.round((sceneEnd - sceneStart) * fps));
+  const entities = scene?.entities || scene?.visual?.entities || [];
+  const events = scene?.events || scene?.visual?.events || [];
+
+  // Strict validation: No built-in fallbacks
+  if (entities.length === 0) {
+    throw new Error(
+      `[WorkflowStateTransition] Validation Error: 'entities' array is required and must not be empty. Scene: "${scene?.title || 'untitled'}"`
+    );
+  }
+  if (events.length === 0) {
+    throw new Error(
+      `[WorkflowStateTransition] Validation Error: 'events' array is required and must not be empty. Scene: "${scene?.title || 'untitled'}"`
+    );
+  }
+
+  const sceneStart = scene.start_time || 0;
   const localFrame = Math.max(0, frame - sceneStartFrame);
+  const localSec = localFrame / fps;
 
-  // Default entities if not provided
-  const rawEntities: WorkflowEntity[] = scene?.entities && scene.entities.length > 0
-    ? scene.entities
-    : [
-        { id: 'op_1', label: "Initial Operation", sub_label: "Operation 1: Primary Execution" },
-        { id: 'op_2', label: "Subsequent Operation", sub_label: "Operation 2: Downstream Verification" },
-      ];
+  // Track runtime state of each entity
+  const stepStates: Record<
+    string,
+    {
+      status: string;
+      badgeText: string;
+      color: string;
+      bgColor: string;
+      borderColor: string;
+      isMemoized: boolean;
+      isRetrying: boolean;
+      progress: number;
+      elapsedBadge?: string;
+    }
+  > = {};
 
-  // Default event sequence demonstrating memoized step recovery
-  const defaultEvents: WorkflowEvent[] = [
-    { target: 'step_1', action: 'start', label: 'Executing Step 1' },
-    { target: 'step_1', action: 'succeed', label: 'RESULT SAVED / MEMOIZED' },
-    { target: 'step_2', action: 'start', label: 'Executing Step 2' },
-    { target: 'step_2', action: 'fail', label: 'FAILED: 503' },
-    { target: 'step_2', action: 'retry', label: 'RETRY #1 — Reusing Step 1 State' },
-    { target: 'step_2', action: 'recover', label: 'RECOVERED' },
-  ];
-
-  const events: WorkflowEvent[] = scene?.events && scene.events.length > 0 ? scene.events : defaultEvents;
-  const numEvents = events.length;
-
-  // Compute active state for each entity based on elapsed localFrame
-  const entityStates: Record<string, {
-    status: string;
-    badgeText: string;
-    label: string;
-    color: string;
-    bgColor: string;
-    borderColor: string;
-    isPulsing: boolean;
-    isMemoized: boolean;
-  }> = {};
-
-  // Initialize
-  rawEntities.forEach((ent) => {
-    entityStates[ent.id] = {
+  entities.forEach((ent) => {
+    stepStates[ent.id] = {
       status: 'idle',
-      badgeText: 'QUEUED',
-      label: 'Waiting in workflow queue',
-      color: '#8b949e',
-      bgColor: 'rgba(22, 27, 34, 0.8)',
+      badgeText: 'PENDING',
+      color: '#64748b',
+      bgColor: 'rgba(255, 255, 255, 0.04)',
       borderColor: 'rgba(255, 255, 255, 0.1)',
-      isPulsing: false,
       isMemoized: false,
+      isRetrying: false,
+      progress: 0,
+      elapsedBadge: undefined,
     };
   });
 
-  // Replay events up to localFrame
-  events.forEach((ev, idx) => {
-    const triggerFrame = Math.floor((idx / numEvents) * sceneDurationFrames);
-    if (localFrame >= triggerFrame) {
-      const targetState = entityStates[ev.target];
-      if (!targetState) return;
+  // Replay events up to localSec strictly based on resolved timestamp_sec
+  events.forEach((ev) => {
+    // Resolved timestamp relative to scene start
+    const triggerSec = ev.timestamp_sec != null
+      ? Math.max(0, ev.timestamp_sec - sceneStart)
+      : 0;
+
+    if (localSec >= triggerSec) {
+      const state = stepStates[ev.target];
+      if (!state) return;
+
+      // Elapsed duration badge strictly if evidence backed
+      if (ev.elapsed != null && ev.evidence_id) {
+        state.elapsedBadge = `${ev.elapsed}`;
+      }
 
       switch (ev.action) {
         case 'start':
-          targetState.status = 'running';
-          targetState.badgeText = 'EXECUTING';
-          targetState.label = ev.label || 'Step execution in progress...';
-          targetState.color = '#58a6ff';
-          targetState.bgColor = 'rgba(88, 166, 255, 0.1)';
-          targetState.borderColor = 'rgba(88, 166, 255, 0.45)';
-          targetState.isPulsing = false;
+          state.status = 'running';
+          state.badgeText = ev.label || 'EXECUTING';
+          state.color = '#38bdf8';
+          state.bgColor = 'rgba(56, 189, 248, 0.12)';
+          state.borderColor = 'rgba(56, 189, 248, 0.4)';
+          state.progress = 60;
           break;
         case 'succeed':
         case 'saved_state':
-          targetState.status = 'succeeded';
-          targetState.badgeText = 'RESULT SAVED / MEMOIZED';
-          targetState.label = ev.label || 'Output saved in workflow state';
-          targetState.color = '#3fb950';
-          targetState.bgColor = 'rgba(63, 185, 80, 0.12)';
-          targetState.borderColor = 'rgba(63, 185, 80, 0.5)';
-          targetState.isPulsing = false;
-          targetState.isMemoized = true;
+          state.status = 'succeeded';
+          state.badgeText = ev.label || 'COMPLETED & MEMOIZED';
+          state.color = '#34d399';
+          state.bgColor = 'rgba(52, 211, 153, 0.14)';
+          state.borderColor = 'rgba(52, 211, 153, 0.5)';
+          state.isMemoized = true;
+          state.progress = 100;
           break;
         case 'fail':
-          targetState.status = 'failed';
-          targetState.badgeText = 'FAILED: 503';
-          targetState.label = ev.label || 'Transient error: HTTP 503 timeout';
-          targetState.color = '#f85149';
-          targetState.bgColor = 'rgba(248, 81, 73, 0.12)';
-          targetState.borderColor = 'rgba(248, 81, 73, 0.55)';
-          targetState.isPulsing = false;
+          state.status = 'failed';
+          state.badgeText = ev.label || 'HTTP ERROR';
+          state.color = '#f87171';
+          state.bgColor = 'rgba(248, 113, 113, 0.16)';
+          state.borderColor = 'rgba(248, 113, 113, 0.55)';
+          state.progress = 40;
           break;
         case 'retry':
-          targetState.status = 'retrying';
-          targetState.badgeText = 'RETRY #1 — Reusing Step 1 State';
-          targetState.label = ev.label || 'Retrying step without re-executing step 1';
-          targetState.color = '#d29922';
-          targetState.bgColor = 'rgba(210, 153, 34, 0.15)';
-          targetState.borderColor = 'rgba(210, 153, 34, 0.65)';
-          targetState.isPulsing = true;
+          state.status = 'retrying';
+          state.badgeText = ev.label || 'RETRYING';
+          state.color = '#fbbf24';
+          state.bgColor = 'rgba(251, 191, 36, 0.16)';
+          state.borderColor = 'rgba(251, 191, 36, 0.6)';
+          state.isRetrying = true;
+          state.progress = 75;
           break;
         case 'recover':
-          targetState.status = 'recovered';
-          targetState.badgeText = 'RECOVERED';
-          targetState.label = ev.label || 'Step executed successfully';
-          targetState.color = '#3fb950';
-          targetState.bgColor = 'rgba(63, 185, 80, 0.16)';
-          targetState.borderColor = 'rgba(63, 185, 80, 0.6)';
-          targetState.isPulsing = false;
+          state.status = 'recovered';
+          state.badgeText = ev.label || 'RECOVERED';
+          state.color = '#34d399';
+          state.bgColor = 'rgba(52, 211, 153, 0.16)';
+          state.borderColor = 'rgba(52, 211, 153, 0.6)';
+          state.progress = 100;
           break;
       }
     }
   });
 
-  // Pulse animation for retry
-  const pulseOpacity = interpolate(
-    Math.sin((localFrame / 10) * Math.PI),
-    [-1, 1],
-    [0.4, 0.95]
-  );
+  const proof = scene.proof_card || scene.callout || (scene.takeaway ? { title: scene.takeaway } : null);
+  const showProofColumn = isWidescreen && Boolean(proof);
 
   return (
     <div
       style={{
-        backgroundColor: '#0d1117',
-        borderRadius: '28px',
-        border: '1.5px solid rgba(88, 166, 255, 0.3)',
-        boxShadow: '0 32px 64px -16px rgba(0, 0, 0, 0.95), 0 0 32px rgba(88, 166, 255, 0.1)',
-        width: '960px',
-        height: 'fit-content',
-        maxHeight: '1380px',
-        overflow: 'hidden',
-        boxSizing: 'border-box',
-        padding: '36px 36px',
+        width: '100%',
+        height: '100%',
         display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'flex-start',
-        gap: '24px',
-        margin: 'auto 0',
+        flexDirection: isWidescreen ? 'row' : 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: isWidescreen ? '36px' : '24px',
+        padding: isWidescreen ? '20px 40px' : '16px 8px',
+        boxSizing: 'border-box',
+        fontFamily: brand?.font_sans || 'Inter, system-ui, sans-serif',
       }}
     >
-      {/* 1. EDITORIAL HEADER */}
+      {/* Main Execution Waterfall Stage */}
       <div
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          borderBottom: '1.5px solid rgba(255, 255, 255, 0.08)',
-          paddingBottom: '20px',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <LayersIcon size={30} color="#58a6ff" />
-          <span
-            style={{
-              fontSize: '28px',
-              fontWeight: 800,
-              color: '#f0f6fc',
-              fontFamily: "'Inter', sans-serif",
-              letterSpacing: '-0.5px',
-            }}
-          >
-            {scene.title || 'Durable State Machine'}
-          </span>
-        </div>
-        <SceneBadge badge={scene.badge} defaultText="DURABLE FLOW" />
-      </div>
-
-      {/* 2. SEQUENTIAL WORKFLOW ENTITIES */}
-      <div
-        style={{
+          flex: showProofColumn ? '0 0 68%' : '1 1 auto',
+          maxWidth: showProofColumn ? '1140px' : (isWidescreen ? '1400px' : '960px'),
+          width: '100%',
+          backgroundColor: brand?.bg_surface || '#0c0e17',
+          borderRadius: '24px',
+          border: `1.5px solid ${brand?.primary_color ? `${brand.primary_color}55` : 'rgba(99, 102, 241, 0.35)'}`,
+          boxShadow: '0 32px 64px -16px rgba(0, 0, 0, 0.95)',
+          padding: isWidescreen ? '28px 32px' : '24px 20px',
+          boxSizing: 'border-box',
           display: 'flex',
           flexDirection: 'column',
-          alignItems: 'center',
-          gap: '16px',
+          gap: '24px',
+          backdropFilter: 'blur(16px)',
         }}
       >
-        {rawEntities.map((entity, index) => {
-          const state = entityStates[entity.id] || {
-            badgeText: 'PENDING',
-            color: '#8b949e',
-            bgColor: '#161b22',
-            borderColor: 'rgba(255, 255, 255, 0.1)',
-            label: '',
-            isPulsing: false,
-            isMemoized: false,
-          };
+        {/* Waterfall Header: strictly from scene.title & optional scene.subtitle */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+            paddingBottom: '16px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                backgroundColor: 'rgba(99, 102, 241, 0.15)',
+                border: '1px solid #6366F1',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <LayersIcon size={18} color="#818cf8" />
+            </div>
+            <div>
+              <div style={{ fontSize: '18px', fontWeight: 800, color: '#f8fafc' }}>
+                {scene.title || 'Workflow Execution Trace'}
+              </div>
+              {scene.subtitle && (
+                <div style={{ fontSize: '12px', color: '#94a3b8', fontFamily: brand?.font_mono || 'monospace' }}>
+                  {scene.subtitle}
+                </div>
+              )}
+            </div>
+          </div>
 
-          const cardBorder = state.isPulsing
-            ? `2px solid rgba(210, 153, 34, ${pulseOpacity})`
-            : `1.5px solid ${state.borderColor}`;
+          <div
+            style={{
+              padding: '6px 14px',
+              borderRadius: '999px',
+              backgroundColor: 'rgba(52, 211, 153, 0.12)',
+              border: '1px solid rgba(52, 211, 153, 0.3)',
+              color: '#34d399',
+              fontSize: '12px',
+              fontWeight: 800,
+              fontFamily: brand?.font_mono || 'monospace',
+              letterSpacing: '0.05em',
+            }}
+          >
+            ACTIVE RUNTIME TRACE
+          </div>
+        </div>
 
-          const cardShadow = state.isPulsing
-            ? `0 0 24px rgba(210, 153, 34, ${pulseOpacity * 0.5})`
-            : '0 8px 24px rgba(0, 0, 0, 0.5)';
+        {/* Steps Waterfall List */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          {entities.map((ent, idx) => {
+            const st = stepStates[ent.id];
+            const isFirst = idx === 0;
 
-          return (
-            <React.Fragment key={entity.id}>
-              {/* Connector Arrow between steps */}
-              {index > 0 && (() => {
-                const prevEntity = rawEntities[index - 1];
-                const prevMemoized = prevEntity ? entityStates[prevEntity.id]?.isMemoized : false;
-                return (
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: '4px',
-                      margin: '-4px 0',
-                    }}
-                  >
-                    <svg width="24" height="38" viewBox="0 0 24 38" fill="none">
-                      <line
-                        x1="12"
-                        y1="0"
-                        x2="12"
-                        y2="26"
-                        stroke={prevMemoized ? '#3fb950' : '#58a6ff'}
-                        strokeWidth="3.5"
-                        strokeDasharray={prevMemoized ? 'none' : '4 3'}
-                      />
-                      <polygon
-                        points="6,24 12,36 18,24"
-                        fill={prevMemoized ? '#3fb950' : '#58a6ff'}
-                      />
-                    </svg>
-                    {prevMemoized && (
-                      <span
-                        style={{
-                          fontSize: '13px',
-                          fontWeight: 700,
-                          color: '#3fb950',
-                          fontFamily: 'monospace',
-                          letterSpacing: '1px',
-                          backgroundColor: 'rgba(63, 185, 80, 0.1)',
-                          padding: '2px 10px',
-                          borderRadius: '10px',
-                          border: '1px solid rgba(63, 185, 80, 0.3)',
-                        }}
-                      >
-                        CACHED STATE REUSED
-                      </span>
-                    )}
-                  </div>
-                );
-              })()}
-
-              {/* Entity Step Card */}
+            return (
               <div
+                key={ent.id}
                 style={{
-                  width: '100%',
-                  backgroundColor: state.bgColor,
-                  border: cardBorder,
-                  borderRadius: '20px',
-                  padding: '22px 26px',
-                  boxShadow: cardShadow,
+                  backgroundColor: 'rgba(17, 19, 28, 0.8)',
+                  borderRadius: '16px',
+                  border: `1.5px solid ${st.borderColor}`,
+                  padding: '18px 20px',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '12px',
-                  boxSizing: 'border-box',
+                  boxShadow: `0 8px 24px rgba(0, 0, 0, 0.5), 0 0 16px ${st.bgColor}`,
                   transition: 'all 0.2s ease',
                 }}
               >
+                {/* Step Title & Status Badge */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span
-                      style={{
-                        fontFamily: 'monospace',
-                        fontSize: '22px',
-                        fontWeight: 800,
-                        color: '#f0f6fc',
-                      }}
-                    >
-                      {entity.label}
-                    </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    {isFirst && st.isMemoized ? (
+                      <div
+                        style={{
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '8px',
+                          backgroundColor: 'rgba(52, 211, 153, 0.2)',
+                          border: '1px solid #34d399',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '14px',
+                        }}
+                      >
+                        🔒
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '8px',
+                          backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          color: '#94a3b8',
+                          fontFamily: brand?.font_mono || 'monospace',
+                        }}
+                      >
+                        0{idx + 1}
+                      </div>
+                    )}
+
+                    <div>
+                      <div
+                        style={{
+                          fontFamily: brand?.font_mono || 'monospace',
+                          fontSize: '15px',
+                          fontWeight: 700,
+                          color: '#f1f5f9',
+                        }}
+                      >
+                        {ent.label}
+                      </div>
+                      {ent.sub_label && (
+                        <div style={{ fontSize: '12px', color: '#94a3b8' }}>
+                          {ent.sub_label}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Dynamic Status Pill */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      backgroundColor: 'rgba(0, 0, 0, 0.45)',
-                      border: `1.5px solid ${state.color}`,
-                      borderRadius: '100px',
-                      padding: '6px 14px',
-                    }}
-                  >
-                    {state.status === 'succeeded' || state.status === 'recovered' ? (
-                      <CheckIcon size={16} color={state.color} />
-                    ) : state.status === 'failed' ? (
-                      <WarningIcon size={16} color={state.color} />
-                    ) : (
-                      <LightningIcon size={16} color={state.color} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {/* Duration / elapsed badge strictly if provided & cited */}
+                    {st.elapsedBadge && (
+                      <div
+                        style={{
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                          color: '#94a3b8',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          fontFamily: brand?.font_mono || 'monospace',
+                        }}
+                      >
+                        {st.elapsedBadge}
+                      </div>
                     )}
-                    <span
+
+                    {/* Live Status Badge */}
+                    <div
                       style={{
-                        fontSize: '14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        backgroundColor: st.bgColor,
+                        border: `1px solid ${st.borderColor}`,
+                        color: st.color,
+                        fontSize: '12px',
                         fontWeight: 800,
-                        color: state.color,
-                        fontFamily: 'monospace',
-                        letterSpacing: '0.8px',
+                        fontFamily: brand?.font_mono || 'monospace',
+                        textTransform: 'uppercase',
                       }}
                     >
-                      {state.badgeText}
-                    </span>
+                      {st.isMemoized && '🔒 '}
+                      {st.badgeText}
+                    </div>
                   </div>
                 </div>
 
+                {/* Live Execution Timeline Span Bar */}
                 <div
                   style={{
-                    fontSize: '16px',
-                    color: '#c9d1d9',
-                    fontFamily: "'Inter', sans-serif",
-                    lineHeight: 1.4,
+                    width: '100%',
+                    height: '10px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                    borderRadius: '999px',
+                    overflow: 'hidden',
+                    position: 'relative',
                   }}
                 >
-                  {state.label}
-                </div>
-
-                {state.isMemoized && (
                   <div
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      backgroundColor: 'rgba(63, 185, 80, 0.15)',
-                      border: '1px solid rgba(63, 185, 80, 0.35)',
-                      borderRadius: '10px',
-                      padding: '8px 14px',
-                      fontSize: '14px',
-                      color: '#86efac',
-                      fontFamily: 'monospace',
+                      position: 'absolute',
+                      top: 0,
+                      left: isFirst ? '0%' : '20%',
+                      width: `${st.progress * (isFirst ? 0.35 : 0.65)}%`,
+                      height: '100%',
+                      backgroundColor: st.color,
+                      borderRadius: '999px',
+                      boxShadow: `0 0 12px ${st.color}`,
+                      transition: 'width 0.3s ease',
                     }}
-                  >
-                    <SparklesIcon size={16} color="#3fb950" />
-                    <span>{(entity as any).memoized_detail || 'Cached Result: Output serialized & saved • 0 redundant operations'}</span>
-                  </div>
-                )}
+                  />
+                </div>
               </div>
-            </React.Fragment>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
+
+      {/* Right Column (Widescreen) or Bottom Proof Card (Only if proof prop provided) */}
+      {proof && (
+        <div
+          style={{
+            flex: isWidescreen ? '0 0 28%' : 'none',
+            width: isWidescreen ? 'auto' : '100%',
+            maxWidth: isWidescreen ? '400px' : '960px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: 'rgba(17, 19, 28, 0.9)',
+              borderRadius: '20px',
+              border: '1.5px solid rgba(52, 211, 153, 0.4)',
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.8), 0 0 24px rgba(52, 211, 153, 0.15)',
+              padding: '24px 24px',
+              backdropFilter: 'blur(16px)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+              <span style={{ fontSize: '20px' }}>🔒</span>
+              <span
+                style={{
+                  fontSize: '13px',
+                  fontWeight: 800,
+                  color: '#34d399',
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  fontFamily: brand?.font_mono || 'monospace',
+                }}
+              >
+                {proof.tag || 'VERIFIED GUARANTEE'}
+              </span>
+            </div>
+
+            {proof.title && (
+              <div
+                style={{
+                  fontSize: isWidescreen ? '18px' : '20px',
+                  fontWeight: 700,
+                  color: '#ffffff',
+                  lineHeight: 1.35,
+                  marginBottom: '12px',
+                }}
+              >
+                {proof.title}
+              </div>
+            )}
+
+            {proof.body && (
+              <div style={{ fontSize: '13px', color: '#94a3b8', lineHeight: 1.5 }}>
+                {proof.body}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 export default WorkflowStateTransition;
-

@@ -1,26 +1,25 @@
-from .beats import (
-    align_timeline,
-    MIN_SCENE_DURATION,
-    align_script_tokens_to_whisper,
-    enforce_minimum_scene_durations,
-    calculate_target_scenes,
-    merge_excess_scenes,
+"""
+engine/timeline/__init__.py
+
+Timeline Mapping, Subtitle Chunking & Audio Synchronization.
+"""
+
+from .timeline_mapper import (
+    map_scene_timeline,
+    chunk_caption_words,
+    resolve_word_timestamp,
+    choreograph_scenes,
+    THEME_PALETTES,
+    COMPARISON_FOOTERS,
+    resolve_domain,
 )
-from .enhancer import classify_scene, enhance_scenes, SEMANTIC_BADGES
-from .choreographer import choreograph_scenes, THEME_PALETTES, resolve_domain
 
 __all__ = [
-    "align_timeline",
-    "MIN_SCENE_DURATION",
-    "align_script_tokens_to_whisper",
-    "enforce_minimum_scene_durations",
-    "calculate_target_scenes",
-    "merge_excess_scenes",
-    "classify_scene",
-    "enhance_scenes",
-    "SEMANTIC_BADGES",
+    "map_scene_timeline",
+    "chunk_caption_words",
+    "resolve_word_timestamp",
     "choreograph_scenes",
     "THEME_PALETTES",
+    "COMPARISON_FOOTERS",
     "resolve_domain",
 ]
-

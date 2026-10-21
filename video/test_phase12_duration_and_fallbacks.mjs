@@ -98,16 +98,16 @@ assert(
 );
 
 // ==========================================
-// 4. Data-driven choreographer verification
+// 4. Data-driven timeline_mapper verification
 // ==========================================
-const choreoPath = path.join(__dirname, '../engine/timeline/choreographer.py');
-assert(fs.existsSync(choreoPath), 'choreographer.py exists in engine/timeline/');
-const choreoContent = fs.readFileSync(choreoPath, 'utf8');
+const mapperPath = path.join(__dirname, '../engine/timeline/timeline_mapper.py');
+assert(fs.existsSync(mapperPath), 'timeline_mapper.py exists in engine/timeline/');
+const mapperContent = fs.readFileSync(mapperPath, 'utf8');
 
 assert(
-  choreoContent.includes('synthesize_domain_bento_data') &&
-  choreoContent.includes('synthesize_domain_graph_data'),
-  'choreographer.py defines synthesize_domain_bento_data and synthesize_domain_graph_data'
+  mapperContent.includes('map_scene_timeline') &&
+  mapperContent.includes('chunk_caption_words'),
+  'timeline_mapper.py defines map_scene_timeline and chunk_caption_words'
 );
 
 if (failed) {

@@ -1,11 +1,13 @@
 """
 engine/audio/scene_audio.py
 
-Per-Scene Audio Synthesis & Master Audio Recomposition (Checkpoint 02).
-- Isolated scene audio synthesis: scenes/<scene_id>/audio_v<N>.mp3
-- Whisper word timestamps per scene: (0.0s to scene_duration)
-- Fast deterministic concatenation into master audio.mp3
-- Accurate cumulative scene offset and global word timestamp calculation.
+Per-Scene Audio Synthesis & Master Audio Recomposition.
+- Isolated scene audio synthesis: scenes/<scene_id>/audio_v<N>.wav (uncompressed PCM WAV, 48000Hz)
+- Native Edge-TTS WordBoundary events with spoken-to-display code mapping
+- Deterministic atrim (end=last_word_end + 0.15) + apad (pad_dur=0.25)
+- Lossless PCM concatenation into master audio.wav & audio.mp3
+- Single master loudnorm pass (I=-16, TP=-1.5, LRA=11)
+- Microsecond-exact cumulative scene offsets and global word timestamps
 """
 
 import asyncio
@@ -15,6 +17,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import wave
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 REPO_DIR = Path(__file__).resolve().parent.parent.parent
@@ -22,31 +25,26 @@ ENGINE_DIR = REPO_DIR / "engine"
 if str(ENGINE_DIR) not in sys.path:
     sys.path.insert(0, str(ENGINE_DIR))
 
-from engine.audio.tts_whisper import generate_voice, extract_word_timings, sanitize_spoken_narration, master_audio
-from engine.timeline.beats import align_script_tokens_to_whisper
+from engine.audio.tts_whisper import (
+    synthesize_voice_with_boundaries,
+    get_audio_duration_seconds,
+)
 
 
 def get_audio_duration(audio_path: Union[str, Path]) -> float:
-    """Returns duration of an audio file in seconds via ffprobe."""
-    cmd = [
-        "ffprobe",
-        "-v", "error",
-        "-show_entries", "format=duration:stream=duration",
-        "-of", "json",
-        str(audio_path),
-    ]
-    try:
-        res = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        meta = json.loads(res.stdout)
-        dur = meta.get("format", {}).get("duration")
-        if dur:
-            return float(dur)
-        streams = meta.get("streams", [])
-        if streams and streams[0].get("duration"):
-            return float(streams[0]["duration"])
+    """Returns exact duration of an audio file in seconds via wave header or ffprobe."""
+    path = Path(audio_path)
+    if not path.exists():
         return 0.0
-    except Exception:
-        return 0.0
+
+    if path.suffix.lower() == ".wav":
+        try:
+            with wave.open(str(path), "rb") as wf:
+                return round(wf.getnframes() / float(wf.getframerate()), 4)
+        except Exception:
+            pass
+
+    return get_audio_duration_seconds(path)
 
 
 async def synthesize_scene_audio_async(
@@ -56,40 +54,50 @@ async def synthesize_scene_audio_async(
     voice_id: str = "en-US-AndrewNeural",
 ) -> Tuple[Path, float, List[Dict[str, Any]]]:
     """
-    Synthesizes audio for a single scene and extracts Whisper word timestamps.
-    Returns (audio_path, duration, words_relative_to_0).
+    Synthesizes audio for a single scene using native Edge-TTS WordBoundary events.
+    Trims silence deterministically using atrim/apad and converts to uncompressed PCM WAV:
+      scenes/<scene_id>/audio_v<N>.wav
+    NO per-scene loudnorm is applied to prevent duration drift.
+    Returns (audio_wav_path, duration, words_relative_to_0).
     """
     scene_dir = Path(scene_dir)
     scene_dir.mkdir(parents=True, exist_ok=True)
-    audio_path = scene_dir / f"audio_v{revision}.mp3"
+    audio_wav_path = scene_dir / f"audio_v{revision}.wav"
 
     raw_text = (narration_text or "").strip()
     text = raw_text if raw_text else "Next concept."
 
-    await generate_voice(text, str(audio_path), voice=voice_id)
+    audio_bytes, words = await synthesize_voice_with_boundaries(text, voice=voice_id)
 
-    dur = get_audio_duration(audio_path)
-    if dur <= 0.0:
-        dur = max(2.5, len(text.split()) * 0.35)
+    temp_mp3 = scene_dir / f"raw_audio_v{revision}.tmp.mp3"
+    with open(temp_mp3, "wb") as f:
+        f.write(audio_bytes)
 
-    words: List[Dict[str, Any]] = []
     try:
-        raw_words = extract_word_timings(str(audio_path))
-        words = align_script_tokens_to_whisper(text, raw_words)
-    except Exception as exc:
-        print(f"[AUDIO:WARN] Scene Whisper extraction fallback: {exc}", file=sys.stderr)
-        # Synthetic evenly distributed timestamps fallback
-        tokens = text.split()
-        if tokens:
-            step = dur / len(tokens)
-            for idx, tok in enumerate(tokens):
-                words.append({
-                    "word": tok,
-                    "start": round(idx * step, 3),
-                    "end": round((idx + 1) * step, 3),
-                })
+        last_word_end = words[-1]["end"] if words else 1.0
+        trim_end = last_word_end + 0.15
 
-    return audio_path, dur, words
+        # Deterministic atrim + apad on Uncompressed PCM WAV (NO silenceremove)
+        # Leaving leading ~40ms untouched so t=0 matches edge-tts word offsets
+        cmd = [
+            "ffmpeg", "-y",
+            "-i", str(temp_mp3),
+            "-af", f"atrim=end={trim_end:.4f},asetpts=PTS-STARTPTS,apad=pad_dur=0.25",
+            "-c:a", "pcm_s16le",
+            "-ar", "48000",
+            "-ac", "2",
+            str(audio_wav_path),
+        ]
+        subprocess.run(cmd, capture_output=True, check=True)
+    finally:
+        if temp_mp3.exists():
+            temp_mp3.unlink(missing_ok=True)
+
+    # Measure exact duration from WAV header
+    with wave.open(str(audio_wav_path), "rb") as wf:
+        dur = round(wf.getnframes() / float(wf.getframerate()), 4)
+
+    return audio_wav_path, dur, words
 
 
 def synthesize_scene_audio(
@@ -112,19 +120,13 @@ def synthesize_scene_audio(
 def concatenate_scene_audios(
     scene_items: List[Dict[str, Any]],
     output_master_audio: Path,
-    min_scene_duration: float = 2.5,
+    tolerance_sec: float = 0.05,
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """
-    Concatenates per-scene audio files into master audio.mp3 using FFmpeg concat.
-    Computes cumulative scene start/end offsets and global word timestamps.
-
-    scene_items: list of dicts with:
-      - scene_id: int
-      - audio_path: Path
-      - duration: float (optional, will probe if omitted)
-      - words: list of word dicts (relative to 0.0)
-
-    Returns (updated_scenes_meta, master_words).
+    Concatenates per-scene PCM WAV files into master audio using FFmpeg concat.
+    Applies single master loudnorm pass (loudnorm=I=-16:TP=-1.5:LRA=11).
+    Asserts abs(sum(scene_wav_durations) - master_audio_duration) <= 0.05.
+    Computes exact cumulative scene start/end offsets and global word timestamps.
     """
     output_master_audio = Path(output_master_audio).resolve()
     output_master_audio.parent.mkdir(parents=True, exist_ok=True)
@@ -132,47 +134,90 @@ def concatenate_scene_audios(
     if not scene_items:
         raise ValueError("Cannot concatenate empty scene audio list.")
 
-    # Write concat demuxer list
+    # Concat demuxer list
     with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False, encoding="utf-8") as f:
         for item in scene_items:
             p = Path(item["audio_path"]).resolve()
             f.write(f"file '{p.as_posix()}'\n")
         concat_list_path = Path(f.name)
 
-    cmd = [
-        "ffmpeg",
-        "-y",
-        "-f", "concat",
-        "-safe", "0",
-        "-i", str(concat_list_path),
-        "-c:a", "libmp3lame",
-        "-ar", "48000",
-        "-ac", "2",
-        "-b:a", "192k",
-        str(output_master_audio),
-    ]
-
+    temp_master_wav = output_master_audio.with_suffix(".concat_tmp.wav")
     try:
-        subprocess.run(cmd, capture_output=True, check=True)
-        master_audio(output_master_audio)
+        # Step 1: Lossless concat of PCM WAVs
+        cmd_concat = [
+            "ffmpeg", "-y",
+            "-f", "concat",
+            "-safe", "0",
+            "-i", str(concat_list_path),
+            "-c:a", "pcm_s16le",
+            "-ar", "48000",
+            "-ac", "2",
+            str(temp_master_wav),
+        ]
+        subprocess.run(cmd_concat, capture_output=True, check=True)
+
+        # Step 2: Single master loudnorm pass on the whole video audio
+        is_mp3 = output_master_audio.suffix.lower() == ".mp3"
+        target_wav = output_master_audio if not is_mp3 else output_master_audio.with_suffix(".wav")
+
+        cmd_master = [
+            "ffmpeg", "-y",
+            "-i", str(temp_master_wav),
+            "-af", "highpass=f=80,loudnorm=I=-16:TP=-1.5:LRA=11",
+            "-c:a", "pcm_s16le",
+            "-ar", "48000",
+            "-ac", "2",
+            str(target_wav),
+        ]
+        subprocess.run(cmd_master, capture_output=True, check=True)
+
+        # Also write parallel .mp3 version if target is .wav or vice versa
+        if is_mp3:
+            cmd_mp3 = [
+                "ffmpeg", "-y",
+                "-i", str(target_wav),
+                "-c:a", "libmp3lame",
+                "-b:a", "192k",
+                "-ar", "48000",
+                "-ac", "2",
+                str(output_master_audio),
+            ]
+            subprocess.run(cmd_mp3, capture_output=True, check=True)
+        else:
+            mp3_path = output_master_audio.with_suffix(".mp3")
+            cmd_mp3 = [
+                "ffmpeg", "-y",
+                "-i", str(target_wav),
+                "-c:a", "libmp3lame",
+                "-b:a", "192k",
+                "-ar", "48000",
+                "-ac", "2",
+                str(mp3_path),
+            ]
+            subprocess.run(cmd_mp3, capture_output=True, check=True)
     finally:
         if concat_list_path.exists():
             concat_list_path.unlink(missing_ok=True)
+        if temp_master_wav.exists():
+            temp_master_wav.unlink(missing_ok=True)
 
-    # Compute deterministic cumulative offsets
+    # Duration assertion against lossless WAV
+    sum_scene_durations = sum(float(item["duration"]) for item in scene_items)
+    master_wav_for_check = output_master_audio if output_master_audio.suffix.lower() == ".wav" else output_master_audio.with_suffix(".wav")
+    master_dur = get_audio_duration(master_wav_for_check)
+    drift = abs(sum_scene_durations - master_dur)
+    print(f"[AUDIO:CONCAT] 🎚️ Master audio rendered. Sum={sum_scene_durations:.4f}s, Master={master_dur:.4f}s, Drift={drift:.6f}s", flush=True)
+    assert drift <= tolerance_sec, f"Audio drift exceeded {tolerance_sec}s: sum={sum_scene_durations:.4f}s vs master={master_dur:.4f}s"
+
+    # Compute exact cumulative offsets (no clamping)
     current_time = 0.0
     master_words: List[Dict[str, Any]] = []
     updated_scenes: List[Dict[str, Any]] = []
 
-    master_dur = get_audio_duration(output_master_audio)
-
     for idx, item in enumerate(scene_items):
         scene_id = item["scene_id"]
         a_path = Path(item["audio_path"])
-        dur = float(item.get("duration", 0.0))
-        if dur <= 0.0:
-            dur = get_audio_duration(a_path)
-        dur = max(min_scene_duration, dur)
+        dur = float(item["duration"])
 
         start_time = round(current_time, 3)
         end_time = round(start_time + dur, 3)
@@ -194,16 +239,6 @@ def concatenate_scene_audios(
             "duration": dur,
             "audio_file": str(a_path),
         })
-
         current_time = end_time
 
-    # Mandatory Tail Padding: Ensure total video duration includes >= +0.4s past master audio
-    if updated_scenes:
-        total_vid = updated_scenes[-1]["end_time"]
-        if total_vid < master_dur + 0.4:
-            deficit = round((master_dur + 0.4) - total_vid, 3)
-            updated_scenes[-1]["duration"] = round(updated_scenes[-1]["duration"] + deficit, 3)
-            updated_scenes[-1]["end_time"] = round(updated_scenes[-1]["start_time"] + updated_scenes[-1]["duration"], 3)
-
     return updated_scenes, master_words
-

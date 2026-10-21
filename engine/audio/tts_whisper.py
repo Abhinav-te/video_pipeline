@@ -19,77 +19,150 @@ _whisper_model = None
 _whisper_device = None
 
 
+PHONETIC_RULES = [
+    # 0. Strict Phonetic Spoken Code Normalization (Applies ONLY to TTS synthesis audio)
+    (r"\bstep\.run\(\)", "step dot run"),
+    (r"\bstep\.run\b", "step dot run"),
+    (r"\binngest\.createFunction\(\)", "inngest create function"),
+    (r"\binngest\.createFunction\b", "inngest create function"),
+    # 1. Clean legacy phonetic mispronunciations
+    (r"\bat\s+([a-zA-Z0-9_-]+)\s+slash\s+([a-zA-Z0-9_-]+)\s+at\s+latest\b", r"the latest \1 \2 package"),
+    (r"\bat\s+([a-zA-Z0-9_-]+)\s+slash\s+([a-zA-Z0-9_-]+)\b", r"the \1 \2 package"),
+    # 2. Package scoped syntax
+    (r"@([a-zA-Z0-9_-]+)/([a-zA-Z0-9_-]+)@(?:latest|[0-9a-zA-Z_.-]+)", r"the latest \1 \2 package"),
+    (r"@([a-zA-Z0-9_-]+)/([a-zA-Z0-9_-]+)", r"the \1 \2 package"),
+    # 3. CLI flags
+    (r"--([a-zA-Z0-9]+)-([a-zA-Z0-9]+)", r"\1 \2"),
+    (r"--([a-zA-Z0-9]+)", r"\1"),
+    # 4. HTTP Endpoints
+    (r"\b(GET|POST|PUT|DELETE|PATCH)\s+/v[0-9]/", r"\1 "),
+    (r"/([a-zA-Z0-9_-]+)", r" \1"),
+    # 5. Algorithmic Complexity notation
+    (r"\bO\(1\)\b", "O of one"),
+    (r"\bO\(n\s*log\s*n\)\b", "O of n log n"),
+    (r"\bO\(n\^2\)\b|\bO\(n²\)\b", "O of n squared"),
+    (r"\bO\(n\)\b", "O of n"),
+    (r"\bO\(N\)\b", "O of N"),
+    # 6. Version notation
+    (r"\bv1\.0\b|\bv1\b", "version one"),
+    (r"\bv2\.0\b|\bv2\b", "version two"),
+]
+
+
+def prepare_tts_text_with_token_map(display_text: str) -> Tuple[str, List[Dict[str, Any]]]:
+    """
+    Parses display_text into tokens while tracking multi-word spoken replacements.
+    Returns (spoken_text, mappings) where mappings is a list of:
+      {"display_word": str, "spoken_words": [str, ...]}
+    """
+    if not display_text:
+        return "", []
+
+    tokens = display_text.strip().split()
+    mappings: List[Dict[str, Any]] = []
+    spoken_token_list: List[str] = []
+
+    for raw_tok in tokens:
+        # Keep clean display token (strip backticks but keep sentence punctuation)
+        disp_tok = raw_tok.replace("`", "")
+
+        spoken_tok = disp_tok
+        for pat, repl in PHONETIC_RULES:
+            if re.search(pat, spoken_tok, flags=re.IGNORECASE):
+                spoken_tok = re.sub(pat, repl, spoken_tok, flags=re.IGNORECASE)
+                break
+
+        # Sub-spoken words for matching edge-tts WordBoundary text
+        sub_spoken_words: List[str] = []
+        for w in spoken_tok.split():
+            clean_w = re.sub(r"^[^\w]+|[^\w]+$", "", w)
+            if clean_w:
+                sub_spoken_words.append(clean_w)
+
+        if not sub_spoken_words:
+            clean_disp = re.sub(r"^[^\w]+|[^\w]+$", "", disp_tok)
+            if clean_disp:
+                sub_spoken_words = [clean_disp]
+
+        mappings.append({
+            "display_word": disp_tok,
+            "spoken_words": sub_spoken_words,
+        })
+        spoken_token_list.append(spoken_tok)
+
+    spoken_text = " ".join(spoken_token_list)
+    return spoken_text, mappings
+
+
+def collapse_spoken_word_boundaries(
+    word_events: List[Dict[str, Any]],
+    mappings: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """
+    Given raw edge-tts WordBoundary events and token mappings,
+    collapses multi-word spoken sequences back into single display tokens.
+    """
+    if not word_events or not mappings:
+        return word_events
+
+    collapsed: List[Dict[str, Any]] = []
+    w_idx = 0
+    n_events = len(word_events)
+
+    for item in mappings:
+        disp = item["display_word"]
+        spk_words = item["spoken_words"]
+
+        if not spk_words:
+            continue
+
+        if w_idx >= n_events:
+            last_end = collapsed[-1]["end"] if collapsed else 0.0
+            collapsed.append({"word": disp, "start": last_end, "end": round(last_end + 0.2, 3)})
+            continue
+
+        first_event = word_events[w_idx]
+        start_time = float(first_event["start"])
+        end_time = float(first_event["end"])
+
+        for _ in spk_words:
+            if w_idx < n_events:
+                ev = word_events[w_idx]
+                end_time = max(end_time, float(ev["end"]))
+                w_idx += 1
+            else:
+                break
+
+        collapsed.append({
+            "word": disp,
+            "start": round(start_time, 3),
+            "end": round(end_time, 3),
+        })
+
+    # If any trailing events remain
+    while w_idx < n_events:
+        ev = word_events[w_idx]
+        collapsed.append({
+            "word": ev.get("word", ""),
+            "start": round(float(ev.get("start", 0.0)), 3),
+            "end": round(float(ev.get("end", 0.0)), 3),
+        })
+        w_idx += 1
+
+    return collapsed
+
+
 def sanitize_spoken_narration(text: str) -> str:
     """
     Sanitizes spoken narration text so raw CLI commands, package scopes, and symbols
     are converted into natural spoken developer English before Edge-TTS / Whisper run.
-
-    Examples:
-      - 'step.run()' -> 'step dot run'
-      - 'npm install @acme/edgecache@latest' -> 'npm install the latest acme edgecache package'
-      - 'npm install at acme slash sdk at latest' -> 'install the latest acme sdk package'
-      - '@scope/pkg' -> 'the scope pkg package'
-      - '--cluster edge-us-east' -> 'cluster edge us east'
-      - 'v1' -> 'version one', 'v2' -> 'version two'
-      - 'O(1)' -> 'O of one', 'O(n)' -> 'O of n', 'O(n log n)' -> 'O of n log n'
     """
     if not text:
         return ""
 
     s = text.strip()
-
-    # 0. Strict Phonetic Spoken Code Normalization (Applies ONLY to TTS synthesis audio)
-    s = re.sub(r"\bstep\.run\(\)", "step dot run", s)
-    s = re.sub(r"\bstep\.run\b", "step dot run", s)
-    s = re.sub(r"\binngest\.createFunction\(\)", "inngest create function", s)
-    s = re.sub(r"\binngest\.createFunction\b", "inngest create function", s)
-
-    # 1. Clean legacy phonetic mispronunciations: "at <pkg> slash <name> at latest" -> "the latest <pkg> <name> package"
-    s = re.sub(
-        r"\bat\s+([a-zA-Z0-9_-]+)\s+slash\s+([a-zA-Z0-9_-]+)\s+at\s+latest\b",
-        r"the latest \1 \2 package",
-        s,
-        flags=re.IGNORECASE,
-    )
-    s = re.sub(
-        r"\bat\s+([a-zA-Z0-9_-]+)\s+slash\s+([a-zA-Z0-9_-]+)\b",
-        r"the \1 \2 package",
-        s,
-        flags=re.IGNORECASE,
-    )
-
-    # 2. Package scoped syntax: @scope/pkg@latest or @scope/pkg@version
-    s = re.sub(
-        r"@([a-zA-Z0-9_-]+)/([a-zA-Z0-9_-]+)@(?:latest|[0-9a-zA-Z_.-]+)",
-        r"the latest \1 \2 package",
-        s,
-    )
-    s = re.sub(
-        r"@([a-zA-Z0-9_-]+)/([a-zA-Z0-9_-]+)",
-        r"the \1 \2 package",
-        s,
-    )
-
-    # 3. CLI flags: --flag-name or --flag -> clean spoken flag name
-    s = re.sub(r"--([a-zA-Z0-9]+)-([a-zA-Z0-9]+)", r"\1 \2", s)
-    s = re.sub(r"--([a-zA-Z0-9]+)", r"\1", s)
-
-    # 4. HTTP Endpoints: GET /v2/cache/keys -> GET cache keys
-    s = re.sub(r"\b(GET|POST|PUT|DELETE|PATCH)\s+/v[0-9]/", r"\1 ", s)
-    s = re.sub(r"/([a-zA-Z0-9_-]+)", r" \1", s)
-
-    # 5. Algorithmic Complexity notation
-    s = re.sub(r"\bO\(1\)\b", "O of one", s)
-    s = re.sub(r"\bO\(n\s*log\s*n\)\b", "O of n log n", s, flags=re.IGNORECASE)
-    s = re.sub(r"\bO\(n\^2\)\b|\bO\(n²\)\b", "O of n squared", s)
-    s = re.sub(r"\bO\(n\)\b", "O of n", s)
-    s = re.sub(r"\bO\(N\)\b", "O of N", s)
-
-    # 6. Version notation
-    s = re.sub(r"\bv1\.0\b|\bv1\b", "version one", s, flags=re.IGNORECASE)
-    s = re.sub(r"\bv2\.0\b|\bv2\b", "version two", s, flags=re.IGNORECASE)
-
-    # 7. Common technical abbreviations
+    for pat, repl in PHONETIC_RULES:
+        s = re.sub(pat, repl, s, flags=re.IGNORECASE)
     s = re.sub(r"\s+", " ", s).strip()
     return s
 
@@ -348,6 +421,66 @@ async def generate_voice(
                 await asyncio.sleep(wait_time)
 
     # NEVER fallback to espeak/espeak-ng. Raise clear runtime error.
+    raise RuntimeError(
+        f"Neural TTS synthesis failed after {max_retries} attempts ({last_err}). "
+        f"Robotic espeak/espeak-ng fallbacks are strictly prohibited per AGENTS.md rules."
+    )
+
+
+async def synthesize_voice_with_boundaries(
+    text: str,
+    voice: Optional[str] = None,
+    max_retries: int = 3,
+) -> Tuple[bytes, List[Dict[str, Any]]]:
+    """
+    Synthesizes neural narration audio and extracts native WordBoundary events directly
+    from Edge-TTS stream. Applies spoken-to-display token mapping so code tokens (step.run())
+    are preserved for display and alignment.
+    Returns (audio_bytes, display_words).
+    """
+    spoken_text, mappings = prepare_tts_text_with_token_map(text)
+    active_voice = voice or os.getenv("EDGE_TTS_VOICE", "en-US-AndrewNeural")
+
+    last_err = None
+    for attempt in range(max_retries):
+        try:
+            communicate = edge_tts.Communicate(spoken_text, active_voice, boundary="WordBoundary")
+            audio_bytes = bytearray()
+            raw_word_events: List[Dict[str, Any]] = []
+
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    audio_bytes.extend(chunk["data"])
+                elif chunk["type"] == "WordBoundary":
+                    start_s = chunk["offset"] / 10_000_000.0
+                    dur_s = chunk["duration"] / 10_000_000.0
+                    raw_word_events.append({
+                        "word": chunk.get("text", ""),
+                        "start": round(start_s, 4),
+                        "end": round(start_s + dur_s, 4),
+                    })
+
+            if not audio_bytes:
+                raise RuntimeError("Edge-TTS returned 0 audio bytes.")
+            if not raw_word_events:
+                raise RuntimeError("Edge-TTS returned 0 WordBoundary events.")
+
+            # Collapse multi-word spoken spans back to display tokens
+            display_words = collapse_spoken_word_boundaries(raw_word_events, mappings)
+            display_words = validate_and_sanitize_word_timestamps(display_words)
+
+            return bytes(audio_bytes), display_words
+        except Exception as e:
+            last_err = e
+            if attempt + 1 < max_retries:
+                wait_time = 2 ** attempt
+                print(
+                    f"[AUDIO:RETRY] Edge-TTS synthesize_voice_with_boundaries attempt {attempt + 1}/{max_retries} failed ({e}). "
+                    f"Retrying in {wait_time}s...",
+                    flush=True,
+                )
+                await asyncio.sleep(wait_time)
+
     raise RuntimeError(
         f"Neural TTS synthesis failed after {max_retries} attempts ({last_err}). "
         f"Robotic espeak/espeak-ng fallbacks are strictly prohibited per AGENTS.md rules."
