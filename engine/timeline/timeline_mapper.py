@@ -271,3 +271,4 @@ def choreograph_scenes(
 
     timed_scenes, _, _ = map_scene_timeline(scenes, scene_audio_results, domain=domain, fps=fps)
     return timed_scenes
+

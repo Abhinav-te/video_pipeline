@@ -25,10 +25,10 @@ export const TakeawayCTAScene: React.FC<TakeawayCTASceneProps> = ({
   const brand = useBrand();
   const localFrame = Math.max(0, frame - sceneStartFrame);
 
-  const headline = scene?.title || 'Durable Execution Primitives';
-  const takeaway = scene?.spoken_text || scene?.narration || 'Wrap operations in step.run() for isolated retries and memoized state recovery.';
-  const quickstart = scene?.quickstart || `npm install ${brand.company_name.toLowerCase()}`;
-  const docsUrl = scene?.cta_url || brand.docs_url_display || 'inngest.com/docs/step-run';
+  const headline = scene?.title || brand.company_name || 'Workflow Architecture';
+  const takeaway = scene?.spoken_text || scene?.narration || '';
+  const quickstart = scene?.quickstart || (brand.company_name ? `npm install ${brand.company_name.toLowerCase()}` : '');
+  const docsUrl = scene?.cta_url || brand.docs_url_display || '';
 
   const cardOpacity = interpolate(localFrame, [0, 10], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
   const cardScale = interpolate(localFrame, [0, 10], [0.95, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });

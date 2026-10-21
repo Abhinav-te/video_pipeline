@@ -39,6 +39,7 @@ class WorkflowCandidate(BaseModel):
     takeaway: str
     evidence_ids: List[str]
     code_snippet: Optional[str] = None
+    release: Optional[Dict[str, Any]] = None
     scores: WorkflowScore
 
 
@@ -253,6 +254,10 @@ def generate_candidate_workflows_deterministic(
 
     # Sort descending by total score
     candidates.sort(key=lambda x: x.scores.total_score, reverse=True)
+    release_payload = (project_profile and project_profile.get("release")) or None
+    if release_payload:
+        for c in candidates:
+            c.release = release_payload
     return candidates
 
 

@@ -430,21 +430,23 @@ export const WorkflowStateTransition: React.FC<WorkflowStateTransitionProps> = (
               backdropFilter: 'blur(16px)',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-              <span style={{ fontSize: '20px' }}>🔒</span>
-              <span
-                style={{
-                  fontSize: '13px',
-                  fontWeight: 800,
-                  color: '#34d399',
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                  fontFamily: brand?.font_mono || 'monospace',
-                }}
-              >
-                {proof.tag || 'VERIFIED GUARANTEE'}
-              </span>
-            </div>
+            {proof.tag ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                <span style={{ fontSize: '20px' }}>🔒</span>
+                <span
+                  style={{
+                    fontSize: '13px',
+                    fontWeight: 800,
+                    color: '#34d399',
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    fontFamily: brand?.font_mono || 'monospace',
+                  }}
+                >
+                  {proof.tag}
+                </span>
+              </div>
+            ) : null}
 
             {proof.title && (
               <div

@@ -1,14 +1,11 @@
-"""
-tests/test_timeline_and_audio.py
+"""tests/test_audio_wav_and_captions.py
 
-Unit tests for Deterministic WAV Audio Pipeline, Spoken-to-Display Token Mapping,
-and TimelineMapper Subtitle Chunking.
+Behavioral Test Suite for Neural Audio, WAV Normalization,
+Spoken-to-Display Token Mapping, Word Timings, and Caption Chunking.
 """
 
 import sys
-import tempfile
 import unittest
-import wave
 from pathlib import Path
 
 REPO_DIR = Path(__file__).resolve().parent.parent
@@ -34,7 +31,7 @@ from engine.timeline.timeline_mapper import (
 )
 
 
-class TestTimelineAndAudio(unittest.TestCase):
+class TestAudioWavAndCaptions(unittest.TestCase):
 
     def test_spoken_to_display_token_mapping(self):
         """
@@ -187,3 +184,4 @@ class TestTimelineAndAudio(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

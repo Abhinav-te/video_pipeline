@@ -19,6 +19,11 @@ from typing import Any, Dict, List, Optional
 import urllib.parse
 import urllib.request
 
+try:
+    from engine.ingestion.code_sanitizer import sanitize_code
+except ImportError:
+    from ingestion.code_sanitizer import sanitize_code
+
 
 class HTMLToMarkdownParser(HTMLParser):
     """Clean HTML to Markdown parser preserving headings, code blocks, lists, and paragraphs."""
@@ -235,23 +240,10 @@ def wrap_code_line(line: str, max_width: int = 46) -> List[str]:
     return sublines
 
 
-def format_code_snippet(code: str, max_lines: int = 12, max_width: int = 46) -> str:
-    """Format and constraint a code block to <= max_width chars and <= max_lines."""
-    raw_lines = code.strip().splitlines()
-    formatted_lines: List[str] = []
-
-    for line in raw_lines:
-        wrapped = wrap_code_line(line, max_width=max_width)
-        formatted_lines.extend(wrapped)
-        if len(formatted_lines) >= max_lines:
-            break
-
-    total_untruncated = sum(len(wrap_code_line(l, max_width=max_width)) for l in raw_lines)
-    if total_untruncated > max_lines:
-        formatted_lines = formatted_lines[: max_lines - 1]
-        formatted_lines.append("// ...")
-
-    return "\n".join(formatted_lines)
+def format_code_snippet(code: str, max_lines: int = 30, max_width: int = 80) -> str:
+    """Format and sanitize a code block while preserving complete syntactically balanced blocks."""
+    sanitized = sanitize_code(code)
+    return sanitized
 
 
 def extract_source_facts(raw_text: str) -> Dict[str, Any]:

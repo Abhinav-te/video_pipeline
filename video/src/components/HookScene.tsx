@@ -36,11 +36,7 @@ export const HookScene: React.FC<HookSceneProps> = ({
   const headline = scene?.title || 'The Distributed Execution Failure Mode';
 
   // Items for Problem / Outcome Flow Diagram
-  const items = scene?.items && scene.items.length > 0 ? scene.items : [
-    { label: 'Step 1', detail: 'Operation Executed & Committed', status: 'done' },
-    { label: 'Step 2', detail: 'Downstream Service Outage (503)', status: 'crashed' },
-    { label: 'Blind Retry', detail: 'Re-runs Step 1 & Duplicates Side Effects', status: 'duplicate_risk' },
-  ];
+  const items = scene?.items && scene.items.length > 0 ? scene.items : [];
 
   // Micro animations
   const titleOpacity = interpolate(localFrame, [0, 10], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
@@ -202,7 +198,7 @@ export const HookScene: React.FC<HookSceneProps> = ({
 
                 <div
                   style={{
-                    fontSize: isWidescreen ? '20px' : '22px',
+                    fontSize: isWidescreen ? '28px' : '22px',
                     fontWeight: 700,
                     color: '#f8fafc',
                     lineHeight: 1.35,

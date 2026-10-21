@@ -255,11 +255,11 @@ export const Subtitles = ({ words: rawWords, captionChunks: preChunked, isWidesc
     >
       <div
         style={{
-          fontSize: isWidescreen ? '34px' : '48px',
+          fontSize: isWidescreen ? '42px' : '48px',
           fontWeight: 900,
           textTransform: 'uppercase',
-          lineHeight: isWidescreen ? '44px' : '60px',
-          height: isWidescreen ? '44px' : '60px',
+          lineHeight: isWidescreen ? '52px' : '60px',
+          height: isWidescreen ? '52px' : '60px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -471,10 +471,10 @@ export const CodingShort = ({ data }) => {
   const hasManim = Boolean(activeScene?.manim_asset_url || activeScene?.manim_video_src);
   const sceneType = hasManim ? 'manim_scene' : rawSceneType;
 
-  let stageTop = isWidescreen ? '50px' : '90px';
-  let stageLeft = isWidescreen ? '120px' : '60px';
-  let stageWidth = isWidescreen ? '1680px' : '960px';
-  let stageHeight = isWidescreen ? '860px' : '1360px';
+  let stageTop = isWidescreen ? '40px' : '90px';
+  let stageLeft = isWidescreen ? '180px' : '60px';
+  let stageWidth = isWidescreen ? '1560px' : '960px';
+  let stageHeight = isWidescreen ? '840px' : '1360px';
   let stageJustify = 'center';
 
   if (!isWidescreen) {

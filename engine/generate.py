@@ -21,7 +21,11 @@ if str(ENGINE_DIR) not in sys.path:
 if str(REPO_DIR) not in sys.path:
     sys.path.insert(0, str(REPO_DIR))
 
-from director.script import generate_script
+# Evidence pipeline imports
+from director.scene_planner import plan_scenes
+from director.workflow_selector import select_best_workflow
+from ingestion.evidence_extractor import extract_evidence_pack
+from validation.evidence_validator import validate_evidence_and_plan
 from validation import validate_script_plan, write_reflection_error, auto_heal_timeline_payload
 from audio.tts_whisper import generate_voice, extract_word_timings
 from timeline.beats import (
@@ -754,50 +758,52 @@ def main():
         # Step 1 & 2 — Ingestion, Evidence Extraction & Planning
         # ---------------------------------------------------------------
 
-        if args.project:
-            stage_start("INGESTION", f"Extracting EvidencePack from official sources for {project_profile.get('product', 'project')}...")
-            from engine.ingestion.evidence_extractor import extract_evidence_pack
-            from engine.director.workflow_selector import select_best_workflow
-            from engine.director.scene_planner import plan_scenes
-            from engine.validation.evidence_validator import validate_evidence_and_plan
+        # Unified Evidence Pipeline Path for all CLI entry points
+        if not project_profile:
+            project_profile = {
+                "product": topic.split()[0] if topic else "Developer Tool",
+                "audience": "Developers & Engineers",
+                "goal": f"Explain {topic} in {args.length} seconds",
+                "duration_target_seconds": args.length,
+                "topic": topic or "Developer Workflow",
+                "subject": args.subject or "code",
+                "sources": sources if sources else [
+                    {
+                        "url": args.source_url or "https://docs.example.com",
+                        "local_file": args.source_file,
+                        "title": topic,
+                    }
+                ],
+            }
 
-            evidence_pack = extract_evidence_pack(sources, project_profile=project_profile, mock=args.mock)
-            with open(run_dir / "evidence_pack.json", "w", encoding="utf-8") as f:
-                json.dump(evidence_pack.model_dump(), f, indent=2)
-            stage_success("INGESTION", f"Extracted {len(evidence_pack.records)} atomic evidence records -> {run_dir}/evidence_pack.json")
+        stage_start("INGESTION", f"Extracting EvidencePack from official sources for {project_profile.get('product', 'project')}...")
+        evidence_pack = extract_evidence_pack(sources, project_profile=project_profile, mock=args.mock)
+        with open(run_dir / "evidence_pack.json", "w", encoding="utf-8") as f:
+            json.dump(evidence_pack.model_dump(), f, indent=2)
+        stage_success("INGESTION", f"Extracted {len(evidence_pack.records)} atomic evidence records -> {run_dir}/evidence_pack.json")
 
-            stage_start("WORKFLOW", "Scoring candidate developer workflows across 6 criteria...")
-            wf_res = select_best_workflow(evidence_pack, project_profile=project_profile, mock=args.mock)
-            selected_workflow = wf_res.selected_workflow
-            with open(run_dir / "workflow_candidates.json", "w", encoding="utf-8") as f:
-                json.dump(wf_res.model_dump(), f, indent=2)
-            stage_success("WORKFLOW", f"Selected workflow '{selected_workflow.title}' (Score: {selected_workflow.scores.total_score}/60)")
+        stage_start("WORKFLOW", "Scoring candidate developer workflows across 6 criteria...")
+        wf_res = select_best_workflow(evidence_pack, project_profile=project_profile, mock=args.mock)
+        selected_workflow = wf_res.selected_workflow
+        with open(run_dir / "workflow_candidates.json", "w", encoding="utf-8") as f:
+            json.dump(wf_res.model_dump(), f, indent=2)
+        stage_success("WORKFLOW", f"Selected workflow '{selected_workflow.title}' (Score: {selected_workflow.scores.total_score}/60)")
 
-            stage_start("SCENE_PLAN", "Generating evidence-linked 5-beat scene plan...")
-            scene_plan = plan_scenes(selected_workflow, evidence_pack, duration_target=args.length, mock=args.mock)
-            with open(run_dir / "scene_plan.json", "w", encoding="utf-8") as f:
-                json.dump(scene_plan.model_dump(), f, indent=2)
-            stage_success("SCENE_PLAN", f"Generated {len(scene_plan.scenes)} evidence-linked scenes -> {run_dir}/scene_plan.json")
+        stage_start("SCENE_PLAN", "Generating evidence-linked 5-beat scene plan...")
+        scene_plan = plan_scenes(selected_workflow, evidence_pack, duration_target=args.length, mock=args.mock)
+        with open(run_dir / "scene_plan.json", "w", encoding="utf-8") as f:
+            json.dump(scene_plan.model_dump(), f, indent=2)
+        stage_success("SCENE_PLAN", f"Generated {len(scene_plan.scenes)} evidence-linked scenes -> {run_dir}/scene_plan.json")
 
-            stage_start("EVIDENCE_GATE", "Validating 100% claim coverage before timeline assembly...")
-            val_report = validate_evidence_and_plan(evidence_pack, scene_plan)
-            with open(run_dir / "validation_report.json", "w", encoding="utf-8") as f:
-                json.dump(val_report.model_dump(), f, indent=2)
-            if not val_report.passed:
-                stage_error("EVIDENCE_GATE", f"Evidence validation failed: {val_report.checks}")
-            stage_success("EVIDENCE_GATE", f"Verified 100% claim backing across all {val_report.total_claims} scenes.")
+        stage_start("EVIDENCE_GATE", "Validating 100% claim coverage before timeline assembly...")
+        val_report = validate_evidence_and_plan(evidence_pack, scene_plan)
+        with open(run_dir / "validation_report.json", "w", encoding="utf-8") as f:
+            json.dump(val_report.model_dump(), f, indent=2)
+        if not val_report.passed:
+            stage_error("EVIDENCE_GATE", f"Evidence validation failed: {val_report.checks}")
+        stage_success("EVIDENCE_GATE", f"Verified 100% claim backing across all {val_report.total_claims} scenes.")
 
-            script = scene_plan.to_director_script()
-        else:
-            script = generate_or_load_script(
-                topic=topic,
-                duration=args.length,
-                no_cache=args.no_cache,
-                subject=args.subject,
-                mock=args.mock,
-                source_text=source_text,
-                source_facts=source_facts,
-            )
+        script = scene_plan.to_director_script()
 
         # ---------------------------------------------------------------
         # Step 2 & 3 — Synthesize Per-Scene Audio & Master Concat

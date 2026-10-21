@@ -16,6 +16,11 @@ from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, Field
 
+try:
+    from engine.ingestion.code_sanitizer import sanitize_code
+except ImportError:
+    from ingestion.code_sanitizer import sanitize_code
+
 
 EvidenceKind = Literal[
     "concept",
@@ -134,7 +139,7 @@ def extract_evidence_offline(
             # 1. Extract Code Blocks (kind: "code_evidence")
             code_blocks = re.findall(r"```([a-zA-Z0-9_\-+]*)\n([\s\S]*?)```", sec_content)
             for lang, code_body in code_blocks:
-                clean_code = code_body.strip()
+                clean_code = sanitize_code(code_body)
                 if not clean_code:
                     continue
 
@@ -261,8 +266,8 @@ def extract_evidence_offline(
                                 confidence="source_supported",
                             )
                         )
-                    # Check for core runtime behavior / memoization / state
-                    elif any(term in lower_sent for term in ["memoized", "saved", "persisted", "reused", "workflow state", "execution context", "resumes", "isolated", "cached", "returns the cached", "without creating", "safe to retry"]):
+                    # Check for core runtime behavior / memoization / state / guarantees
+                    elif "behavior" in sec_title.lower() or "guarantee" in sec_title.lower() or any(term in lower_sent for term in ["memoized", "saved", "persisted", "reused", "workflow state", "execution context", "resumes", "isolated", "cached", "returns the cached", "without creating", "safe to retry", "guarantees", "renews", "atomic", "mutual exclusion"]):
                         rec_id = f"ev_{record_counter:02d}"
                         record_counter += 1
                         records.append(
@@ -376,7 +381,25 @@ def extract_evidence_pack(
 
     # In mock or offline mode, extract using the deterministic offline parser
     if mock or not os.getenv("GEMINI_API_KEY"):
-        return extract_evidence_offline(source_docs, project_name=project_name)
+        pack = extract_evidence_offline(source_docs, project_name=project_name)
+        release = project_profile.get("release") if project_profile else None
+        if release:
+            v_tag = release.get("version_tag", "vNext")
+            rel_notes = release.get("release_notes", f"Release {v_tag} updates")
+            rec_id = f"ev_release_{v_tag.replace('.', '_')}"
+            now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            pack.records.insert(0, EvidenceRecord(
+                id=rec_id,
+                kind="concept",
+                claim=f"Release {v_tag}: {rel_notes}",
+                source_url=pack.sources[0].source_url if pack.sources else "",
+                source_section=f"Release {v_tag}",
+                excerpt=rel_notes,
+                retrieved_at=now_iso,
+                content_hash=compute_sha256(rel_notes),
+                confidence="source_supported",
+            ))
+        return pack
 
     # In live mode with GEMINI_API_KEY, use Gemini structured extraction with offline fallback
     try:

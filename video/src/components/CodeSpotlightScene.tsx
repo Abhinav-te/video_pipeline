@@ -1,5 +1,5 @@
 import React from 'react';
-import { useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
+import { useCurrentFrame, interpolate } from 'remotion';
 import { useBrand } from '../context/BrandContext';
 import { CodeIcon, SparklesIcon, CheckIcon } from './SvgIcons';
 
@@ -12,63 +12,86 @@ export interface CodeSpotlightSceneProps {
     language?: string;
     highlight_lines?: number[];
     focus_phrase?: string;
-    callout?: string;
+    callout?: string | { title?: string; body?: string };
+    proof_card?: { title?: string; body?: string; tag?: string };
+    badge?: { text?: string };
     evidence_ids?: string[];
   };
   sceneStartFrame?: number;
   isWidescreen?: boolean;
 }
 
-// Tokenizes a line of code into syntax highlighted React elements
-const renderSyntaxLine = (line: string) => {
-  if (!line) return <span>&nbsp;</span>;
+// Comprehensive TypeScript Syntax Tokenizer
+interface Token {
+  type: 'comment' | 'string' | 'keyword' | 'type' | 'number' | 'call' | 'property' | 'operator' | 'punctuation' | 'identifier' | 'whitespace';
+  value: string;
+}
 
-  // Regex tokenizer matching comments, strings, keywords, numbers, punctuation, and identifiers
-  const tokenRegex = /(\/\/[^\n]*|\/\*[\s\S]*?\*\/|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|\b(?:const|let|var|import|from|export|default|async|await|return|function|class|if|else|try|catch|throw|new|typeof|yield)\b|\b(?:true|false|null|undefined)\b|\b\d+\b|[{}()[\].,;:+\-*/%=<>!&|]+|[a-zA-Z_$][a-zA-Z0-9_$]*|[^\s]+|\s+)/g;
+const tokenizeTypeScript = (code: string): Token[] => {
+  const tokens: Token[] = [];
+  const regex = /(\/\/[^\n]*|\/\*[\s\S]*?\*\/|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|\b(?:const|let|var|import|from|export|default|async|await|return|function|class|new|if|else|try|catch|finally|throw|type|interface|extends|implements|as|in|of|typeof|keyof|readonly|static|get|set)\b|\b(?:string|number|boolean|any|void|unknown|never|Record|Promise|Array|true|false|null|undefined)\b|\b\d+(?:\.\d+)?\b|[a-zA-Z_$][a-zA-Z0-9_$]*(?=\s*\()|[a-zA-Z_$][a-zA-Z0-9_$]*(?=\s*:)|(=>|===|!==|==|!=|<=|>=|&&|\|\||[+\-*/%=<>!&|?:]+)|([{}()[\].,;])|[a-zA-Z_$][a-zA-Z0-9_$]*|[^\S\r\n]+|\n|[^\s\w]+)/g;
 
-  const parts = [];
   let match;
-  let keyIdx = 0;
-
-  while ((match = tokenRegex.exec(line)) !== null) {
-    const token = match[0];
-    keyIdx++;
-
-    // Comments
-    if (token.startsWith('//') || token.startsWith('/*')) {
-      parts.push(<span key={keyIdx} style={{ color: '#64748b', fontStyle: 'italic' }}>{token}</span>);
-    }
-    // Strings
-    else if (token.startsWith('"') || token.startsWith("'") || token.startsWith('`')) {
-      parts.push(<span key={keyIdx} style={{ color: '#34d399' }}>{token}</span>);
-    }
-    // Keywords
-    else if (/^(const|let|var|import|from|export|default|async|await|return|function|class|if|else|try|catch|throw|new|typeof|yield)$/.test(token)) {
-      parts.push(<span key={keyIdx} style={{ color: '#c084fc', fontWeight: 600 }}>{token}</span>);
-    }
-    // Booleans / Literals
-    else if (/^(true|false|null|undefined)$/.test(token)) {
-      parts.push(<span key={keyIdx} style={{ color: '#f472b6', fontWeight: 600 }}>{token}</span>);
-    }
-    // Numbers
-    else if (/^\d+$/.test(token)) {
-      parts.push(<span key={keyIdx} style={{ color: '#fb923c' }}>{token}</span>);
-    }
-    // Methods / step.run
-    else if (token === 'run' || token === 'step' || token === 'inngest' || token === 'createFunction') {
-      parts.push(<span key={keyIdx} style={{ color: '#38bdf8', fontWeight: 700 }}>{token}</span>);
-    }
-    // Operators
-    else if (/^[{}()[\].,;:+\-*/%=<>!&|]+$/.test(token)) {
-      parts.push(<span key={keyIdx} style={{ color: '#94a3b8' }}>{token}</span>);
-    }
-    // Default identifiers
-    else {
-      parts.push(<span key={keyIdx} style={{ color: '#f1f5f9' }}>{token}</span>);
+  while ((match = regex.exec(code)) !== null) {
+    const val = match[0];
+    if (val.startsWith('//') || val.startsWith('/*')) {
+      tokens.push({ type: 'comment', value: val });
+    } else if (val.startsWith('"') || val.startsWith("'") || val.startsWith('`')) {
+      tokens.push({ type: 'string', value: val });
+    } else if (/^(const|let|var|import|from|export|default|async|await|return|function|class|new|if|else|try|catch|finally|throw|type|interface|extends|implements|as|in|of|typeof|keyof|readonly|static|get|set)$/.test(val)) {
+      tokens.push({ type: 'keyword', value: val });
+    } else if (/^(string|number|boolean|any|void|unknown|never|Record|Promise|Array|true|false|null|undefined)$/.test(val)) {
+      tokens.push({ type: 'type', value: val });
+    } else if (/^\d+(?:\.\d+)?$/.test(val)) {
+      tokens.push({ type: 'number', value: val });
+    } else if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(val) && code.slice(regex.lastIndex).trim().startsWith('(')) {
+      tokens.push({ type: 'call', value: val });
+    } else if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(val) && code.slice(regex.lastIndex).trim().startsWith(':') && !code.slice(regex.lastIndex).trim().startsWith('::')) {
+      tokens.push({ type: 'property', value: val });
+    } else if (/^(=>|===|!==|==|!=|<=|>=|&&|\|\||[+\-*/%=<>!&|?:]+)$/.test(val)) {
+      tokens.push({ type: 'operator', value: val });
+    } else if (/^[{}()[\].,;]$/.test(val)) {
+      tokens.push({ type: 'punctuation', value: val });
+    } else if (/^[^\S\r\n]+$/.test(val) || val === '\n') {
+      tokens.push({ type: 'whitespace', value: val });
+    } else {
+      tokens.push({ type: 'identifier', value: val });
     }
   }
 
-  return parts;
+  return tokens;
+};
+
+const renderSyntaxLine = (line: string) => {
+  if (!line) return <span>&nbsp;</span>;
+  const tokens = tokenizeTypeScript(line);
+
+  return tokens.map((token, idx) => {
+    switch (token.type) {
+      case 'comment':
+        return <span key={idx} style={{ color: '#64748b', fontStyle: 'italic' }}>{token.value}</span>;
+      case 'string':
+        return <span key={idx} style={{ color: '#34d399' }}>{token.value}</span>;
+      case 'keyword':
+        return <span key={idx} style={{ color: '#c084fc', fontWeight: 600 }}>{token.value}</span>;
+      case 'type':
+        return <span key={idx} style={{ color: '#38bdf8', fontWeight: 600 }}>{token.value}</span>;
+      case 'number':
+        return <span key={idx} style={{ color: '#fb923c' }}>{token.value}</span>;
+      case 'call':
+        return <span key={idx} style={{ color: '#60a5fa', fontWeight: 600 }}>{token.value}</span>;
+      case 'property':
+        return <span key={idx} style={{ color: '#e2e8f0', fontWeight: 500 }}>{token.value}</span>;
+      case 'operator':
+        return <span key={idx} style={{ color: '#f472b6' }}>{token.value}</span>;
+      case 'punctuation':
+        return <span key={idx} style={{ color: '#94a3b8' }}>{token.value}</span>;
+      case 'whitespace':
+        return <span key={idx}>{token.value}</span>;
+      default:
+        return <span key={idx} style={{ color: '#f1f5f9' }}>{token.value}</span>;
+    }
+  });
 };
 
 export const CodeSpotlightScene: React.FC<CodeSpotlightSceneProps> = ({
@@ -80,12 +103,43 @@ export const CodeSpotlightScene: React.FC<CodeSpotlightSceneProps> = ({
   const brand = useBrand();
   const localFrame = Math.max(0, frame - sceneStartFrame);
 
-  const rawCode = scene?.code || scene?.code_snippet || `export const processOrder = inngest.createFunction(\n  { id: "process-order" },\n  { event: "order/created" },\n  async ({ event, step }) => {\n    const billing = await step.run("fetch-billing-data", async () => {\n      return await api.getBillingCustomer(event.data.userId);\n    });\n    await step.run("charge-customer", async () => {\n      return await api.chargeCustomer(billing.id, event.data.amount);\n    });\n  }\n);`;
+  const rawCode = scene?.code || scene?.code_snippet || '';
+  if (!rawCode.trim()) {
+    throw new Error(
+      `[CodeSpotlightScene] Validation Error: 'code' or 'code_snippet' is required and must not be empty. Scene: "${scene?.title || 'untitled'}"`
+    );
+  }
 
   const lines = rawCode.split('\n');
-  const filename = scene?.filename || 'process-order.ts';
-  const highlightLines = new Set(scene?.highlight_lines || [5, 6, 7]);
-  const calloutText = scene?.callout || scene?.focus_phrase || 'step.run checkpoints state and isolates retries';
+  const filename = scene?.filename || 'snippet.ts';
+  const highlightLines = new Set(scene?.highlight_lines || []);
+
+  const calloutRaw = scene?.callout;
+  const calloutText = typeof calloutRaw === 'string'
+    ? calloutRaw
+    : (calloutRaw?.body || scene?.focus_phrase || scene?.title || '');
+
+  const badgeText = scene?.badge?.text || (scene?.focus_phrase ? `FOCUS: ${scene.focus_phrase}` : (scene?.title || 'CODE SPOTLIGHT'));
+  const proofText = scene?.proof_card?.body || (scene?.focus_phrase ? `Verified syntax: ${scene.focus_phrase}` : '');
+
+  // Calculate dynamic font size based on max line length to prevent horizontal clipping
+  const maxLineLength = Math.max(...lines.map((l) => l.length), 1);
+  const availableCodeWidth = isWidescreen ? 1120 : 860;
+  
+  // Monospace character width ratio is roughly 0.58-0.61 of font size
+  const computedFontSize = Math.floor(availableCodeWidth / (maxLineLength * 0.59));
+  // Target >= 26px at 1080p widescreen, scaling down smoothly if lines are extra long
+  const fontSize = isWidescreen
+    ? Math.max(20, Math.min(27, computedFontSize))
+    : Math.max(18, Math.min(23, computedFontSize));
+
+  // Check if any line overflows safe bounds
+  const estimatedLineWidth = maxLineLength * fontSize * 0.59;
+  if (estimatedLineWidth > availableCodeWidth + 180) {
+    throw new Error(
+      `[CodeSpotlightScene] Line width overflow: line length ${maxLineLength} at ${fontSize}px exceeds available container width (${availableCodeWidth}px).`
+    );
+  }
 
   // Highlight pulse animation
   const pulseOpacity = interpolate(
@@ -104,16 +158,16 @@ export const CodeSpotlightScene: React.FC<CodeSpotlightSceneProps> = ({
         alignItems: 'center',
         justifyContent: 'center',
         gap: isWidescreen ? '40px' : '24px',
-        padding: isWidescreen ? '30px 50px' : '20px 10px',
+        padding: isWidescreen ? '30px 40px' : '20px 10px',
         boxSizing: 'border-box',
         fontFamily: brand.font_sans,
       }}
     >
-      {/* Left/Main Column: Sleek Modern Dark Glass IDE Card */}
+      {/* Main Column: Dark Glass IDE Card */}
       <div
         style={{
-          flex: isWidescreen ? '0 0 65%' : '1 1 auto',
-          maxWidth: isWidescreen ? '1100px' : '960px',
+          flex: isWidescreen ? '0 0 68%' : '1 1 auto',
+          maxWidth: isWidescreen ? '1180px' : '960px',
           width: '100%',
           backgroundColor: '#0c0e17',
           borderRadius: '24px',
@@ -138,7 +192,7 @@ export const CodeSpotlightScene: React.FC<CodeSpotlightSceneProps> = ({
             boxSizing: 'border-box',
           }}
         >
-          {/* Mac window dots */}
+          {/* Window action dots */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#ff5f56' }} />
             <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#ffbd2e' }} />
@@ -157,7 +211,7 @@ export const CodeSpotlightScene: React.FC<CodeSpotlightSceneProps> = ({
               border: '1px solid rgba(255, 255, 255, 0.1)',
               color: '#cbd5e1',
               fontFamily: brand.font_mono,
-              fontSize: '13px',
+              fontSize: '14px',
               fontWeight: 600,
             }}
           >
@@ -173,9 +227,10 @@ export const CodeSpotlightScene: React.FC<CodeSpotlightSceneProps> = ({
           style={{
             padding: isWidescreen ? '26px 28px' : '20px 18px',
             fontFamily: brand.font_mono,
-            fontSize: isWidescreen ? '18px' : '19px',
-            lineHeight: 1.6,
-            overflowX: 'hidden',
+            fontSize: `${fontSize}px`,
+            lineHeight: 1.55,
+            overflowX: 'visible',
+            boxSizing: 'border-box',
           }}
         >
           {lines.map((line, idx) => {
@@ -192,17 +247,19 @@ export const CodeSpotlightScene: React.FC<CodeSpotlightSceneProps> = ({
                   borderLeft: isHighlighted ? '3.5px solid #6366F1' : '3.5px solid transparent',
                   padding: '2px 8px',
                   borderRadius: '4px',
-                  opacity: isHighlighted ? 1 : 0.6,
+                  opacity: (highlightLines.size === 0 || isHighlighted) ? 1.0 : 0.55,
                   transition: 'opacity 0.2s ease, background-color 0.2s ease',
                   position: 'relative',
+                  whiteSpace: 'pre',
                 }}
               >
                 {/* Line number */}
                 <span
                   style={{
-                    width: '36px',
+                    width: '38px',
+                    minWidth: '38px',
                     color: isHighlighted ? '#a5b4fc' : '#475569',
-                    fontSize: '13px',
+                    fontSize: `${Math.max(13, fontSize - 10)}px`,
                     userSelect: 'none',
                     fontWeight: isHighlighted ? 700 : 400,
                   }}
@@ -220,12 +277,12 @@ export const CodeSpotlightScene: React.FC<CodeSpotlightSceneProps> = ({
         </div>
       </div>
 
-      {/* Right Column (Widescreen) or Bottom Floating Card: Live Annotation Badge */}
+      {/* Right Column (Widescreen) or Bottom Annotation Card */}
       <div
         style={{
-          flex: isWidescreen ? '0 0 30%' : 'none',
+          flex: isWidescreen ? '0 0 28%' : 'none',
           width: isWidescreen ? 'auto' : '100%',
-          maxWidth: isWidescreen ? '440px' : '960px',
+          maxWidth: isWidescreen ? '420px' : '960px',
           display: 'flex',
           flexDirection: 'column',
           gap: '16px',
@@ -266,7 +323,7 @@ export const CodeSpotlightScene: React.FC<CodeSpotlightSceneProps> = ({
                 fontFamily: brand.font_mono,
               }}
             >
-              ACTIVE ISOLATION SCOPE
+              {badgeText}
             </span>
           </div>
 
@@ -276,25 +333,27 @@ export const CodeSpotlightScene: React.FC<CodeSpotlightSceneProps> = ({
               fontWeight: 700,
               color: '#ffffff',
               lineHeight: 1.35,
-              marginBottom: '14px',
+              marginBottom: proofText ? '14px' : '0px',
             }}
           >
             {calloutText}
           </div>
 
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: '14px',
-              color: '#34d399',
-              fontWeight: 600,
-            }}
-          >
-            <CheckIcon size={16} color="#34d399" />
-            Automatic Memoization & Retry Guard
-          </div>
+          {proofText ? (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '14px',
+                color: '#34d399',
+                fontWeight: 600,
+              }}
+            >
+              <CheckIcon size={16} color="#34d399" />
+              {proofText}
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
@@ -302,4 +361,3 @@ export const CodeSpotlightScene: React.FC<CodeSpotlightSceneProps> = ({
 };
 
 export default CodeSpotlightScene;
-
