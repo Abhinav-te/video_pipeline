@@ -61,12 +61,14 @@ def test_wrap_code_line_constraints():
         assert len(w) <= 50  # Allows slight boundary buffer
 
 
-def test_format_code_snippet_bounds():
-    code_block = "\n".join([f"line_{i} = do_something_with_a_moderately_long_expression_call_{i}()" for i in range(25)])
-    formatted = format_code_snippet(code_block, max_lines=12, max_width=46)
+def test_format_code_snippet_preserves_syntax():
+    code_block = "```ts\n" + "\n".join([f"const line_{i} = doSomething({i});" for i in range(25)]) + "\n```"
+    formatted = format_code_snippet(code_block)
     lines = formatted.splitlines()
-    assert len(lines) <= 12
-    assert lines[-1] == "// ..."
+    # Code display invariant: never truncate code with fixed line limits or // ...
+    assert len(lines) == 25
+    assert not formatted.startswith("```")
+    assert "// ..." not in lines
 
 
 def test_extract_source_facts_full_parse():

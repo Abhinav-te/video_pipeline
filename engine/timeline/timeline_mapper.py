@@ -138,6 +138,44 @@ def resolve_word_timestamp(
     return default_time, start_search_idx
 
 
+def resolve_event_trigger_time(
+    ev: Dict[str, Any],
+    scene_words: List[Dict[str, Any]],
+    start_time: float,
+    previous_event_time: float,
+    start_search_idx: int = 0,
+) -> Tuple[float, int]:
+    """
+    Resolves workflow state machine event timestamp from spoken words:
+    1. Checks explicit 'at_word'
+    2. Searches for action keywords in spoken words (start, fail, retry, succeed, memoize, etc.)
+    3. If unresolved, aligns to previous event time + minimum pacing delta (0.3s)
+    Never distributes mechanically by array index (idx / num_events).
+    """
+    at_word = ev.get("at_word")
+    if at_word:
+        t_sec, next_search = resolve_word_timestamp(scene_words, at_word, -1.0, start_search_idx)
+        if t_sec >= 0.0:
+            return t_sec, next_search + 1
+
+    action = str(ev.get("action", "")).lower()
+    ACTION_KEYWORDS = {
+        "fail": ["fail", "error", "503", "400", "crash", "timeout", "drop"],
+        "retry": ["retry", "retrying", "retried", "again", "backoff"],
+        "succeed": ["succeed", "success", "saved", "memoiz", "done", "200"],
+        "recover": ["recover", "cached", "reused", "restore", "saved"],
+        "start": ["start", "initial", "begin", "dispatch", "call", "send"],
+    }
+    keywords = ACTION_KEYWORDS.get(action, [])
+    for kw in keywords:
+        t_sec, next_search = resolve_word_timestamp(scene_words, kw, -1.0, start_search_idx)
+        if t_sec >= 0.0:
+            return t_sec, next_search + 1
+
+    fallback_time = max(start_time, previous_event_time + 0.3)
+    return round(fallback_time, 3), start_search_idx
+
+
 def map_scene_timeline(
     scenes: List[Dict[str, Any]],
     scene_audio_results: List[Dict[str, Any]],
@@ -205,18 +243,14 @@ def map_scene_timeline(
         events = visual.get("events") or scene.get("events") or []
         if events and scene_words:
             search_idx = 0
-            num_events = len(events)
-            for e_idx, ev in enumerate(events):
-                at_word = ev.get("at_word")
-                if at_word:
-                    t_sec, next_search = resolve_word_timestamp(
-                        scene_words, at_word, start_time + (e_idx + 1) * (dur / (num_events + 1)), search_idx
-                    )
-                    ev["timestamp_sec"] = t_sec
-                    search_idx = next_search + 1
-                elif "timestamp_sec" not in ev:
-                    # Distribute evenly if no at_word specified
-                    ev["timestamp_sec"] = round(start_time + (e_idx + 1) * (dur / (num_events + 1)), 3)
+            prev_time = start_time
+            for ev in events:
+                t_sec, next_search = resolve_event_trigger_time(
+                    ev, scene_words, start_time, prev_time, search_idx
+                )
+                ev["timestamp_sec"] = t_sec
+                prev_time = t_sec
+                search_idx = next_search
 
         # Generate scene-level subtitle caption chunks
         scene["caption_chunks"] = chunk_caption_words(scene_words)

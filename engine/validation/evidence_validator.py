@@ -19,6 +19,8 @@ import datetime
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Union
@@ -49,6 +51,9 @@ class ValidationReport(BaseModel):
     gate2_errors: List[str] = Field(default_factory=list)
     gate3_errors: List[str] = Field(default_factory=list)
     gate4_errors: List[str] = Field(default_factory=list)
+    gate5_errors: List[str] = Field(default_factory=list)
+    gate6_errors: List[str] = Field(default_factory=list)
+    schema_lineage_errors: List[str] = Field(default_factory=list)
     checks: List[ValidationCheckItem] = Field(default_factory=list)
     timestamp: str = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
 
@@ -452,8 +457,70 @@ def validate_evidence_and_plan(
         gate2_errors=gate2_errors,
         gate3_errors=gate3_errors,
         gate4_errors=gate4_errors,
+        gate5_errors=gate4_errors,  # Component lint maps to Gate 5
+        gate6_errors=[],
+        schema_lineage_errors=[],
         checks=checks,
     )
+
+
+def validate_post_render_qa(
+    video_path: Union[str, Path],
+    expected_duration: Optional[float] = None,
+    expected_audio_path: Optional[Union[str, Path]] = None,
+    aspect_ratio: str = "16:9",
+    tolerance_sec: float = 0.5,
+) -> Tuple[bool, List[str], Dict[str, Any]]:
+    """
+    Gate 6: Post-Render Technical and Visual QA.
+    Verifies:
+    1. Container format and stream counts (1 video, 1 audio).
+    2. Video resolution (1920x1080 for 16:9, 1080x1920 for 9:16) and target FPS ~30.
+    3. Audio codec (aac/mp3) and sample rate >= 24000Hz.
+    4. Exact audio/video duration synchronization (within tolerance_sec).
+    5. Midpoint keyframe extraction and non-blank frame verification.
+    """
+    try:
+        from engine.validation.output import validate_video_output
+    except ImportError:
+        from validation.output import validate_video_output
+
+    req_w, req_h = (1080, 1920) if aspect_ratio == "9:16" else (1920, 1080)
+    is_valid, errors, meta = validate_video_output(
+        video_path=video_path,
+        expected_audio_path=expected_audio_path,
+        expected_duration=expected_duration,
+        tolerance_sec=max(0.5, tolerance_sec),
+        expected_width=req_w,
+        expected_height=req_h,
+        aspect_ratio=aspect_ratio,
+    )
+
+    vid_p = Path(video_path)
+    if vid_p.exists() and vid_p.stat().st_size > 0 and shutil.which("ffmpeg"):
+        kf_path = vid_p.with_suffix(".keyframe.jpg")
+        try:
+            dur = meta.get("video_duration") or 2.0
+            mid_t = max(0.5, dur / 2.0)
+            kf_cmd = [
+                "ffmpeg", "-y",
+                "-ss", f"{mid_t:.2f}",
+                "-i", str(vid_p),
+                "-vframes", "1",
+                "-q:v", "2",
+                str(kf_path),
+            ]
+            subprocess.run(kf_cmd, capture_output=True, check=True)
+            if not kf_path.exists() or kf_path.stat().st_size < 1000:
+                errors.append(f"Gate 6: Rendered keyframe extraction produced blank or corrupt frame ({kf_path})")
+                is_valid = False
+            else:
+                meta["keyframe_path"] = str(kf_path)
+        except Exception as e:
+            errors.append(f"Gate 6: Failed to extract validation keyframe: {e}")
+            is_valid = False
+
+    return is_valid, errors, meta
 
 
 if __name__ == "__main__":

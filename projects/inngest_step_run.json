@@ -1,11 +1,16 @@
 {
   "project_profile": {
     "product": "Inngest",
+    "product_subject": "step.run() Durable Execution",
+    "product_company": "Inngest",
+    "publisher_brand": "Inngest",
+    "client_brand": "Inngest",
     "audience": "Backend developers",
     "goal": "Explain one practical durable execution feature in a 30-second video",
     "duration_target_seconds": 30,
     "topic": "Inngest step.run() Durable Execution & Retries",
     "subject": "code",
+    "video_intent": "developer_workflow_explainer",
     "sources": [
       {
         "url": "https://www.inngest.com/docs/durable-execution/primitives/step-run",
@@ -20,19 +25,19 @@
     ]
   },
   "render_profile": {
-    "aspect_ratio": "9:16",
-    "width": 1080,
-    "height": 1920,
+    "aspect_ratio": "16:9",
+    "width": 1920,
+    "height": 1080,
     "fps": 30,
     "theme": {
       "background": "#0d1117",
       "card_background": "#161b22",
       "text_primary": "#f0f6fc",
       "text_secondary": "#8b949e",
-      "accent": "#58a6ff",
-      "success": "#3fb950",
-      "danger": "#f85149",
-      "warning": "#d29922"
+      "accent": "#6366F1",
+      "success": "#10B981",
+      "danger": "#EF4444",
+      "warning": "#F59E0B"
     },
     "typography": {
       "font_family_code": "JetBrains Mono, monospace",
@@ -57,4 +62,3 @@
     "docs_url_display": "inngest.com/docs/step-run"
   }
 }
-

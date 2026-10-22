@@ -173,7 +173,7 @@ class TestB2BValidation(unittest.TestCase):
         is_valid, errors = validate_script_plan(plan)
         self.assertFalse(is_valid)
         self.assertTrue(
-            any("Script plan must contain at least one 'comparison' or 'workflow_state_transition'" in e for e in errors),
+            any("Script plan must contain at least one 'comparison'" in e and "workflow_state_transition" in e for e in errors),
             f"Expected missing workflow error, got: {errors}",
         )
 

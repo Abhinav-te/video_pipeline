@@ -1,6 +1,6 @@
 {
-  "company_name": "Inngest",
-  "logo_text": "INNGEST",
+  "company_name": "Developer Tools",
+  "logo_text": "DEVTOOL",
   "primary_color": "#6366F1",
   "secondary_color": "#10B981",
   "warning_color": "#F59E0B",
@@ -9,6 +9,5 @@
   "bg_surface": "#11131C",
   "font_sans": "Inter, system-ui, sans-serif",
   "font_mono": "JetBrains Mono, monospace",
-  "docs_url_display": "inngest.com/docs/step-run"
+  "docs_url_display": "docs.example.com"
 }
-

@@ -4,6 +4,7 @@ engine/config/brand_config.py
 Client Brand Configuration & Design System Token Loader.
 Extracts brand colors, typography, company name, logo badges, and documentation
 URLs from project configs or brand_config.json to inject directly into Remotion BrandContext.
+Strictly isolates branding between projects to prevent cross-brand leakage.
 """
 
 import json
@@ -15,8 +16,8 @@ REPO_DIR = Path(__file__).resolve().parent.parent.parent
 
 
 class BrandConfig(BaseModel):
-    company_name: str = Field(default="Inngest", description="Company or product display name")
-    logo_text: str = Field(default="INNGEST", description="High-contrast logo badge text")
+    company_name: str = Field(default="Developer Tools", description="Company or product display name")
+    logo_text: str = Field(default="DEVTOOL", description="High-contrast logo badge text")
     primary_color: str = Field(default="#6366F1", description="Primary brand accent color (hex)")
     secondary_color: str = Field(default="#10B981", description="Secondary brand color (hex)")
     warning_color: str = Field(default="#F59E0B", description="Warning / alert state color (hex)")
@@ -25,35 +26,54 @@ class BrandConfig(BaseModel):
     bg_surface: str = Field(default="#11131C", description="Elevated card surface color (hex)")
     font_sans: str = Field(default="Inter, system-ui, -apple-system, sans-serif", description="Main typography font family")
     font_mono: str = Field(default="JetBrains Mono, Fira Code, monospace", description="Code and monospace font family")
-    docs_url_display: str = Field(default="inngest.com/docs/step-run", description="Display link for docs pill")
+    docs_url_display: str = Field(default="docs.example.com", description="Display link for docs pill")
 
 
 def load_brand_config(project_input: Union[Dict[str, Any], str, Path, None] = None) -> BrandConfig:
     """
     Loads BrandConfig from:
     1. 'brand' or 'brand_config' block in project dictionary
-    2. 'brand_config.json' in current directory or project folder
-    3. Default Inngest / developer brand configuration fallback
+    2. Derived from project_profile (product_company, publisher_brand, product, sources)
+    3. Neutral fallback tokens (never silently substituting another company)
     """
     raw_brand: Dict[str, Any] = {}
 
     # Case 1: Dict input
     if isinstance(project_input, dict):
+        pp = project_input.get("project_profile") if isinstance(project_input.get("project_profile"), dict) else project_input
+        
+        # Check explicit brand block
         if "brand" in project_input and isinstance(project_input["brand"], dict):
             raw_brand = dict(project_input["brand"])
         elif "brand_config" in project_input and isinstance(project_input["brand_config"], dict):
             raw_brand = dict(project_input["brand_config"])
-        elif "project_profile" in project_input and isinstance(project_input["project_profile"], dict):
-            pp = project_input["project_profile"]
-            if "brand" in pp and isinstance(pp["brand"], dict):
-                raw_brand = dict(pp["brand"])
-            elif pp.get("product"):
-                raw_brand["company_name"] = pp["product"]
-                raw_brand["logo_text"] = pp["product"].upper()
+        elif "brand" in pp and isinstance(pp["brand"], dict):
+            raw_brand = dict(pp["brand"])
+
+        # Derive company name / logo from project identity
+        company = (
+            raw_brand.get("company_name")
+            or pp.get("product_company")
+            or pp.get("publisher_brand")
+            or pp.get("client_brand")
+            or pp.get("product")
+        )
+        if company:
+            raw_brand.setdefault("company_name", company)
+            raw_brand.setdefault("logo_text", company.upper())
+
+        # Derive docs URL from sources if not specified
+        sources = pp.get("sources", [])
+        if "docs_url_display" not in raw_brand and sources and isinstance(sources, list):
+            first_src = sources[0]
+            if isinstance(first_src, dict) and first_src.get("url"):
+                clean_url = first_src["url"].replace("https://", "").replace("http://", "").rstrip("/")
+                raw_brand["docs_url_display"] = clean_url
 
         # Check render_profile theme if brand colors not specified
-        if "render_profile" in project_input and isinstance(project_input["render_profile"], dict):
-            theme = project_input["render_profile"].get("theme", {})
+        rp = project_input.get("render_profile") or pp.get("render_profile", {})
+        if isinstance(rp, dict):
+            theme = rp.get("theme", {})
             if "accent" in theme and "primary_color" not in raw_brand:
                 raw_brand["primary_color"] = theme["accent"]
             if "success" in theme and "secondary_color" not in raw_brand:
@@ -78,15 +98,4 @@ def load_brand_config(project_input: Union[Dict[str, Any], str, Path, None] = No
             except Exception:
                 pass
 
-    # Case 3: Check local brand_config.json in repo root
-    if not raw_brand:
-        local_brand_file = REPO_DIR / "brand_config.json"
-        if local_brand_file.exists():
-            try:
-                with open(local_brand_file, "r", encoding="utf-8") as f:
-                    raw_brand = json.load(f)
-            except Exception:
-                pass
-
     return BrandConfig(**raw_brand)
-

@@ -78,18 +78,11 @@ class ScenePlan(BaseModel):
 
 def format_spoken_text(text: str) -> str:
     """Converts code syntax and symbols into natural, professional spoken English."""
-    s = text
-    s = re.sub(r"\bIdempotency-Key\b", "Idempotency Key", s)
-    s = re.sub(r"\bidempotencyKey\b", "idempotency key", s)
-    s = re.sub(r"\bPOST\b", "post", s)
-    s = re.sub(r"\bHTTP\s+503\b", "H T T P 503", s)
-    s = re.sub(r"\bHTTP\s+400\b", "H T T P 400", s)
-    s = re.sub(r"\bAPI\b", "A P I", s)
-    s = re.sub(r"\bIDs?\b", "I D", s)
-    s = re.sub(r"\bURL\b", "U R L", s)
-    s = re.sub(r"\bUUID\s*v4\b", "U U I D version 4", s)
-    s = re.sub(r"\bstep\.run\(\)", "step dot run", s)
-    s = re.sub(r"\bstep\.run\b", "step dot run", s)
+    try:
+        from engine.audio.tts_whisper import sanitize_spoken_narration
+        s = sanitize_spoken_narration(text)
+    except ImportError:
+        s = text
     s = re.sub(r"[{}\[\]`'\"]", "", s)
     s = re.sub(r"\s+", " ", s).strip()
     return s
@@ -213,29 +206,37 @@ def build_scene_plan_deterministic(
     raw_code = (code_rec.excerpt if code_rec else workflow.code_snippet) or ""
     sanitized_code = sanitize_code(raw_code)
 
-    # Derive focus token dynamically from action_rec or workflow
-    focus_token = "step.run(" if "step.run" in sanitized_code else ("idempotencyKey" if "idempotencyKey" in sanitized_code else "")
-    if not focus_token and action_rec:
+    # Derive focus token dynamically from code structure and action evidence
+    focus_token = ""
+    method_matches = re.findall(r"(?:function|const|let|var|export const|export function)\s+([a-zA-Z0-9_]+)", sanitized_code)
+    call_matches = re.findall(r"\.([a-zA-Z0-9_]+)\(", sanitized_code)
+
+    if action_rec:
         for word in action_rec.claim.split():
             clean_w = re.sub(r"[{}\[\]`'\"]", "", word)
             if clean_w in sanitized_code and len(clean_w) > 3:
                 focus_token = clean_w
                 break
+    if not focus_token and call_matches:
+        focus_token = call_matches[0]
+    elif not focus_token and method_matches:
+        focus_token = method_matches[0]
 
     b2_highlights = derive_highlight_lines(sanitized_code, focus_token)
     b2_title = derive_clean_title_from_claim(action_rec.claim if action_rec else (code_rec.source_section if code_rec else "Implementation"), max_words=6)
     b2_narration = action_rec.claim if action_rec else (f"Implement {workflow.title} using verified syntax.")
-    b2_filename = "process-order.ts" if "processorder" in sanitized_code.lower() else ("create-payment.ts" if "payment" in sanitized_code.lower() else "workflow.ts")
+    fn_name = method_matches[0] if method_matches else "workflow"
+    b2_filename = f"{fn_name}.ts"
 
     # Beat 3: Demonstration / State Trace
     beh_rec = find_best_matching_record(
         behavior_records,
-        [workflow.title, "memoize", "cache", "retry", "state", "recovery"]
+        [workflow.title, "memoize", "cache", "retry", "state", "recovery", "verify", "signature"]
     ) or (behavior_records[0] if behavior_records else None)
 
     fail_rec = find_best_matching_record(
         failure_records,
-        [workflow.title, "fail", "timeout", "network", "crashed"]
+        [workflow.title, "fail", "timeout", "network", "crashed", "duplicate", "replay", "tampered"]
     ) or (failure_records[0] if failure_records else None)
 
     all_recs = evidence_pack.records
@@ -253,18 +254,21 @@ def build_scene_plan_deterministic(
     b3_title = derive_clean_title_from_claim(primary_b3_rec.claim if primary_b3_rec else "Runtime Execution Trace", max_words=6)
     b3_narration = f"{beh_rec.claim if beh_rec else (primary_b3_rec.claim if primary_b3_rec else 'State is isolated during execution.')} {fail_rec.claim if fail_rec else ''}".strip()
     
-    # Dynamically build state transition events
+    # Dynamically build state transition events from verified evidence
+    ent_1_label = (action_rec.source_section if action_rec else None) or "Initial Operation"
+    ent_2_label = "Retry & State Recovery"
+
     b3_entities = [
-        {"id": "step_1", "label": "Initial Operation: Save State", "sub_label": "Execution context checkpointed"},
-        {"id": "step_2", "label": "Subsequent Step: Retry Recovery", "sub_label": "Transient outage recovery"},
+        {"id": "initial_operation", "label": ent_1_label, "sub_label": "Execution context checkpointed"},
+        {"id": "recovery_operation", "label": ent_2_label, "sub_label": "Recovery without side effects"},
     ]
     b3_events = [
-        {"target": "step_1", "action": "start", "label": "Executing Initial Step"},
-        {"target": "step_1", "action": "succeed", "label": beh_rec.claim[:36] if beh_rec else "State Checkpointed"},
-        {"target": "step_2", "action": "start", "label": "Executing Dependent Step"},
-        {"target": "step_2", "action": "fail", "label": fail_rec.claim[:36] if fail_rec else "Transient Network Outage"},
-        {"target": "step_2", "action": "retry", "label": "Automatic Retry with Exponential Backoff"},
-        {"target": "step_2", "action": "recover", "label": "Succeeded — Memoized State Reused"},
+        {"target": "initial_operation", "action": "start", "label": "Executing Operation", "at_word": "isolated" if "isolated" in b3_narration.lower() else "operation"},
+        {"target": "initial_operation", "action": "succeed", "label": beh_rec.claim[:36] if beh_rec else "State Persisted", "at_word": "succeed"},
+        {"target": "recovery_operation", "action": "start", "label": "Fault Detection & Check"},
+        {"target": "recovery_operation", "action": "fail", "label": fail_rec.claim[:36] if fail_rec else "Transient Network Drop", "at_word": "fail"},
+        {"target": "recovery_operation", "action": "retry", "label": "Retry with Checkpoint", "at_word": "retry"},
+        {"target": "recovery_operation", "action": "recover", "label": "Succeeded — State Reused", "at_word": "reused"},
     ]
 
     # Beat 4: Payoff & Guarantees (Bento Grid)
@@ -321,7 +325,7 @@ def build_scene_plan_deterministic(
     ) or (concept_records[0] if concept_records else None)
 
     b5_ev_ids = [concept_rec.id] if concept_rec else (b1_ev_ids or ([code_rec.id] if code_rec else [default_ev_id]))
-    doc_source_url = evidence_pack.sources[0].source_url if evidence_pack.sources else "https://docs.inngest.com"
+    doc_source_url = evidence_pack.sources[0].source_url if evidence_pack.sources else "https://docs.example.com"
     b5_claim = concept_rec.claim if concept_rec else (prob_rec.claim if prob_rec else workflow.takeaway)
     b5_title = derive_clean_title_from_claim(b5_claim, max_words=6)
     b5_display = f"{b5_title.upper()}"

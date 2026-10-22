@@ -30,6 +30,7 @@ EvidenceKind = Literal[
     "limitation",
     "code_evidence",
     "metric",
+    "release_change",
 ]
 
 ConfidenceLevel = Literal["source_supported", "inferred_needs_review"]

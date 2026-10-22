@@ -1,0 +1,60 @@
+{
+  "project_profile": {
+    "product": "Resend",
+    "product_subject": "Webhook Signature Verification",
+    "product_company": "Resend",
+    "publisher_brand": "Resend",
+    "client_brand": "Resend",
+    "audience": "Backend & API developers",
+    "goal": "Explain how to verify HMAC webhook signatures and prevent replay attacks in a 30-second video",
+    "duration_target_seconds": 30,
+    "topic": "Resend Webhook Signature Verification & Security",
+    "subject": "code",
+    "video_intent": "api_sdk_walkthrough",
+    "sources": [
+      {
+        "url": "https://resend.com/docs/dashboard/webhooks/verify-webhooks",
+        "local_file": "examples/docs/resend_webhooks.md",
+        "title": "Resend Webhook Signature Verification Documentation"
+      }
+    ]
+  },
+  "render_profile": {
+    "aspect_ratio": "16:9",
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "theme": {
+      "background": "#000000",
+      "card_background": "#111111",
+      "text_primary": "#ffffff",
+      "text_secondary": "#888888",
+      "accent": "#ffffff",
+      "success": "#00e599",
+      "danger": "#ff4d4d",
+      "warning": "#f5a623"
+    },
+    "typography": {
+      "font_family_code": "JetBrains Mono, monospace",
+      "font_family_text": "Inter, sans-serif"
+    },
+    "caption_layout": {
+      "position": "bottom",
+      "max_words_per_line": 5
+    }
+  },
+  "brand": {
+    "company_name": "Resend",
+    "logo_text": "RESEND",
+    "primary_color": "#ffffff",
+    "secondary_color": "#00e599",
+    "warning_color": "#f5a623",
+    "danger_color": "#ff4d4d",
+    "bg_canvas": "#000000",
+    "bg_surface": "#111111",
+    "font_sans": "Inter, sans-serif",
+    "font_mono": "JetBrains Mono, monospace",
+    "docs_url_display": "resend.com/docs/webhooks"
+  }
+}
+

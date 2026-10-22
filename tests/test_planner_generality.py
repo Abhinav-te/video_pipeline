@@ -207,3 +207,32 @@ export async function modernTask() {
     val_report = validate_evidence_and_plan(pack, plan)
     assert val_report.passed, f"Release diff validation failed: {val_report.checks}"
 
+
+def test_planner_generality_resend_webhooks():
+    """Verify scene planning for Resend Webhook Signatures is 100% data-driven and passes all 4 gates."""
+    doc_path = REPO_DIR / "examples" / "docs" / "resend_webhooks.md"
+    assert doc_path.exists(), f"Missing {doc_path}"
+
+    sources = [{"url": "https://resend.com/docs/dashboard/webhooks/verify-webhooks", "local_file": str(doc_path), "title": "Resend Webhook Docs"}]
+    project_profile = {
+        "product": "Resend",
+        "topic": "Resend Webhook Signature Verification & Security",
+        "duration_target_seconds": 30,
+    }
+
+    pack = extract_evidence_pack(sources, project_profile=project_profile, mock=True)
+    assert len(pack.records) >= 3
+
+    wf_res = select_best_workflow(pack, project_profile=project_profile, mock=True)
+    plan = plan_scenes(wf_res.selected_workflow, pack, duration_target=30)
+
+    assert len(plan.scenes) == 5
+    code_scene = plan.scenes[1]
+    assert code_scene.code is not None
+    assert "Webhook" in code_scene.code
+    assert code_scene.highlight_lines is not None and len(code_scene.highlight_lines) > 0
+
+    val_report = validate_evidence_and_plan(pack, plan)
+    assert val_report.passed, f"Validation failed: {val_report.checks}"
+
+

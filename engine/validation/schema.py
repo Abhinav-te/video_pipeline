@@ -112,28 +112,31 @@ def resolve_script_subject(script_data: Any) -> str:
     if isinstance(subject, str) and subject.strip().lower() in ALL_SUBJECTS:
         return subject.strip().lower()
 
-    if detect_domain is not None:
-        title = script_data.get("title", "")
-        detected = detect_domain(title)
-        if detected in ALL_SUBJECTS:
-            return detected
-
-        for s in (script_data.get("scenes") or []):
-            if isinstance(s, dict):
-                text = s.get("narration") or s.get("spoken_text") or ""
-                detected = detect_domain(text)
-                if detected in ALL_SUBJECTS:
-                    return detected
-
+    # First inspect explicit scene visual primitives
     scenes = script_data.get("scenes") or []
     for s in scenes:
         if not isinstance(s, dict):
             continue
         v_type = s.get("visual_type") or s.get("scene_type")
-        if v_type in {"code_reveal", "code_transform", "show_code", "highlight_code"}:
-            return "code"
         if v_type in {"terminal", "show_terminal"}:
             return "devtools"
+        if v_type in {"code_reveal", "code_transform", "show_code", "highlight_code"}:
+            return "code"
+
+    if detect_domain is not None:
+        title = (script_data.get("title") or "").strip()
+        if title:
+            detected = detect_domain(title)
+            if detected in ALL_SUBJECTS:
+                return detected
+
+        for s in scenes:
+            if isinstance(s, dict):
+                text = (s.get("narration") or s.get("spoken_text") or "").strip()
+                if text:
+                    detected = detect_domain(text)
+                    if detected in ALL_SUBJECTS:
+                        return detected
 
     return "code"
 

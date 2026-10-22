@@ -346,13 +346,12 @@ def main():
     audio_file_path = run_dir / "audio.wav" if (run_dir / "audio.wav").exists() else run_dir / "audio.mp3"
 
     try:
-        is_valid, errors, meta = validate_video_output(
+        from validation.evidence_validator import validate_post_render_qa
+        is_valid, errors, meta = validate_post_render_qa(
             video_path=out_file_path,
             expected_audio_path=audio_file_path if (audio_file_path.exists() and not args.frames) else None,
-            tolerance_sec=1.5,
             aspect_ratio=aspect_ratio,
-            expected_width=render_width,
-            expected_height=render_height,
+            tolerance_sec=1.5,
         )
     except Exception as exc:
         is_valid = False

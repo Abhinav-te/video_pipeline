@@ -69,94 +69,47 @@ def generate_candidate_workflows_deterministic(
     primary_code = code_records[0].excerpt if code_records else ""
     primary_code_id = code_records[0].id if code_records else ""
 
-    # Detect the technical pattern generically from evidence content & project goal
-    corpus = " ".join([r.claim.lower() + " " + r.excerpt.lower() for r in evidence_pack.records])
-    is_step_flow = "step.run" in corpus or "step" in goal.lower() or "durable" in goal.lower()
-    is_idempotency = not is_step_flow and ("idempotenc" in corpus or "idempotent" in goal.lower())
+    # Derive candidate workflows generically from evidence records
+    primary_action = action_records[0].claim if action_records else f"Implement {p_name} verified primitives."
+    primary_prob = failure_records[0].claim if failure_records else "Network dropouts and transient failures cause unhandled job crashes or duplicate execution."
+    primary_beh = behavior_records[0].claim if behavior_records else f"{p_name} checkpoints state and guarantees safe retry recovery."
+    primary_concept = concept_records[0].claim if concept_records else f"Use {p_name} for safe production operations."
 
-    if is_idempotency:
-        c1_id = "wf_idempotent_requests"
-        c1_title = "Safe Request Retries with Idempotency Key Recovery"
-        c1_desc = "Pass unique idempotency keys so network retries reuse cached responses without duplicate charges."
-        c1_prob = failure_records[0].claim if failure_records else "Network timeouts and connection drops leave request state unknown, risking duplicate charges on retry."
-        c1_impl = action_records[0].claim if action_records else "Pass a unique Idempotency-Key header on mutating requests."
-        c1_demo = behavior_records[0].claim if behavior_records else "Initial request executes and saves response; retries with the same key return the cached result without duplicate execution."
-        c1_payoff = "Zero duplicate transactions, safe network retry recovery, and verified payment integrity."
-        c1_takeaway = "Idempotency keys prevent duplicate operations and ensure safe retries out of the box."
-
-        c2_id = "wf_unprotected_retries"
-        c2_title = "Unprotected Requests Without Idempotency Keys"
-        c2_desc = "Retrying mutating POST requests after a timeout without idempotency keys risks duplicate operations."
-        c2_prob = "A network timeout leaves client state ambiguous, forcing blind retries that duplicate operations."
-        c2_impl = "Execute API calls directly without passing an Idempotency-Key header."
-        c2_demo = "Downstream timeout forces a second request that creates a duplicate customer charge."
-        c2_payoff = "Highlights the double-charge problem, but offers no recovery mechanism on its own."
-        c2_takeaway = "Without idempotency keys, network retries can perform the same mutating operation multiple times."
-
-        c3_id = "wf_parameter_mismatch_boundary"
-        c3_title = "Idempotency Key Parameter Parity & Expiration Constraints"
-        c3_desc = limitation_records[0].claim if limitation_records else "Sending the same Idempotency-Key with different parameters causes a 400 error."
-        c3_prob = "Altering request parameters while reusing an idempotency key creates an ambiguous state error."
-        c3_impl = "Ensure idempotency keys are tied to deterministic parameter hashes and expired after 24 hours."
-        c3_demo = "A retried request with altered payload is rejected with a 400 error to prevent payload drift."
-        c3_payoff = "Guarantees strict payload consistency and prevents unintended parameter mutation."
-        c3_takeaway = "Idempotency keys must match original request parameters exactly and expire after 24 hours."
-
-    elif is_step_flow:
-        c1_id = "wf_durable_step_recovery"
-        c1_title = "Durable Step Execution with Isolated Retries and Memoized Recovery"
-        c1_desc = "Wrap critical operations in steps so that transient errors retry only the failed step without re-executing completed work."
-        c1_prob = failure_records[0].claim if failure_records else "Multi-step workflows crash entirely on downstream errors, forcing costly and duplicate re-execution of earlier steps."
-        c1_impl = action_records[0].claim if action_records else "Wrap individual operations in isolated steps using official execution primitives."
-        c1_demo = behavior_records[0].claim if behavior_records else "Step 1 succeeds and its result is memoized. When Step 2 fails with a transient error, the engine retries only Step 2 while reusing Step 1 state."
-        c1_payoff = "Zero redundant external API calls, automatic retry recovery, and resilient distributed execution."
-        c1_takeaway = "Durable steps isolate failures and reuse memoized state for zero-duplicate recovery."
-
-        c2_id = "wf_monolithic_failure"
-        c2_title = "Monolithic Function Execution without Step Isolation"
-        c2_desc = "Executing multi-step logic in a single function without step boundaries causes whole-function aborts."
-        c2_prob = "A single network failure midway through a function aborts everything and loses in-flight state."
-        c2_impl = "Execute all calls directly within one un-partitioned async handler."
-        c2_demo = "Downstream failure aborts the entire execution context, requiring full restart."
-        c2_payoff = "Demonstrates the problem, but offers no recovery mechanism on its own."
-        c2_takeaway = "Without step-level durability, workflows cannot recover partial progress."
-
-        c3_id = "wf_idempotent_side_effects"
-        c3_title = "Idempotent Side Effect Handling During Automated Step Retries"
-        c3_desc = limitation_records[0].claim if limitation_records else "Handling uncommitted external side effects safely when steps are retried automatically."
-        c3_prob = "Automatic retries can duplicate non-idempotent side effects if a step fails mid-execution."
-        c3_impl = "Isolate side-effecting operations into atomic, idempotent step boundaries."
-        c3_demo = "A step retry verifies idempotency keys before dispatching external calls."
-        c3_payoff = "Guarantees safe distributed side effects during automated retry loops."
-        c3_takeaway = "Ensure side effects inside retried steps are atomic or idempotent."
+    # Candidate 1: Primary Recommended Developer Workflow
+    c1_id = "wf_primary_verified_workflow"
+    if goal:
+        c1_title = f"{p_name}: {goal}" if not goal.lower().startswith(p_name.lower()) else goal
+    elif action_records:
+        c1_title = f"{p_name}: {action_records[0].source_section or action_records[0].claim[:45]}"
     else:
-        # Fully generic developer workflow
-        c1_id = "wf_primary_resilient_workflow"
-        c1_title = f"{p_name} Resilient Execution and Recovery"
-        c1_desc = "Execute operations with verified checkpointing and recovery guarantees."
-        c1_prob = failure_records[0].claim if failure_records else "Downstream failures cause unhandled job crashes."
-        c1_impl = action_records[0].claim if action_records else "Call official resilient primitives."
-        c1_demo = behavior_records[0].claim if behavior_records else "State is persisted and recovered on retry."
-        c1_payoff = "Zero duplicate work, automatic retry recovery, and system resilience."
-        c1_takeaway = concept_records[0].claim if concept_records else f"Use {p_name} for safe production operations."
+        c1_title = f"{p_name} Verified Execution & Recovery"
 
-        c2_id = "wf_unhandled_failure_contrast"
-        c2_title = "Unprotected Execution Without Checkpoints"
-        c2_desc = "Running without resilience primitives risks unrecoverable failure."
-        c2_prob = c1_prob
-        c2_impl = "Execute operations without resilience guards."
-        c2_demo = "A failure causes total abort."
-        c2_payoff = "Demonstrates the failure mode."
-        c2_takeaway = "Unhandled execution cannot recover partial state."
+    c1_desc = f"{primary_action} {primary_beh}"
+    c1_prob = primary_prob
+    c1_impl = primary_action
+    c1_demo = primary_beh
+    c1_payoff = "Zero duplicate operations, verified state recovery, and system resilience."
+    c1_takeaway = primary_concept
 
-        c3_id = "wf_boundary_constraints"
-        c3_title = f"{p_name} Operational Limitations and Safety"
-        c3_desc = limitation_records[0].claim if limitation_records else "Handling edge cases safely."
-        c3_prob = "Edge cases and constraints must be handled explicitly."
-        c3_impl = "Validate boundaries before retry."
-        c3_demo = "Boundary constraints are checked."
-        c3_payoff = "Prevents invalid state mutation."
-        c3_takeaway = "Always verify boundary constraints."
+    # Candidate 2: Failure Mode Contrast Workflow
+    c2_id = "wf_unhandled_failure_contrast"
+    c2_title = f"Unprotected Execution without {p_name} Primitives"
+    c2_desc = f"Running operations without {p_name} guards risks unrecoverable failure on transient errors."
+    c2_prob = primary_prob
+    c2_impl = "Execute operations directly without resilience or verification primitives."
+    c2_demo = "A transient network error or crash aborts execution, risking inconsistent state or duplicate operations."
+    c2_payoff = "Demonstrates the failure mode, but offers no recovery mechanism on its own."
+    c2_takeaway = f"Without {p_name} guards, workflows cannot safely recover partial progress."
+
+    # Candidate 3: Boundary & Limitation Workflow
+    c3_id = "wf_boundary_constraints"
+    c3_title = f"{p_name} Boundary Constraints & Operational Safety"
+    c3_desc = limitation_records[0].claim if limitation_records else f"Operational constraints and parameters must be verified during execution."
+    c3_prob = "Altering request parameters or violating constraints creates ambiguous state errors."
+    c3_impl = "Ensure operations comply with verified boundary constraints and parameter validation."
+    c3_demo = "Operations violating constraints are rejected cleanly to prevent state corruption."
+    c3_payoff = "Guarantees strict parameter consistency and prevents unintended side effects."
+    c3_takeaway = limitation_records[0].claim if limitation_records else f"Always verify operational boundary constraints with {p_name}."
 
     # Candidate 1: Primary Recommended Developer Workflow (Core Feature)
     ev_ids_c1 = [r.id for r in (action_records[:2] + behavior_records[:2] + failure_records[:2])]

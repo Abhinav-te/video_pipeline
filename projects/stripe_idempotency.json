@@ -1,11 +1,16 @@
 {
   "project_profile": {
     "product": "Stripe API",
+    "product_subject": "Idempotent Requests & Safe Retries",
+    "product_company": "Stripe",
+    "publisher_brand": "Stripe",
+    "client_brand": "Stripe",
     "audience": "Backend & payments engineers",
     "goal": "Explain how to safely retry POST requests after network timeouts without double-charging customers in a 30-second video",
     "duration_target_seconds": 30,
     "topic": "Stripe API Idempotent Requests & Safe Retries",
     "subject": "code",
+    "video_intent": "failure_recovery_explainer",
     "sources": [
       {
         "url": "https://docs.stripe.com/api/idempotent_requests",
@@ -15,19 +20,19 @@
     ]
   },
   "render_profile": {
-    "aspect_ratio": "9:16",
-    "width": 1080,
-    "height": 1920,
+    "aspect_ratio": "16:9",
+    "width": 1920,
+    "height": 1080,
     "fps": 30,
     "theme": {
-      "background": "#0d1117",
-      "card_background": "#161b22",
-      "text_primary": "#f0f6fc",
-      "text_secondary": "#8b949e",
+      "background": "#0a0d14",
+      "card_background": "#141926",
+      "text_primary": "#f8fafc",
+      "text_secondary": "#94a3b8",
       "accent": "#635bff",
-      "success": "#3fb950",
-      "danger": "#f85149",
-      "warning": "#d29922"
+      "success": "#00d924",
+      "danger": "#df1b41",
+      "warning": "#e25950"
     },
     "typography": {
       "font_family_code": "JetBrains Mono, monospace",
@@ -37,6 +42,18 @@
       "position": "bottom",
       "max_words_per_line": 5
     }
+  },
+  "brand": {
+    "company_name": "Stripe",
+    "logo_text": "STRIPE",
+    "primary_color": "#635bff",
+    "secondary_color": "#00d924",
+    "warning_color": "#e25950",
+    "danger_color": "#df1b41",
+    "bg_canvas": "#0a0d14",
+    "bg_surface": "#141926",
+    "font_sans": "Inter, sans-serif",
+    "font_mono": "JetBrains Mono, monospace",
+    "docs_url_display": "docs.stripe.com/api/idempotent_requests"
   }
 }
-
