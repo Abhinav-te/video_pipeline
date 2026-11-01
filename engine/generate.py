@@ -2,6 +2,7 @@
 
 import argparse
 import asyncio
+import contextlib
 import datetime
 import glob
 import hashlib
@@ -64,15 +65,30 @@ def generate_run_id() -> str:
 
 def cleanup_run_artifacts(run_dir: Path) -> None:
     """
-    Cleans up partial or corrupted files in public/runs/<run_id>/ on failure.
-    Guarantees zero stale or half-baked artifacts remain.
+    Cleans up transient scratch files inside run_dir on failure.
+    Never deletes the run directory itself or durable artifacts such as
+    validation diagnostics, manifest, timeline data, audio, or revisions.
     """
-    if run_dir and run_dir.exists():
+    if run_dir and run_dir.exists() and run_dir.is_dir():
         try:
-            shutil.rmtree(run_dir, ignore_errors=True)
-            log(f"🧹 Cleaned up failed run directory: {run_dir}")
+            transient_patterns = [
+                "*.tmp",
+                "*.partial",
+                ".staged_*",
+                "temp_*",
+            ]
+            for pattern in transient_patterns:
+                for p in run_dir.glob(pattern):
+                    try:
+                        if p.is_file() or p.is_symlink():
+                            p.unlink(missing_ok=True)
+                        elif p.is_dir():
+                            shutil.rmtree(p, ignore_errors=True)
+                    except Exception:
+                        pass
+            log(f"🧹 Cleaned up transient scratch files in run directory: {run_dir}")
         except Exception as exc:
-            print(f"[ENGINE:WARN] Failed to clean up run directory {run_dir}: {exc}", file=sys.stderr)
+            print(f"[ENGINE:WARN] Failed to clean up transient files in {run_dir}: {exc}", file=sys.stderr)
 
 
 # ---------------------------------------------------------------------------
@@ -502,7 +518,11 @@ def build_final_payload(
         "run_id": run_id,
         "scenes": timed_scenes,
         "words": words,
-        "audio_file": f"runs/{run_id}/audio.mp3",
+        "audio_file": (
+            f"runs/{run_id}/audio.wav"
+            if (RUNS_DIR / run_id / "audio.wav").exists() or (Path("video/public/runs") / run_id / "audio.wav").exists()
+            else f"runs/{run_id}/audio.mp3"
+        ),
     }
     if source_facts:
         payload["source_facts"] = source_facts
@@ -599,7 +619,7 @@ def main():
     parser.add_argument(
         "--subject",
         type=str,
-        choices=["auto", "code", "devtools", "math", "physics", "systems", "ml", "chemistry", "quantum_physics", "mechanics", "electrical"],
+        choices=["auto", "code", "devtools", "systems"],
         default="auto",
         help="Subject domain for video.",
     )
@@ -636,12 +656,6 @@ def main():
         type=str,
         default=None,
         help="Unique identifier for run isolation.",
-    )
-
-    parser.add_argument(
-        "--no-manim",
-        action="store_true",
-        help="Disable Stage 4.5 Manim Community pre-rendering.",
     )
 
     parser.add_argument(
@@ -746,6 +760,18 @@ def main():
     print(f"Run Dir:  {run_dir}")
     print("=" * 70)
     print()
+
+    try:
+        from engine.pipeline.manifest import RevisionLock
+    except ImportError:
+        from pipeline.manifest import RevisionLock
+
+    lock_ctx = (
+        RevisionLock(run_dir)
+        if not os.environ.get("ENGINE_LOCK_HELD")
+        else contextlib.nullcontext()
+    )
+    lock_ctx.__enter__()
 
     try:
         # Clean existing artifacts in this run_dir if re-running same run_id
@@ -918,6 +944,8 @@ def main():
         write_reflection_error(run_dir, stage="GENERATION", message=str(exc))
         cleanup_run_artifacts(run_dir)
         raise
+    finally:
+        lock_ctx.__exit__(None, None, None)
 
     print()
     print("=" * 70)

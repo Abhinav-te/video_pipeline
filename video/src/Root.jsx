@@ -26,7 +26,7 @@ export const RemotionRoot = () => {
       || currentData?.duration 
       || (currentData?.scenes?.length > 0 ? currentData.scenes[currentData.scenes.length - 1].end_time : null)
       || (currentData?.words?.length > 0 ? currentData.words[currentData.words.length - 1].end + 0.25 : 30);
-    const durationInFrames = Math.max(30, Math.ceil(totalDurationSec * fps));
+    const durationInFrames = Math.max(30, Math.round(totalDurationSec * fps));
 
     const aspectRatio = currentData?.render_profile?.aspect_ratio || currentData?.aspect_ratio || '16:9';
     const isVertical = aspectRatio === '9:16';

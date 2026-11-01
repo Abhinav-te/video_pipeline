@@ -12,7 +12,7 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Literal, Optional, Set
 from pydantic import BaseModel, Field
 
 try:
@@ -37,6 +37,14 @@ class PlannedScene(BaseModel):
     visual_type: str
     evidence_ids: List[str] = Field(default_factory=list)
     narration_segments: List[NarrationSegment] = Field(default_factory=list)
+    visual_representation: Literal["observed_capture", "illustrative", "composite"] = Field(
+        default="illustrative",
+        description="Visual presentation fidelity: observed_capture (from execution), illustrative (concept animation), or composite",
+    )
+    execution_artifact_id: Optional[str] = Field(
+        default=None,
+        description="Associated execution artifact ID when visual_representation is observed_capture or composite",
+    )
     
     # Universal Scene Vocabulary Fields
     display_text: Optional[str] = None
@@ -76,14 +84,28 @@ class ScenePlan(BaseModel):
         }
 
 
+def strip_markdown_prose(text: str) -> str:
+    """Strips Markdown syntax from human-readable prose while preserving technical code terms."""
+    if not text:
+        return ""
+    s = str(text).strip()
+    s = re.sub(r"^#{1,6}\s*", "", s)
+    s = re.sub(r"\*\*([^*]+)\*\*", r"\1", s)
+    s = re.sub(r"\*([^*]+)\*", r"\1", s)
+    s = re.sub(r"__([^_]+)__", r"\1", s)
+    s = re.sub(r"(?<!\w)_([^_]+)_(?!\w)", r"\1", s)
+    s = re.sub(r"`([^`]+)`", r"\1", s)
+    s = re.sub(r"^[-*•]\s*", "", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+
 def format_spoken_text(text: str) -> str:
-    """Converts code syntax and symbols into natural, professional spoken English."""
-    try:
-        from engine.audio.tts_whisper import sanitize_spoken_narration
-        s = sanitize_spoken_narration(text)
-    except ImportError:
-        s = text
-    s = re.sub(r"[{}\[\]`'\"]", "", s)
+    """Normalizes narration prose while preserving exact code identifiers and technical syntax."""
+    if not text:
+        return ""
+    s = strip_markdown_prose(text)
+    s = re.sub(r"[{}\[\]]", "", s)
     s = re.sub(r"\s+", " ", s).strip()
     return s
 
@@ -125,10 +147,36 @@ def find_best_matching_record(
     return best_rec
 
 
+DANGLING_CONJUNCTIONS = {
+    "and", "&", "or", "with", "in", "on", "at", "to", "for", "of", "via", "by", "vs", "versus"
+}
+
+
 def derive_clean_title_from_claim(claim: str, prefix: str = "", max_words: int = 6) -> str:
-    """Derives a concise on-screen title directly from a claim ensuring high content-word overlap."""
-    clean = re.sub(r"[{}\[\]`'\"]", "", claim).strip()
-    words = clean.split()[:max_words]
+    """Derives a concise on-screen title directly from a claim, ensuring complete phrases without dangling conjunctions."""
+    clean = strip_markdown_prose(claim)
+    clean = re.sub(r"[{}\[\]'\"]", "", clean).strip()
+    all_words = clean.split()
+    if not all_words:
+        return ""
+
+    if len(all_words) <= max_words:
+        words = list(all_words)
+    else:
+        words = all_words[:max_words]
+        # If the last word is a dangling conjunction or preposition, include the next word to complete the phrase
+        while words and words[-1].lower() in DANGLING_CONJUNCTIONS:
+            next_idx = len(words)
+            if next_idx < len(all_words):
+                words.append(all_words[next_idx])
+            else:
+                words.pop()
+                break
+
+    # If title still ends in dangling conjunction (in edge cases), pop it
+    while words and words[-1].lower() in DANGLING_CONJUNCTIONS:
+        words.pop()
+
     title_text = " ".join(words)
     return title_text
 
@@ -178,12 +226,28 @@ def build_scene_plan_deterministic(
     b1_claim = prob_rec.claim if prob_rec else workflow.problem_statement
     b1_narration = b1_claim
     b1_title = derive_clean_title_from_claim(b1_claim, max_words=6)
-    b1_display = f"PROBLEM: {b1_title.upper()}"
+    b1_display = f"PROBLEM • {b1_title.upper()}"
     b1_emphasis = list(get_content_words(b1_claim))[-1].upper() if get_content_words(b1_claim) else "FAILURE"
-    
+
+    clean_b1_claim = strip_markdown_prose(b1_claim)
+    # Find a distinct secondary failure or impact record for Consequence
+    consequence_rec = find_best_matching_record(
+        [r for r in (failure_records + limitation_records) if r.id != prob_rec.id],
+        ["consequence", "crash", "timeout", "duplicate", "error", "fail", "retry", "limit"]
+    )
+    if consequence_rec:
+        consequence_text = strip_markdown_prose(consequence_rec.claim)
+        if consequence_rec.id not in b1_ev_ids:
+            b1_ev_ids.append(consequence_rec.id)
+    elif prob_rec and prob_rec.excerpt and prob_rec.excerpt != prob_rec.claim:
+        excerpt_clean = strip_markdown_prose(prob_rec.excerpt)
+        consequence_text = excerpt_clean if excerpt_clean else "Uncontrolled execution failure in distributed workflow."
+    else:
+        consequence_text = "Transient failures trigger unmemoized cascading retries."
+
     b1_items = [
-        {"label": "Failure Mode", "detail": b1_claim[:60] + ("..." if len(b1_claim) > 60 else ""), "status": "crashed"},
-        {"label": "Consequence", "detail": (prob_rec.excerpt[:60] + ("..." if len(prob_rec.excerpt) > 60 else "")) if prob_rec else b1_claim[:60], "status": "warning"},
+        {"label": "Failure Mode", "detail": clean_b1_claim[:65] + ("..." if len(clean_b1_claim) > 65 else ""), "status": "crashed"},
+        {"label": "Consequence", "detail": consequence_text[:65] + ("..." if len(consequence_text) > 65 else ""), "status": "warning"},
     ]
 
     # Beat 2: Implementation / Code
@@ -211,12 +275,20 @@ def build_scene_plan_deterministic(
     method_matches = re.findall(r"(?:function|const|let|var|export const|export function)\s+([a-zA-Z0-9_]+)", sanitized_code)
     call_matches = re.findall(r"\.([a-zA-Z0-9_]+)\(", sanitized_code)
 
+    GENERIC_LANGUAGE_KEYWORDS = {"await", "async", "const", "let", "var", "function", "return", "import", "export"}
     if action_rec:
-        for word in action_rec.claim.split():
-            clean_w = re.sub(r"[{}\[\]`'\"]", "", word)
-            if clean_w in sanitized_code and len(clean_w) > 3:
-                focus_token = clean_w
+        # Check compound or method call tokens in claim first (e.g. step.run, inngest.createFunction)
+        claim_calls = re.findall(r"([a-zA-Z0-9_]+\.[a-zA-Z0-9_]+)\b", action_rec.claim)
+        for cc in claim_calls:
+            if cc in sanitized_code:
+                focus_token = cc
                 break
+        if not focus_token:
+            for word in action_rec.claim.split():
+                clean_w = re.sub(r"[{}\[\]`'\"();,].*", "", word)
+                if clean_w in sanitized_code and len(clean_w) > 3 and clean_w.lower() not in GENERIC_LANGUAGE_KEYWORDS:
+                    focus_token = clean_w
+                    break
     if not focus_token and call_matches:
         focus_token = call_matches[0]
     elif not focus_token and method_matches:
@@ -224,7 +296,11 @@ def build_scene_plan_deterministic(
 
     b2_highlights = derive_highlight_lines(sanitized_code, focus_token)
     b2_title = derive_clean_title_from_claim(action_rec.claim if action_rec else (code_rec.source_section if code_rec else "Implementation"), max_words=6)
-    b2_narration = action_rec.claim if action_rec else (f"Implement {workflow.title} using verified syntax.")
+    raw_b2_narr = action_rec.claim if action_rec else (code_rec.claim if code_rec else f"Implement {workflow.title} using verified syntax.")
+    # Clean trailing syntax noise and awkward 'in await' from claim so narration reads naturally as step.run()
+    b2_narration = re.sub(r"\b(?:in\s+)?await\s+(step\.run)\([^)]*,?\s*async\s*\(\)\s*=>.*", lambda m: "in step.run()." if m.group(0).startswith("in") else "step.run().", raw_b2_narr)
+    b2_narration = re.sub(r"step\.run\([^)]*,?\s*async\s*\(\)\s*=>.*", "step.run().", b2_narration)
+    b2_narration = re.sub(r"\bin\s+await\s+step\.run\b", "in step.run", b2_narration)
     fn_name = method_matches[0] if method_matches else "workflow"
     b2_filename = f"{fn_name}.ts"
 
@@ -252,7 +328,9 @@ def build_scene_plan_deterministic(
 
     primary_b3_rec = beh_rec or (evidence_pack.get_record(b3_ev_ids[0]) if b3_ev_ids else None)
     b3_title = derive_clean_title_from_claim(primary_b3_rec.claim if primary_b3_rec else "Runtime Execution Trace", max_words=6)
-    b3_narration = f"{beh_rec.claim if beh_rec else (primary_b3_rec.claim if primary_b3_rec else 'State is isolated during execution.')} {fail_rec.claim if fail_rec else ''}".strip()
+    beh_text = beh_rec.claim.strip().rstrip(".") + "." if beh_rec else (primary_b3_rec.claim.strip().rstrip(".") + "." if primary_b3_rec else "State is isolated during execution.")
+    fail_text = fail_rec.claim.strip().rstrip(".") + "." if fail_rec else ""
+    b3_narration = f"{beh_text} {fail_text}".strip()
     
     # Dynamically build state transition events from verified evidence
     ent_1_label = (action_rec.source_section if action_rec else None) or "Initial Operation"
@@ -262,11 +340,13 @@ def build_scene_plan_deterministic(
         {"id": "initial_operation", "label": ent_1_label, "sub_label": "Execution context checkpointed"},
         {"id": "recovery_operation", "label": ent_2_label, "sub_label": "Recovery without side effects"},
     ]
+    beh_action_label = derive_clean_title_from_claim(beh_rec.claim, max_words=4) if beh_rec else "State Persisted"
+    fail_action_label = derive_clean_title_from_claim(fail_rec.claim, max_words=4) if fail_rec else "Transient Network Drop"
     b3_events = [
         {"target": "initial_operation", "action": "start", "label": "Executing Operation", "at_word": "isolated" if "isolated" in b3_narration.lower() else "operation"},
-        {"target": "initial_operation", "action": "succeed", "label": beh_rec.claim[:36] if beh_rec else "State Persisted", "at_word": "succeed"},
+        {"target": "initial_operation", "action": "succeed", "label": beh_action_label, "at_word": "succeed"},
         {"target": "recovery_operation", "action": "start", "label": "Fault Detection & Check"},
-        {"target": "recovery_operation", "action": "fail", "label": fail_rec.claim[:36] if fail_rec else "Transient Network Drop", "at_word": "fail"},
+        {"target": "recovery_operation", "action": "fail", "label": fail_action_label, "at_word": "fail"},
         {"target": "recovery_operation", "action": "retry", "label": "Retry with Checkpoint", "at_word": "retry"},
         {"target": "recovery_operation", "action": "recover", "label": "Succeeded — State Reused", "at_word": "reused"},
     ]
@@ -292,7 +372,7 @@ def build_scene_plan_deterministic(
     b4_items = []
     if primary_b4_rec:
         b4_items.append({
-            "title": derive_clean_title_from_claim(primary_b4_rec.claim, max_words=3).upper(),
+            "title": derive_clean_title_from_claim(primary_b4_rec.claim, max_words=5).upper(),
             "value": "STATE SAVED",
             "subtitle": primary_b4_rec.claim,
             "tag": "DURABILITY",
@@ -300,7 +380,7 @@ def build_scene_plan_deterministic(
         })
     if fail_rec and fail_rec.id != (primary_b4_rec.id if primary_b4_rec else None):
         b4_items.append({
-            "title": derive_clean_title_from_claim(fail_rec.claim, max_words=3).upper(),
+            "title": derive_clean_title_from_claim(fail_rec.claim, max_words=5).upper(),
             "value": "INDEPENDENT RETRY",
             "subtitle": fail_rec.claim,
             "tag": "RESILIENCE",
@@ -311,7 +391,7 @@ def build_scene_plan_deterministic(
     if limitation_records:
         for lim in limitation_records:
             b4_items.append({
-                "title": derive_clean_title_from_claim(lim.claim, max_words=3).upper(),
+                "title": derive_clean_title_from_claim(lim.claim, max_words=5).upper(),
                 "value": "SAFETY CONSTRAINT",
                 "subtitle": lim.claim,
                 "tag": "LIMITATION",
@@ -324,12 +404,23 @@ def build_scene_plan_deterministic(
         [workflow.title, "primitive", "durable", "idempotent", "workflow"]
     ) or (concept_records[0] if concept_records else None)
 
-    b5_ev_ids = [concept_rec.id] if concept_rec else (b1_ev_ids or ([code_rec.id] if code_rec else [default_ev_id]))
+    takeaway_rec = (
+        concept_rec
+        or find_best_matching_record(
+            [r for r in behavior_records if r.id not in b1_ev_ids],
+            [workflow.title, "primitive", "durable", "recovery", "workflow", "reliable", "guarantee"]
+        )
+        or (behavior_records[0] if behavior_records and behavior_records[0].id not in b1_ev_ids else None)
+        or (all_recs[0] if all_recs and all_recs[0].id not in b1_ev_ids else None)
+    )
+
+    b5_ev_ids = [takeaway_rec.id] if takeaway_rec else [default_ev_id]
     doc_source_url = evidence_pack.sources[0].source_url if evidence_pack.sources else "https://docs.example.com"
-    b5_claim = concept_rec.claim if concept_rec else (prob_rec.claim if prob_rec else workflow.takeaway)
+    b5_claim = takeaway_rec.claim if takeaway_rec else (workflow.takeaway or "Reliable distributed execution.")
     b5_title = derive_clean_title_from_claim(b5_claim, max_words=6)
     b5_display = f"{b5_title.upper()}"
-    b5_narration = f"{b5_claim} Check the official docs to get started."
+    clean_b5_claim = strip_markdown_prose(b5_claim).rstrip(".")
+    b5_narration = f"{clean_b5_claim}. Check the official docs to get started."
 
     scenes: List[PlannedScene] = []
 

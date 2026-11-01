@@ -329,8 +329,8 @@ def stitch_segments(
                 "-map", "1:a:0",
                 "-c:v", "copy",
                 "-c:a", "aac",
-                "-ar", "44100",
-                "-b:a", "192k",
+                "-ar", "48000",
+                "-b:a", "320k",
                 str(output_video_path),
             ]
             res_mux = subprocess.run(cmd_mux, capture_output=True, text=True)
@@ -362,7 +362,7 @@ def stitch_segments(
                     "-map", "[outv]",
                 ])
                 if master_audio_path and Path(master_audio_path).exists():
-                    cmd_filter.extend(["-map", f"{n}:a", "-c:a", "aac", "-ar", "44100", "-b:a", "192k"])
+                    cmd_filter.extend(["-map", f"{n}:a", "-c:a", "aac", "-ar", "48000", "-b:a", "320k", "-shortest"])
                 cmd_filter.extend([
                     "-c:v", "libx264",
                     "-preset", "veryfast",

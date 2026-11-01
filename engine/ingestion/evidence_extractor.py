@@ -34,6 +34,24 @@ EvidenceKind = Literal[
 ]
 
 ConfidenceLevel = Literal["source_supported", "inferred_needs_review"]
+EvidenceProvenance = Literal["documented", "prerecorded_fixture", "observed_execution"]
+
+
+class ExecutionArtifact(BaseModel):
+    artifact_id: str = Field(description="Unique stable artifact identifier (e.g. 'exec_art_01')")
+    run_id: str = Field(description="Associated run identifier")
+    command: List[str] = Field(description="Exact approved command and arguments executed")
+    exit_code: int = Field(description="Process termination exit code (0 for success)")
+    stdout_preview: str = Field(default="", description="Bounded stdout preview (max 4KB)")
+    stderr_preview: str = Field(default="", description="Bounded stderr preview (max 4KB)")
+    stdout_ref: Optional[str] = Field(default=None, description="Path or URI to full stdout log")
+    stderr_ref: Optional[str] = Field(default=None, description="Path or URI to full stderr log")
+    executed_at: Optional[str] = Field(default=None, description="ISO-8601 execution timestamp if observed live, or recorded fixture timestamp")
+    is_fixture: bool = Field(default=False, description="True if artifact is from a prerecorded fixture, False if verified live execution")
+    environment_meta: Dict[str, Any] = Field(default_factory=dict, description="Metadata describing execution environment or fixture context")
+    source_hash: str = Field(description="SHA-256 of the source script or fixture executed")
+    artifact_hash: str = Field(description="SHA-256 of the execution output")
+    provenance: EvidenceProvenance = Field(default="prerecorded_fixture", description="Provenance status of the execution artifact")
 
 
 class EvidenceRecord(BaseModel):
@@ -47,6 +65,8 @@ class EvidenceRecord(BaseModel):
     content_hash: str = Field(description="SHA-256 of the normalized source section")
     confidence: ConfidenceLevel = Field(default="source_supported", description="Verification confidence")
     code_evidence: Optional[str] = Field(default=None, description="Optional attached code snippet")
+    provenance: EvidenceProvenance = Field(default="documented", description="Evidence origin: documented vs observed_execution")
+    execution_artifact_id: Optional[str] = Field(default=None, description="Linked execution artifact ID when observed_execution")
 
 
 class SourceDocument(BaseModel):
@@ -61,6 +81,7 @@ class EvidencePack(BaseModel):
     project: str = Field(default="Generic Technical Product", description="Product or project identifier")
     sources: List[SourceDocument] = Field(default_factory=list)
     records: List[EvidenceRecord] = Field(default_factory=list)
+    execution_artifacts: List[ExecutionArtifact] = Field(default_factory=list, description="Associated execution artifacts")
     generated_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
 
     def get_record(self, record_id: str) -> Optional[EvidenceRecord]:

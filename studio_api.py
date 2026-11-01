@@ -17,16 +17,17 @@ import json
 import os
 from pathlib import Path
 import re
+import secrets
 import shutil
 import subprocess
 import sys
 import threading
 import uuid
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, status
+from fastapi import FastAPI, HTTPException, BackgroundTasks, status, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -55,6 +56,53 @@ from engine.pipeline.manifest import (
     compute_audio_hash,
 )
 from engine.revise import execute_revision, parse_scene_id
+from engine.security import (
+    validate_url_for_ssrf,
+    get_allowed_source_dirs,
+    validate_path_containment,
+    is_safe_identifier,
+    validate_run_id_safe,
+    validate_rev_id_safe,
+    validate_scene_id_safe,
+    validate_export_filename_safe,
+    verify_studio_token,
+    verify_github_signature,
+    is_origin_allowed,
+)
+
+# ---------------------------------------------------------------------------
+# Local Security & Authentication Configuration
+# ---------------------------------------------------------------------------
+raw_token = os.environ.get("STUDIO_AUTH_TOKEN", "").strip()
+if not raw_token or len(raw_token) < 8:
+    STUDIO_AUTH_TOKEN = secrets.token_hex(24)
+else:
+    STUDIO_AUTH_TOKEN = raw_token
+
+DEFAULT_ALLOWED_ORIGINS = [
+    "http://127.0.0.1:8000",
+    "http://localhost:8000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3000",
+]
+env_origins = os.environ.get("STUDIO_ALLOWED_ORIGINS", "").strip()
+if env_origins:
+    # Explicitly filter out wildcard "*" or empty entries to prevent accidental exposure
+    parsed_origins = [o.strip() for o in env_origins.split(",") if o.strip() and o.strip() != "*"]
+    ALLOWED_ORIGINS = parsed_origins if parsed_origins else DEFAULT_ALLOWED_ORIGINS
+else:
+    ALLOWED_ORIGINS = DEFAULT_ALLOWED_ORIGINS
+
+ALLOWED_MEDIA_EXTS: Set[str] = {".mp4", ".mp3", ".wav", ".png", ".jpg", ".jpeg", ".webm"}
+MEDIA_CONTENT_TYPES: Dict[str, str] = {
+    ".mp4": "video/mp4",
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webm": "video/webm",
+}
 
 # ---------------------------------------------------------------------------
 # FastAPI App Initialization
@@ -67,11 +115,46 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "X-Studio-Token", "Authorization", "X-Hub-Signature-256", "X-GitHub-Event"],
 )
+
+
+@app.middleware("http")
+async def studio_security_middleware(request: Request, call_next):
+    # Verify origin on state-changing requests (CSRF protection)
+    if request.method in {"POST", "PUT", "DELETE", "PATCH"}:
+        origin = request.headers.get("origin")
+        if origin and not request.url.path.startswith("/api/webhooks/"):
+            if not is_origin_allowed(origin, ALLOWED_ORIGINS):
+                return JSONResponse(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    content={"detail": "Forbidden: Cross-origin request not permitted."},
+                )
+
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Content-Security-Policy"] = "frame-ancestors 'none'"
+    return response
+
+
+def require_studio_auth(request: Request):
+    """Enforces authentication for state-changing endpoints."""
+    token = request.headers.get("X-Studio-Token")
+    if not token:
+        auth_hdr = request.headers.get("Authorization", "")
+        if auth_hdr.startswith("Bearer "):
+            token = auth_hdr[7:].strip()
+
+    if not token or not verify_studio_token(token, STUDIO_AUTH_TOKEN):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized: Invalid or missing Studio authentication token.",
+        )
+
 
 # Ensure directories exist
 PUBLIC_DIR.mkdir(parents=True, exist_ok=True)
@@ -79,9 +162,7 @@ RUNS_DIR.mkdir(parents=True, exist_ok=True)
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 STUDIO_UI_DIR.mkdir(parents=True, exist_ok=True)
 
-# Mount static asset directories so browser can directly stream audio/video
-app.mount("/public", StaticFiles(directory=str(PUBLIC_DIR)), name="public")
-app.mount("/out", StaticFiles(directory=str(OUT_DIR)), name="out")
+# Mount UI static asset directory for safe frontend code/css (DO NOT mount runs/ or out/ broadly)
 if STUDIO_UI_DIR.exists():
     app.mount("/studio_ui", StaticFiles(directory=str(STUDIO_UI_DIR)), name="studio_ui")
 
@@ -176,7 +257,11 @@ def get_project_state(run_id: str) -> Dict[str, Any]:
     """
     Constructs the complete project state dictionary for run_id.
     """
-    run_dir = RUNS_DIR / run_id
+    try:
+        run_dir = validate_run_id_safe(run_id, RUNS_DIR)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     if not run_dir.exists():
         raise HTTPException(status_code=404, detail=f"Project '{run_id}' not found.")
 
@@ -395,14 +480,70 @@ def get_project_state(run_id: str) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 @app.get("/", summary="Serve Production Studio UI")
 def serve_ui():
-    """Serves the local Production Studio Single Page Control Room."""
+    """Serves the local Production Studio Single Page Control Room with injected local auth token."""
     index_file = STUDIO_UI_DIR / "index.html"
     if not index_file.exists():
         return JSONResponse(
             status_code=404,
             content={"error": "studio_ui/index.html not found. Run generation to initialize UI."},
         )
-    return FileResponse(index_file)
+    html_text = index_file.read_text(encoding="utf-8")
+    html_text = html_text.replace("__STUDIO_AUTH_TOKEN_PLACEHOLDER__", STUDIO_AUTH_TOKEN)
+    return HTMLResponse(content=html_text, status_code=200)
+
+
+@app.get("/public/runs/{run_id}/{file_path:path}", summary="Secure Run Media Streamer")
+def serve_run_media(run_id: str, file_path: str):
+    """
+    Safely streams video/audio assets for run_id.
+    Strictly verifies directory containment and restricts file types to audio/video/images.
+    Blocks access to manifests, evidence packs, data.json, and internal metadata.
+    """
+    try:
+        run_dir = validate_run_id_safe(run_id, RUNS_DIR)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if not run_dir.exists():
+        raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found.")
+
+    target_file = (run_dir / file_path).resolve()
+    if not target_file.is_relative_to(run_dir):
+        raise HTTPException(status_code=403, detail="Access denied: path traversal attempt.")
+
+    ext = target_file.suffix.lower()
+    if ext not in ALLOWED_MEDIA_EXTS:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Access to '{ext}' files is prohibited. Only media assets can be streamed.",
+        )
+
+    if not target_file.is_file():
+        raise HTTPException(status_code=404, detail=f"Media file '{file_path}' not found.")
+
+    return FileResponse(target_file, media_type=MEDIA_CONTENT_TYPES.get(ext, "application/octet-stream"))
+
+
+@app.get("/out/{filename}", summary="Secure Export Media Streamer")
+def serve_export_media(filename: str):
+    """
+    Safely serves exported final MP4 videos from video/out/.
+    Restricts access strictly to .mp4 files and blocks path traversal.
+    """
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise HTTPException(status_code=400, detail="Invalid export filename.")
+
+    target_file = (OUT_DIR / filename).resolve()
+    if not target_file.is_relative_to(OUT_DIR.resolve()):
+        raise HTTPException(status_code=403, detail="Access denied: path traversal attempt.")
+
+    if target_file.suffix.lower() != ".mp4":
+        raise HTTPException(status_code=403, detail="Only .mp4 exports may be downloaded.")
+
+    if not target_file.is_file():
+        raise HTTPException(status_code=404, detail=f"Exported video '{filename}' not found.")
+
+    return FileResponse(target_file, media_type="video/mp4")
 
 
 @app.get("/api/health", summary="Studio Health Check")
@@ -424,20 +565,15 @@ def get_terminal_logs():
 def get_visual_types():
     return {
         "visual_types": [
-            {"id": "code_reveal", "label": "Code Reveal (Spotlight)", "category": "code"},
+            {"id": "code_reveal", "label": "Code Spotlight / Reveal", "category": "code"},
             {"id": "code_transform", "label": "Code Transform / Diff", "category": "code"},
             {"id": "terminal", "label": "Terminal CLI Simulator", "category": "code"},
+            {"id": "workflow_state_transition", "label": "Workflow State Transition", "category": "workflow"},
             {"id": "diagram", "label": "Architecture Flow & API Payloads", "category": "systems"},
             {"id": "comparison", "label": "Editorial Comparison", "category": "dual"},
-            {"id": "manim_scene", "label": "Manim Math/Vector Engine", "category": "math"},
-            {"id": "math_equation", "label": "LaTeX Math Derivation", "category": "math"},
-            {"id": "function_graph", "label": "Function Graph Plotter", "category": "math"},
-            {"id": "quantum_sim", "label": "Quantum Wavepacket Simulator", "category": "physics"},
-            {"id": "mechanics_fbd", "label": "Mechanics Free Body Diagram", "category": "physics"},
-            {"id": "electrical_grid", "label": "Electrical Grid & Phasor", "category": "systems"},
-            {"id": "chemistry_reaction", "label": "Chemistry Reaction Pathway", "category": "chemistry"},
             {"id": "bento_grid", "label": "Bento Metric Grid", "category": "general"},
-            {"id": "concept_hero", "label": "Concept Hero Showcase", "category": "general"},
+            {"id": "hook_scene", "label": "Problem Hook", "category": "narrative"},
+            {"id": "takeaway_cta", "label": "Takeaway & Documentation CTA", "category": "narrative"},
         ]
     }
 
@@ -605,14 +741,34 @@ def _run_generator_job(job_id: str, run_id: str, req: GenerateRequest):
         log_terminal(f"❌ Generation job {job_id} exception: {exc}")
 
 
-@app.post("/api/projects/generate", summary="Generate New Video Project")
+@app.post("/api/projects/generate", summary="Generate New Video Project", dependencies=[Depends(require_studio_auth)])
 def generate_project(req: GenerateRequest, background_tasks: BackgroundTasks):
     """
-    Accepts { topic, subject, length, mock }, invokes generate_and_render.py,
-    and returns { run_id, job_id, status }.
+    Accepts { topic, subject, length, mock }, validates inputs and SSRF guards,
+    invokes generate_and_render.py, and returns { run_id, job_id, status }.
     """
     if not req.topic or not req.topic.strip():
         raise HTTPException(status_code=400, detail="Topic is required.")
+
+    # SSRF & path traversal input validation
+    if req.source_url and req.source_url.strip():
+        is_safe, reason = validate_url_for_ssrf(req.source_url.strip())
+        if not is_safe:
+            raise HTTPException(status_code=400, detail=f"Invalid source_url: {reason}")
+
+    if req.source_file and req.source_file.strip():
+        try:
+            allowed_dirs = get_allowed_source_dirs(REPO_DIR)
+            validate_path_containment(req.source_file.strip(), allowed_dirs)
+        except PermissionError as e:
+            raise HTTPException(status_code=400, detail=f"Invalid source_file: {e}")
+
+    if req.project and req.project.strip():
+        try:
+            allowed_dirs = get_allowed_source_dirs(REPO_DIR)
+            validate_path_containment(req.project.strip(), allowed_dirs)
+        except PermissionError as e:
+            raise HTTPException(status_code=400, detail=f"Invalid project configuration: {e}")
 
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     short_id = uuid.uuid4().hex[:6]
@@ -657,13 +813,22 @@ def get_job_status(job_id: str):
     return JOBS[job_id]
 
 
-@app.post("/api/projects/{run_id}/scenes/{scene_id}/revise-visual", summary="Mode A: Visual-Only Scene Revision")
+@app.post("/api/projects/{run_id}/scenes/{scene_id}/revise-visual", summary="Mode A: Visual-Only Scene Revision", dependencies=[Depends(require_studio_auth)])
 def revise_scene_visual(run_id: str, scene_id: Union[int, str], req: ReviseVisualRequest):
     """
     Mode A: Accepts { visual_type, title, sub_mode, visual_props },
     calls engine/revise.py (Mode A) to re-render ONLY scene_id and stitch master MP4,
     returning updated project state.
     """
+    try:
+        run_dir = validate_run_id_safe(run_id, RUNS_DIR)
+        sid = validate_scene_id_safe(scene_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if not run_dir.exists():
+        raise HTTPException(status_code=404, detail=f"Project '{run_id}' not found.")
+
     has_changes = bool(req.visual_type or req.title or req.sub_mode or req.visual_props)
     if not has_changes:
         raise HTTPException(status_code=400, detail="Mode A requires at least one of: visual_type, title, sub_mode, visual_props.")
@@ -674,155 +839,109 @@ def revise_scene_visual(run_id: str, scene_id: Union[int, str], req: ReviseVisua
 
     v_json_str = json.dumps(v_props) if v_props else None
 
-    log_terminal(f"⚡ [Mode A] Revising visual for {run_id} Scene {scene_id} (type='{req.visual_type}', title='{req.title}')")
+    log_terminal(f"⚡ [Mode A] Revising visual for {run_id} Scene {sid} (type='{req.visual_type}', title='{req.title}')")
 
     try:
         execute_revision(
             run_id=run_id,
-            target_scene_id=scene_id,
+            target_scene_id=sid,
             set_visual_type=req.visual_type,
             set_title=req.title,
             set_visual_json=v_json_str,
             set_narration=None,
         )
-        log_terminal(f"✅ [Mode A] Scene {scene_id} revision complete.")
+        log_terminal(f"✅ [Mode A] Scene {sid} revision complete.")
     except Exception as exc:
-        log_terminal(f"❌ [Mode A] Scene {scene_id} revision failed: {exc}")
+        log_terminal(f"❌ [Mode A] Scene {sid} revision failed: {exc}")
         raise HTTPException(status_code=500, detail=f"Revision failed: {exc}")
 
     return get_project_state(run_id)
 
 
-@app.post("/api/projects/{run_id}/scenes/{scene_id}/revise-narration", summary="Mode B: Narration & Timing Revision")
+@app.post("/api/projects/{run_id}/scenes/{scene_id}/revise-narration", summary="Mode B: Narration & Timing Revision", dependencies=[Depends(require_studio_auth)])
 def revise_scene_narration(run_id: str, scene_id: Union[int, str], req: ReviseNarrationRequest):
     """
     Mode B: Accepts { narration },
     calls engine/revise.py (Mode B) to regenerate TTS + Whisper alignment ONLY for scene_id,
     shift downstream timings, re-render scene_id, stitch master MP4, and return updated project state.
     """
+    try:
+        run_dir = validate_run_id_safe(run_id, RUNS_DIR)
+        sid = validate_scene_id_safe(scene_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if not run_dir.exists():
+        raise HTTPException(status_code=404, detail=f"Project '{run_id}' not found.")
+
     if not req.narration or not req.narration.strip():
         raise HTTPException(status_code=400, detail="Narration cannot be empty for Mode B revision.")
 
-    log_terminal(f"🎙️ [Mode B] Revising narration for {run_id} Scene {scene_id} ('{req.narration[:40]}...')")
+    log_terminal(f"🎙️ [Mode B] Revising narration for {run_id} Scene {sid} ('{req.narration[:40]}...')")
 
     try:
         execute_revision(
             run_id=run_id,
-            target_scene_id=scene_id,
+            target_scene_id=sid,
             set_visual_type=None,
             set_title=None,
             set_visual_json=None,
             set_narration=req.narration.strip(),
         )
-        log_terminal(f"✅ [Mode B] Scene {scene_id} narration revision complete.")
+        log_terminal(f"✅ [Mode B] Scene {sid} narration revision complete.")
     except Exception as exc:
-        log_terminal(f"❌ [Mode B] Scene {scene_id} narration revision failed: {exc}")
+        log_terminal(f"❌ [Mode B] Scene {sid} narration revision failed: {exc}")
         raise HTTPException(status_code=500, detail=f"Revision failed: {exc}")
 
     return get_project_state(run_id)
 
 
-@app.post("/api/projects/{run_id}/restore/{rev_id}", summary="Non-Destructive Snapshot Rollback")
+@app.post("/api/projects/{run_id}/restore/{rev_id}", summary="Non-Destructive Snapshot Rollback", dependencies=[Depends(require_studio_auth)])
 def restore_project_snapshot(run_id: str, rev_id: str):
     """
     Non-destructively restores snapshot revisions/{rev_id} as the new active state
     (archiving current state first) so no good work is ever lost.
     """
-    run_dir = RUNS_DIR / run_id
+    try:
+        run_dir = validate_run_id_safe(run_id, RUNS_DIR)
+        validate_rev_id_safe(rev_id, run_dir)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     if not run_dir.exists():
         raise HTTPException(status_code=404, detail=f"Project '{run_id}' not found.")
 
-    snap_dir = run_dir / "revisions" / rev_id
-    if not snap_dir.exists():
+    m = re.search(r"\d+", str(rev_id))
+    if not m:
+        raise HTTPException(status_code=400, detail=f"Invalid snapshot id: '{rev_id}'")
+    target_rev = int(m.group(0))
+
+    try:
+        from engine.pipeline.manifest import restore_revision_snapshot
+        restore_res = restore_revision_snapshot(run_dir=run_dir, target_revision=target_rev)
+        log_terminal(f"✅ Successfully restored {rev_id} as Revision {restore_res['revision']} for {run_id}.")
+    except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Snapshot '{rev_id}' not found in revisions/ for project '{run_id}'.")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"Snapshot '{rev_id}' is missing data.json or manifest.json: {exc}")
+    except Exception as exc:
+        log_terminal(f"❌ Failed to restore snapshot {rev_id}: {exc}")
+        raise HTTPException(status_code=500, detail=f"Failed to restore snapshot: {exc}")
 
-    snap_data_file = snap_dir / "data.json"
-    snap_manifest_file = snap_dir / "manifest.json"
-
-    if not snap_data_file.exists() or not snap_manifest_file.exists():
-        raise HTTPException(status_code=400, detail=f"Snapshot '{rev_id}' is missing data.json or manifest.json.")
-
-    with open(snap_data_file, "r", encoding="utf-8") as f:
-        snap_data = json.load(f)
-    with open(snap_manifest_file, "r", encoding="utf-8") as f:
-        snap_manifest = json.load(f)
-
-    # 1. Archive current active state first before overwriting
-    current_data_file = run_dir / "data.json"
-    current_manifest_file = run_dir / "manifest.json"
-    current_manifest = load_manifest(run_dir) or {}
-    curr_rev = current_manifest.get("revision", 1)
-
-    if current_data_file.exists():
-        with open(current_data_file, "r", encoding="utf-8") as f:
-            current_data = json.load(f)
-        _, current_master_mp4, _ = resolve_master_video(run_id, curr_rev)
-        archive_revision_snapshot(
-            run_dir=run_dir,
-            revision=curr_rev,
-            data_payload=current_data,
-            manifest_data=current_manifest,
-            output_mp4=current_master_mp4,
-        )
-
-    # 2. Compute new revision number (strictly higher than current and all existing snapshots)
-    existing_rev_nums = [curr_rev]
-    for d in (run_dir / "revisions").iterdir():
-        if d.is_dir():
-            m = re.search(r"rev_(\d+)", d.name)
-            if m:
-                existing_rev_nums.append(int(m.group(1)))
-    new_rev = max(existing_rev_nums) + 1
-    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
-
-    log_terminal(f"⏮️ Restoring snapshot {rev_id} -> New Revision {new_rev} for project '{run_id}'")
-
-    # 3. Update snapshot manifest to become the new revision
-    snap_manifest["revision"] = new_rev
-    snap_manifest["updated_at"] = now_iso
-    if "history" not in snap_manifest:
-        snap_manifest["history"] = []
-    snap_manifest["history"].append({
-        "revision": new_rev,
-        "timestamp": now_iso,
-        "action": f"Restored snapshot {rev_id}",
-    })
-
-    # 4. Save restored data.json and manifest.json to run_dir
-    with open(run_dir / "data.json", "w", encoding="utf-8") as f:
-        json.dump(snap_data, f, indent=2, ensure_ascii=False)
-        f.write("\n")
-
-    save_manifest(snap_manifest, run_dir)
-
-    # 5. Restore snapshot output video if present
-    snap_vid = snap_dir / "output.mp4"
-    if snap_vid.exists():
-        dest_out = OUT_DIR / f"{run_id}_v{new_rev}.mp4"
-        shutil.copyfile(snap_vid, dest_out)
-        shutil.copyfile(snap_vid, run_dir / "output.mp4")
-        log_terminal(f"🎬 Restored master video to {dest_out.name}")
-
-    # 6. Archive this newly restored state as rev_<new_rev>
-    archive_revision_snapshot(
-        run_dir=run_dir,
-        revision=new_rev,
-        data_payload=snap_data,
-        manifest_data=snap_manifest,
-        output_mp4=snap_vid if snap_vid.exists() else None,
-    )
-
-    log_terminal(f"✅ Successfully restored {rev_id} as Revision {new_rev} for {run_id}.")
     return get_project_state(run_id)
 
 
-@app.post("/api/projects/{run_id}/export", summary="Export Verified Final MP4")
+@app.post("/api/projects/{run_id}/export", summary="Export Verified Final MP4", dependencies=[Depends(require_studio_auth)])
 def export_project(run_id: str, req: ExportRequest):
     """
     Copies current verified master MP4 to video/out/{custom_filename}.mp4
     and returns { download_url, filename, size_bytes }.
     """
-    run_dir = RUNS_DIR / run_id
+    try:
+        run_dir = validate_run_id_safe(run_id, RUNS_DIR)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     if not run_dir.exists():
         raise HTTPException(status_code=404, detail=f"Project '{run_id}' not found.")
 
@@ -833,18 +952,21 @@ def export_project(run_id: str, req: ExportRequest):
     if not master_path or not master_path.exists():
         raise HTTPException(status_code=400, detail=f"No rendered master video found for project '{run_id}'.")
 
-    if req.custom_filename and req.custom_filename.strip():
-        clean_name = re.sub(r"[^a-zA-Z0-9_\-\.]", "_", req.custom_filename.strip())
-        if not clean_name.lower().endswith(".mp4"):
-            clean_name += ".mp4"
-    else:
-        clean_name = f"{run_id}_final_v{curr_rev}.mp4"
+    try:
+        export_path = validate_export_filename_safe(
+            filename=req.custom_filename,
+            run_id=run_id,
+            current_rev=curr_rev,
+            out_dir=OUT_DIR,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
-    export_path = OUT_DIR / clean_name
     if master_path.resolve() != export_path.resolve():
         shutil.copyfile(master_path, export_path)
 
-    log_terminal(f"📦 Exported {run_id} -> {export_path.name} ({export_path.stat().st_size:,} bytes)")
+    clean_name = export_path.name
+    log_terminal(f"📦 Exported {run_id} -> {clean_name} ({export_path.stat().st_size:,} bytes)")
 
     return {
         "download_url": f"/out/{clean_name}",
@@ -858,20 +980,69 @@ def export_project(run_id: str, req: ExportRequest):
 # GitHub Release Webhook Automation (Rule 5.5)
 # ---------------------------------------------------------------------------
 @app.post("/api/webhooks/github", summary="GitHub Release Webhook Receiver")
-async def github_webhook(payload: Dict[str, Any]):
+async def github_webhook(request: Request):
     """
     Ingests GitHub webhook payloads (specifically release events).
-    Extracts repository name, release tag_name, body, and HTML URL,
-    and triggers automated video generation.
+    Authenticates via HMAC SHA-256 signature (X-Hub-Signature-256).
+    Disabled by default unless GITHUB_WEBHOOK_SECRET is configured.
     """
-    action = payload.get("action", "")
-    release = payload.get("release", {})
-    repo = payload.get("repository", {})
+    secret = os.environ.get("GITHUB_WEBHOOK_SECRET", "").strip()
+    if not secret or len(secret) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="GitHub webhook receiver is disabled by default. Configure GITHUB_WEBHOOK_SECRET to enable.",
+        )
 
-    repo_name = repo.get("name", "Product")
-    tag_name = release.get("tag_name", "latest")
+    sig_header = request.headers.get("X-Hub-Signature-256")
+    if not sig_header:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing X-Hub-Signature-256 header.",
+        )
+
+    body_bytes = await request.body()
+    if not verify_github_signature(body_bytes, sig_header, secret):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid GitHub webhook signature.",
+        )
+
+    event_type = request.headers.get("X-GitHub-Event", "release")
+    if event_type == "ping":
+        return {"status": "pong"}
+    if event_type != "release":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported event type '{event_type}'. Only 'release' is supported.",
+        )
+
+    try:
+        payload = json.loads(body_bytes.decode("utf-8"))
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid JSON payload.")
+
+    action = payload.get("action", "")
+    release = payload.get("release")
+    repo = payload.get("repository")
+
+    if not isinstance(release, dict) or not isinstance(repo, dict):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Malformed release webhook payload. Expected release and repository objects.",
+        )
+
+    raw_repo = str(repo.get("name", "Product"))
+    raw_tag = str(release.get("tag_name", "latest"))
+    repo_name = re.sub(r"[^a-zA-Z0-9_\-\.]", "", raw_repo) or "Product"
+    tag_name = re.sub(r"[^a-zA-Z0-9_\-\.]", "", raw_tag) or "latest"
     body = release.get("body", "")
     html_url = release.get("html_url", "")
+
+    # Enforce SSRF validation on html_url
+    if html_url:
+        is_safe, _ = validate_url_for_ssrf(html_url)
+        if not is_safe:
+            html_url = None
 
     topic = f"{repo_name} {tag_name} Release Overview"
     job_id = f"gh_{uuid.uuid4().hex[:8]}"
@@ -902,7 +1073,7 @@ async def github_webhook(payload: Dict[str, Any]):
     )
     thread.start()
 
-    log_terminal(f"🔔 Ingested GitHub Release webhook for {repo_name} {tag_name} -> Job {job_id}")
+    log_terminal(f"🔔 Ingested verified GitHub Release webhook for {repo_name} {tag_name} -> Job {job_id}")
     return {
         "status": "queued",
         "job_id": job_id,
@@ -917,6 +1088,9 @@ async def github_webhook(payload: Dict[str, Any]):
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("PORT", 8000))
-    print(f"🎬 Starting Local Production Studio Control Room on http://localhost:{port}")
-    uvicorn.run("studio_api:app", host="0.0.0.0", port=port, reload=True)
+    host = os.environ.get("STUDIO_HOST", "127.0.0.1").strip()
+    if not host:
+        host = "127.0.0.1"
+    port = int(os.environ.get("STUDIO_PORT", os.environ.get("PORT", 8000)))
+    print(f"🎬 Starting Local Production Studio Control Room on http://{host}:{port}")
+    uvicorn.run("studio_api:app", host=host, port=port, reload=True)

@@ -9,7 +9,7 @@ REQUIRED_WIDTH = 1080
 REQUIRED_HEIGHT = 1920
 TARGET_FPS = 30.0
 FPS_TOLERANCE = 1.5  # Allowed framerate variance [28.5, 31.5]
-DEFAULT_DURATION_TOLERANCE_SEC = 1.5  # +/- 1.5s (approx 45 frames at 30fps)
+DEFAULT_DURATION_TOLERANCE_SEC = 0.05  # +/- 0.05s (~1-2 frames at 30fps)
 DEFAULT_MIN_SIZE_BYTES = 100 * 1024  # 100 KB
 VALID_VIDEO_CODECS = {"h264", "avc1"}
 VALID_AUDIO_CODECS = {"aac", "mp3"}
@@ -77,7 +77,8 @@ def inspect_video_file(video_path: Union[str, Path]) -> Tuple[Dict[str, Any], Op
     cmd = [
         "ffprobe",
         "-v", "error",
-        "-show_entries", "stream=index,codec_type,codec_name,width,height,r_frame_rate,avg_frame_rate,sample_rate,duration",
+        "-show_entries", "stream=index,codec_type,codec_name,width,height,r_frame_rate,avg_frame_rate,sample_rate,duration,start_time,initial_padding",
+        "-show_entries", "stream_side_data",
         "-show_entries", "format=format_name,duration,size",
         "-of", "json",
         str(path),
@@ -246,7 +247,7 @@ def validate_video_output(
             )
 
     # 7. Duration verification
-    v_dur_raw = format_data.get("duration") or (video_streams[0].get("duration") if video_streams else None)
+    v_dur_raw = (video_streams[0].get("duration") if (video_streams and video_streams[0].get("duration")) else None) or format_data.get("duration")
     video_dur: Optional[float] = None
     if v_dur_raw:
         try:
@@ -255,6 +256,16 @@ def validate_video_output(
             pass
 
     metadata["video_duration"] = video_dur
+
+    a_dur_raw = audio_streams[0].get("duration") if audio_streams else None
+    audio_dur: Optional[float] = None
+    if a_dur_raw:
+        try:
+            audio_dur = float(a_dur_raw)
+        except (ValueError, TypeError):
+            pass
+
+    metadata["audio_duration"] = audio_dur
 
     if video_dur is None or video_dur <= 0.0:
         errors.append("Video duration is 0 or unreadable.")
@@ -272,13 +283,118 @@ def validate_video_output(
 
     metadata["expected_duration"] = target_audio_duration
 
+    # Determine codec priming / padding overhead where media structure justifies it.
+    # Codec delay (e.g. 2048 samples for AAC LC) or packet alignment padding can only be compensated
+    # when verified by explicit container metadata (initial_padding > 0, packet side data skip_samples > 0,
+    # or audio edit list with media_time > 0). Unconditional silent subtraction is prohibited as it
+    # masks genuine excess audio defects (e.g. 0.0600s excess vs 0.0500s tolerance).
+    effective_audio_dur = audio_dur
+    codec_overhead_sec = 0.0
+    codec_padding_verified = False
+
+    if audio_dur is not None and audio_streams:
+        a_stream = audio_streams[0]
+        a_codec = a_stream.get("codec_name", "").lower()
+        a_sr = metadata.get("sample_rate") or 48000
+
+        # Check for verified container/stream padding metadata
+        verified_padding_samples = 0
+        try:
+            init_pad = int(a_stream.get("initial_padding") or 0)
+            if init_pad > 0:
+                verified_padding_samples = init_pad
+        except (ValueError, TypeError):
+            pass
+
+        # Check stream side_data_list for skip_samples or discard_padding
+        side_data_list = a_stream.get("side_data_list") or []
+        for sd in side_data_list:
+            if isinstance(sd, dict):
+                skip = sd.get("skip_samples") or sd.get("discard_padding")
+                if skip:
+                    try:
+                        skip_val = int(skip)
+                        if skip_val > verified_padding_samples:
+                            verified_padding_samples = skip_val
+                    except (ValueError, TypeError):
+                        pass
+
+        # Check edit-list or presentation offset if explicitly exposed
+        edit_list = a_stream.get("edit_list")
+        if isinstance(edit_list, dict):
+            media_time = edit_list.get("media_time")
+            if media_time is not None:
+                try:
+                    mt_val = int(media_time)
+                    if mt_val > verified_padding_samples:
+                        verified_padding_samples = mt_val
+                except (ValueError, TypeError):
+                    pass
+
+        if verified_padding_samples > 0 and a_sr > 0:
+            codec_overhead_sec = round(float(verified_padding_samples) / float(a_sr), 4)
+            codec_padding_verified = True
+            metadata["verified_padding_samples"] = verified_padding_samples
+
+    metadata["codec_padding_verified"] = codec_padding_verified
+    metadata["codec_overhead_sec"] = codec_overhead_sec
+
+    # Apply verified codec overhead compensation only where verified by metadata.
+    # If the file does not expose verified presentation trimming metadata,
+    # use conservative validation (effective_audio_dur = audio_dur) rather than silent subtraction.
+    if audio_dur is not None and codec_padding_verified and codec_overhead_sec > 0.0:
+        if target_audio_duration is not None and target_audio_duration > 0.0:
+            if audio_dur > target_audio_duration:
+                effective_audio_dur = max(target_audio_duration, round(audio_dur - codec_overhead_sec, 4))
+            else:
+                effective_audio_dur = audio_dur
+        elif video_dur is not None and video_dur > 0.0:
+            if audio_dur > video_dur:
+                effective_audio_dur = max(video_dur, round(audio_dur - codec_overhead_sec, 4))
+            else:
+                effective_audio_dur = audio_dur
+        else:
+            effective_audio_dur = max(0.0, round(audio_dur - codec_overhead_sec, 4))
+    else:
+        effective_audio_dur = audio_dur
+        if audio_dur is not None and target_audio_duration is not None and audio_dur > target_audio_duration:
+            metadata["codec_padding_unverified_warning"] = (
+                f"Audio stream duration ({audio_dur:.4f}s) exceeds reference duration "
+                f"({target_audio_duration:.4f}s), but container does not expose verified "
+                "edit-list or packet skip_samples metadata. Conservative validation applied without subtraction."
+            )
+
+    metadata["effective_audio_duration"] = effective_audio_dur
+
+    # 7a. Internal stream synchronization: MP4 audio stream vs video stream
+    if video_dur is not None and effective_audio_dur is not None and effective_audio_dur > 0.0:
+        stream_sync_diff = round(abs(video_dur - effective_audio_dur), 4)
+        metadata["stream_sync_difference"] = stream_sync_diff
+        if stream_sync_diff > tolerance_sec:
+            errors.append(
+                f"Internal MP4 stream duration desynchronization: video stream ({video_dur:.4f}s) "
+                f"differs from audio presentation duration ({effective_audio_dur:.4f}s) by {stream_sync_diff:.4f}s "
+                f"(tolerance: +/-{tolerance_sec:.4f}s)."
+            )
+
+    # 7b. Video vs reference audio synchronization
     if video_dur is not None and target_audio_duration is not None and target_audio_duration > 0.0:
-        diff = abs(video_dur - target_audio_duration)
-        metadata["duration_difference"] = round(diff, 3)
+        diff = round(abs(video_dur - target_audio_duration), 4)
+        metadata["duration_difference"] = diff
         if diff > tolerance_sec:
             errors.append(
-                f"Video duration ({video_dur:.2f}s) differs from reference narration duration "
-                f"({target_audio_duration:.2f}s) by {diff:.2f}s (tolerance: +/-{tolerance_sec:.2f}s / ~45 frames)."
+                f"Video duration ({video_dur:.4f}s) differs from reference narration duration "
+                f"({target_audio_duration:.4f}s) by {diff:.4f}s (tolerance: +/-{tolerance_sec:.4f}s)."
+            )
+
+    # 7c. Container audio vs reference audio synchronization
+    if effective_audio_dur is not None and target_audio_duration is not None and target_audio_duration > 0.0:
+        a_diff = round(abs(effective_audio_dur - target_audio_duration), 4)
+        metadata["audio_reference_difference"] = a_diff
+        if a_diff > tolerance_sec:
+            errors.append(
+                f"Container audio presentation duration ({effective_audio_dur:.4f}s) differs from reference narration duration "
+                f"({target_audio_duration:.4f}s) by {a_diff:.4f}s (tolerance: +/-{tolerance_sec:.4f}s)."
             )
 
     is_valid = len(errors) == 0

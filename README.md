@@ -84,11 +84,33 @@ node video/scripts/validate_timeline.mjs video/public/data.json
 
 ---
 
-## 4. The Six Validation Gates
+## 4. Authoritative Six Validation Gates
 
-1. **Gate 1 — Schema & Lineage:** Validates `evidence_pack.json`, `scene_plan.json`, source hashes, and distinct project/publisher identities.
-2. **Gate 2 — Source-Code Fidelity:** Ensures displayed code is an exact, syntactically balanced, contiguous slice of source `code_evidence` with zero markdown fences.
-3. **Gate 3 — Claim Support:** Rejects unbacked numbers, verifies evidence links, and detects contradictory assertions.
-4. **Gate 4 — Limitation & Nuance:** Propagates relevant caveats without requiring unrelated warnings in every video.
-5. **Gate 5 — Component & Data Integrity:** Lints React components to prevent hardcoded trace IDs, company slogans, or fake trust labels.
-6. **Gate 6 — Post-Render Technical QA:** Verifies MP4 container format, video/audio duration agreement within 0.05s, non-blank frames, and keyframe integrity.
+The engine enforces six testable validation gates across pre-render and post-render stages:
+
+| Gate | Name | Pipeline Stage | Primary Implementation | Contract & Verification Rules |
+| :--- | :--- | :--- | :--- | :--- |
+| **Gate 1** | **Lineage & Citation Integrity** | Pre-render | `validate_evidence_and_plan` (`claim_citation`, `banned_contamination_tokens`) | Every scene must cite valid evidence IDs from `evidence_pack.json`. Rejects unbacked claims, missing records, and placeholder contamination (`lorem`, `todo`, `mock_metric`). |
+| **Gate 2** | **Source-Code Fidelity** | Pre-render | `validate_evidence_and_plan` (internal: `gate1_contiguous_code_equality`) | Displayed code must be an exact contiguous slice (or normalized whitespace match) of source `code_evidence`. Fails if delimiters are unbalanced or markdown fences (` ``` `) leak into output. |
+| **Gate 3** | **Claim & Metric Support** | Pre-render | `validate_evidence_and_plan` (internal: `gate2_quote_paraphrase`, `numerical_claims`) | Rejects unbacked numbers in spoken text and metric cards. Enforces $\ge 0.35$ content-word overlap between on-screen text and cited evidence excerpts. |
+| **Gate 4** | **Limitation Propagation** | Pre-render | `validate_evidence_and_plan` (internal: `gate3_limitation_propagation`) | When limitation records exist, enforces that documented caveats are cited and displayed on-screen ($\ge 2$ content words). Rejects `"GUARDED"` placeholder anti-pattern. |
+| **Gate 5** | **Component Integrity & Timeline Schema** | Pre-render | `validate_evidence_and_plan` (internal: `gate4_component_literal_lint`) & `video/scripts/validate_timeline.mjs` | Lints React components to prevent hardcoded brand tokens (`inngest`, `stripe`, `resend`, `#00e599`, `step.run`). Validates assembled `data.json` against Node.js TypeScript Zod schema. |
+| **Gate 6** | **Post-Render Technical QA** | Post-render | `validate_post_render_qa` (`output.py` + keyframe check) | Inspects MP4 container streams (h264/aac), resolution (1920x1080 or 1080x1920), FPS (30), audio/video duration sync ($\le 0.5\text{s}$ tolerance), and extracts midpoint keyframe to verify non-blank video. Quarantines corrupt video to `.corrupt.mp4`. |
+
+---
+
+## 5. Current Capabilities vs. Roadmap
+
+### Current Production Capabilities (Implemented & Verified)
+- **Remotion-Only Video Generation:** Frame-accurate React rendering for both 16:9 widescreen and 9:16 vertical developer videos.
+- **Unified 11-Step Pipeline:** Single data-driven execution flow from documentation ingestion to final MP4 QA.
+- **Evidence-Linked Scene Planning:** Dynamic 5-beat story arcs derived from atomic evidence records without hardcoded company branches.
+- **Cross-Brand Isolation:** Strict separation of `product_subject`, `product_company`, and `publisher_brand` with zero asset/token leakage across Inngest, Stripe, and Resend runs.
+- **Zero-Drift Neural Audio:** Measured 48kHz PCM WAV headers drive Remotion frame counts and spoken-word subtitle chunking.
+- **Surgical Scene Revisions:** Mode A (visual-only) and Mode B (narration) scene re-rendering and FFmpeg segment stitching via Studio API.
+
+### Future Roadmap (Under Specification)
+- **Isolated CLI Execution Adapter:** Safe sandbox execution of documented terminal commands and curl snippets with captured exit codes and environment metadata.
+- **Explicit Evidence Provenance Badges:** On-screen visual tags distinguishing `[OBSERVED EXECUTION]` from `[ILLUSTRATIVE MODEL]`.
+- **Fine-Grained Dependency Graph:** Full `dependency_graph.json` tracking `source -> evidence record -> scene -> audio -> video segment` for automatic invalidation upon upstream documentation edits.
+- **Browser Automation Capture:** Automated headless browser recording of interactive developer consoles.

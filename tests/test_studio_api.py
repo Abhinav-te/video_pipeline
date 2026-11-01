@@ -37,7 +37,7 @@ from engine.pipeline.manifest import init_manifest, archive_revision_snapshot, s
 class TestStudioAPI(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.client = TestClient(app)
+        cls.client = TestClient(app, headers={"X-Studio-Token": studio_api.STUDIO_AUTH_TOKEN})
 
     def setUp(self):
         self.test_run_id = f"test_studio_run_{datetime.datetime.now().strftime('%H%M%S')}"
@@ -48,27 +48,27 @@ class TestStudioAPI(unittest.TestCase):
         self.scenes = [
             {
                 "scene_id": 1,
-                "title": "Introduction to Limits",
-                "visual_type": "fullscreen_text",
-                "spoken_text": "Welcome to calculus where we analyze rates of change.",
+                "title": "Webhook Security Risk",
+                "visual_type": "hook_scene",
+                "spoken_text": "Unverified webhooks allow attackers to spoof request payloads.",
                 "start_time": 0.0,
                 "end_time": 4.0,
                 "duration": 4.0,
             },
             {
                 "scene_id": 2,
-                "title": "Partition Slices",
-                "visual_type": "function_graph",
-                "spoken_text": "We slice the curve into small rectangular partitions.",
+                "title": "HMAC Verification",
+                "visual_type": "code_reveal",
+                "spoken_text": "Verify the HMAC signature header using your webhook signing secret.",
                 "start_time": 4.0,
                 "end_time": 9.0,
                 "duration": 5.0,
             },
             {
                 "scene_id": 3,
-                "title": "Definite Integral",
-                "visual_type": "math_equation",
-                "spoken_text": "Taking the continuous limit yields the exact definite integral.",
+                "title": "Replay Attack Prevention",
+                "visual_type": "workflow_state_transition",
+                "spoken_text": "Timestamp validation prevents replaying captured valid requests.",
                 "start_time": 9.0,
                 "end_time": 14.5,
                 "duration": 5.5,
@@ -77,15 +77,15 @@ class TestStudioAPI(unittest.TestCase):
 
         self.data_payload = {
             "run_id": self.test_run_id,
-            "topic": "Calculus Fundamentals",
-            "subject": "math",
+            "topic": "Webhook Security & Signature Verification",
+            "subject": "code",
             "duration": 14.5,
             "scenes": self.scenes,
             "words": [
-                {"word": "Welcome", "start": 0.2, "end": 0.6},
-                {"word": "calculus", "start": 0.7, "end": 1.2},
-                {"word": "slice", "start": 4.2, "end": 4.6},
-                {"word": "Taking", "start": 9.1, "end": 9.5},
+                {"word": "Unverified", "start": 0.2, "end": 0.6},
+                {"word": "webhooks", "start": 0.7, "end": 1.2},
+                {"word": "Verify", "start": 4.2, "end": 4.6},
+                {"word": "Timestamp", "start": 9.1, "end": 9.5},
             ],
         }
 
@@ -142,7 +142,7 @@ class TestStudioAPI(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         types = resp.json().get("visual_types", [])
         type_ids = [t["id"] for t in types]
-        for expected in ["code_reveal", "comparison", "manim_scene", "math_equation", "quantum_sim"]:
+        for expected in ["code_reveal", "comparison", "code_transform", "terminal", "workflow_state_transition"]:
             self.assertIn(expected, type_ids)
 
     def test_03_get_projects_and_test_rev_workflow(self):
@@ -159,8 +159,8 @@ class TestStudioAPI(unittest.TestCase):
 
         # Verify fields on our project summary
         target = next(p for p in projects if p["run_id"] == self.test_run_id)
-        self.assertEqual(target["topic"], "Calculus Fundamentals")
-        self.assertEqual(target["subject"], "math")
+        self.assertEqual(target["topic"], "Webhook Security & Signature Verification")
+        self.assertEqual(target["subject"], "code")
         self.assertEqual(target["scene_count"], 3)
         self.assertEqual(target["current_revision"], 1)
         self.assertTrue(target["has_output"])
@@ -188,7 +188,7 @@ class TestStudioAPI(unittest.TestCase):
 
         sc1 = payload["scenes_resolved"][0]
         self.assertEqual(sc1["scene_id"], 1)
-        self.assertEqual(sc1["visual_type"], "fullscreen_text")
+        self.assertEqual(sc1["visual_type"], "hook_scene")
         self.assertTrue(sc1["has_segment_video"])
         self.assertTrue(sc1["segment_video_url"].startswith(f"/public/runs/{self.test_run_id}/"))
 
@@ -261,8 +261,8 @@ class TestStudioAPI(unittest.TestCase):
                 f"/api/projects/{self.test_run_id}/scenes/2/revise-visual",
                 json={
                     "visual_type": "comparison",
-                    "title": "Partition vs Riemann Integral",
-                    "visual_props": {"comparison_sides": {"left": "Discrete", "right": "Continuous"}},
+                    "title": "HMAC vs Public Key Signatures",
+                    "visual_props": {"comparison_sides": {"left": "HMAC Secret", "right": "Public Key"}},
                 },
             )
             self.assertEqual(resp.status_code, 200)
@@ -272,7 +272,7 @@ class TestStudioAPI(unittest.TestCase):
             # Scene 2 should now have visual_type 'comparison' and updated title
             sc2 = next(s for s in data["scenes_resolved"] if s["scene_id"] == 2)
             self.assertEqual(sc2["visual_type"], "comparison")
-            self.assertEqual(sc2["title"], "Partition vs Riemann Integral")
+            self.assertEqual(sc2["title"], "HMAC vs Public Key Signatures")
 
     def test_10_mode_b_narration_revision_state_update(self):
         """
@@ -297,7 +297,7 @@ class TestStudioAPI(unittest.TestCase):
             return r_dir / "output.mp4"
 
         with patch("studio_api.execute_revision", side_effect=mock_execute_narration):
-            new_text = "Here we rigorously examine the infinite limit of Riemann sums."
+            new_text = "Here we rigorously verify the webhook HMAC signature using timing safe equal."
             resp = self.client.post(
                 f"/api/projects/{self.test_run_id}/scenes/3/revise-narration",
                 json={"narration": new_text},
@@ -342,7 +342,7 @@ class TestStudioAPI(unittest.TestCase):
 
         # Step 4: Scene 1 title must have reverted to rev_001's original title
         sc1 = next(s for s in restored["scenes_resolved"] if s["scene_id"] == 1)
-        self.assertEqual(sc1["title"], "Introduction to Limits")
+        self.assertEqual(sc1["title"], "Webhook Security Risk")
 
         # Step 5: Verify rev_002 snapshot was archived during restore
         rev2_snapshot_dir = self.test_run_dir / "revisions" / "rev_002"
@@ -363,7 +363,7 @@ class TestStudioAPI(unittest.TestCase):
     # =========================================================================
     def test_13_export_production_mp4(self):
         """Tests exporting master video with custom filename."""
-        custom_name = "test_calculus_export_final.mp4"
+        custom_name = "test_webhook_export_final.mp4"
         export_file = OUT_DIR / custom_name
         if export_file.exists():
             export_file.unlink()
@@ -396,8 +396,8 @@ class TestStudioAPI(unittest.TestCase):
             resp = self.client.post(
                 "/api/projects/generate",
                 json={
-                    "topic": "Quantum Harmonic Oscillator",
-                    "subject": "quantum_physics",
+                    "topic": "Stripe Webhook Signature Verification",
+                    "subject": "code",
                     "length": 35,
                     "mock": True,
                 },
@@ -412,8 +412,8 @@ class TestStudioAPI(unittest.TestCase):
             job_resp = self.client.get(f"/api/jobs/{data['job_id']}")
             self.assertEqual(job_resp.status_code, 200)
             job_data = job_resp.json()
-            self.assertEqual(job_data["topic"], "Quantum Harmonic Oscillator")
-            self.assertEqual(job_data["subject"], "quantum_physics")
+            self.assertEqual(job_data["topic"], "Stripe Webhook Signature Verification")
+            self.assertEqual(job_data["subject"], "code")
 
 
 if __name__ == "__main__":

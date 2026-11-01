@@ -1,0 +1,2039 @@
+{
+  "title": "Inngest: Explain one practical durable execution feature in a 30-second video",
+  "topic": "Inngest: Explain one practical durable execution feature in a 30-second video",
+  "subject": "code",
+  "schema_version": "2.1",
+  "engine_version": "2.0",
+  "run_id": "run_20261030_191600_7f3392",
+  "scenes": [
+    {
+      "scene_id": 1,
+      "title": "Failure Behavior and Step Isolation",
+      "spoken_text": "Failure Behavior and Step Isolation",
+      "visual_type": "fullscreen_text",
+      "evidence_ids": [
+        "ev_11",
+        "ev_24"
+      ],
+      "narration_segments": [
+        {
+          "text": "Failure Behavior and Step Isolation",
+          "evidence_ids": [
+            "ev_11",
+            "ev_24"
+          ]
+        }
+      ],
+      "visual_representation": "illustrative",
+      "display_text": "PROBLEM \u2022 FAILURE BEHAVIOR AND STEP ISOLATION",
+      "emphasis_word": "STEP",
+      "items": [
+        {
+          "label": "Failure Mode",
+          "detail": "Failure Behavior and Step Isolation",
+          "status": "crashed"
+        },
+        {
+          "label": "Consequence",
+          "detail": "Retry Guarantees and Idempotency",
+          "status": "warning"
+        }
+      ],
+      "emphasis_time": 1.35,
+      "caption_chunks": [
+        {
+          "start": 0.175,
+          "end": 2.225,
+          "text": "Failure Behavior and Step Isolation",
+          "words": [
+            {
+              "word": "Failure",
+              "start": 0.175,
+              "end": 0.487
+            },
+            {
+              "word": "Behavior",
+              "start": 0.5,
+              "end": 1.038
+            },
+            {
+              "word": "and",
+              "start": 1.275,
+              "end": 1.337
+            },
+            {
+              "word": "Step",
+              "start": 1.35,
+              "end": 1.613
+            },
+            {
+              "word": "Isolation",
+              "start": 1.625,
+              "end": 2.225
+            }
+          ]
+        }
+      ],
+      "start_time": 0.0,
+      "end_time": 2.475,
+      "duration": 2.475,
+      "theme": {
+        "primary": "#38bdf8",
+        "secondary": "#818cf8",
+        "accent": "#34d399",
+        "bg_card": "rgba(15, 23, 42, 0.75)",
+        "border": "rgba(56, 189, 248, 0.25)",
+        "text": "#f8fafc"
+      },
+      "domain": "code"
+    },
+    {
+      "scene_id": 2,
+      "title": "To execute synchronous or asynchronous operations",
+      "spoken_text": "To execute synchronous or asynchronous operations durably, wrap your operation in step.run().",
+      "visual_type": "code_reveal",
+      "evidence_ids": [
+        "ev_02",
+        "ev_03"
+      ],
+      "narration_segments": [
+        {
+          "text": "To execute synchronous or asynchronous operations durably, wrap your operation in step.run().",
+          "evidence_ids": [
+            "ev_02",
+            "ev_03"
+          ]
+        }
+      ],
+      "visual_representation": "illustrative",
+      "emphasis_word": "step.run",
+      "code": "export const processOrder = inngest.createFunction(\n  { id: \"process-order\" },\n  { event: \"order.created\" },\n  async ({ event, step }) => {\n    const billing = await step.run(\"fetch-billing-data\", async () => {\n      return await getBillingAccount(event.data.customerId);\n    });\n    const receipt = await step.run(\"charge-customer\", async () => {\n      return await paymentGateway.charge({ customerId: billing.id, amount: event.data.amount });\n    });\n    return { status: \"completed\", receiptId: receipt.id };\n  }\n);",
+      "filename": "processOrder.ts",
+      "language": "typescript",
+      "highlight_lines": [
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "focus_phrase": "step.run",
+      "emphasis_time": 7.725,
+      "caption_chunks": [
+        {
+          "start": 2.588,
+          "end": 4.988,
+          "text": "To execute synchronous or asynchronous",
+          "words": [
+            {
+              "word": "To",
+              "start": 2.588,
+              "end": 2.712
+            },
+            {
+              "word": "execute",
+              "start": 2.725,
+              "end": 3.262
+            },
+            {
+              "word": "synchronous",
+              "start": 3.275,
+              "end": 3.913
+            },
+            {
+              "word": "or",
+              "start": 4.037,
+              "end": 4.225
+            },
+            {
+              "word": "asynchronous",
+              "start": 4.312,
+              "end": 4.988
+            }
+          ]
+        },
+        {
+          "start": 5.0,
+          "end": 6.187,
+          "text": "operations durably,",
+          "words": [
+            {
+              "word": "operations",
+              "start": 5.0,
+              "end": 5.675
+            },
+            {
+              "word": "durably,",
+              "start": 5.687,
+              "end": 6.187
+            }
+          ]
+        },
+        {
+          "start": 6.575,
+          "end": 8.525,
+          "text": "wrap your operation in step.run().",
+          "words": [
+            {
+              "word": "wrap",
+              "start": 6.575,
+              "end": 6.75
+            },
+            {
+              "word": "your",
+              "start": 6.762,
+              "end": 6.887
+            },
+            {
+              "word": "operation",
+              "start": 6.9,
+              "end": 7.525
+            },
+            {
+              "word": "in",
+              "start": 7.613,
+              "end": 7.712
+            },
+            {
+              "word": "step.run().",
+              "start": 7.725,
+              "end": 8.525
+            }
+          ]
+        }
+      ],
+      "start_time": 2.475,
+      "end_time": 8.775,
+      "duration": 6.3,
+      "theme": {
+        "primary": "#38bdf8",
+        "secondary": "#818cf8",
+        "accent": "#34d399",
+        "bg_card": "rgba(15, 23, 42, 0.75)",
+        "border": "rgba(56, 189, 248, 0.25)",
+        "text": "#f8fafc"
+      },
+      "domain": "code"
+    },
+    {
+      "scene_id": 3,
+      "title": "Durable Execution & Memoization Behavior",
+      "spoken_text": "Durable Execution & Memoization Behavior. Inngest Retries and Error Handling.",
+      "visual_type": "workflow_state_transition",
+      "evidence_ids": [
+        "ev_04",
+        "ev_17"
+      ],
+      "narration_segments": [
+        {
+          "text": "Durable Execution & Memoization Behavior. Inngest Retries and Error Handling.",
+          "evidence_ids": [
+            "ev_04",
+            "ev_17"
+          ]
+        }
+      ],
+      "visual_representation": "illustrative",
+      "emphasis_word": "runtime",
+      "entities": [
+        {
+          "id": "initial_operation",
+          "label": "Definition and Syntax",
+          "sub_label": "Execution context checkpointed"
+        },
+        {
+          "id": "recovery_operation",
+          "label": "Retry & State Recovery",
+          "sub_label": "Recovery without side effects"
+        }
+      ],
+      "events": [
+        {
+          "target": "initial_operation",
+          "action": "start",
+          "label": "Executing Operation",
+          "at_word": "operation",
+          "timestamp_sec": 9.075
+        },
+        {
+          "target": "initial_operation",
+          "action": "succeed",
+          "label": "Durable Execution & Memoization",
+          "at_word": "succeed",
+          "timestamp_sec": 10.112
+        },
+        {
+          "target": "recovery_operation",
+          "action": "start",
+          "label": "Fault Detection & Check",
+          "timestamp_sec": 10.412
+        },
+        {
+          "target": "recovery_operation",
+          "action": "fail",
+          "label": "Inngest Retries and Error",
+          "at_word": "fail",
+          "timestamp_sec": 13.15
+        },
+        {
+          "target": "recovery_operation",
+          "action": "retry",
+          "label": "Retry with Checkpoint",
+          "at_word": "retry",
+          "timestamp_sec": 13.45
+        },
+        {
+          "target": "recovery_operation",
+          "action": "recover",
+          "label": "Succeeded \u2014 State Reused",
+          "at_word": "reused",
+          "timestamp_sec": 13.75
+        }
+      ],
+      "emphasis_time": 8.775,
+      "caption_chunks": [
+        {
+          "start": 8.888,
+          "end": 10.25,
+          "text": "Durable Execution Memoization",
+          "words": [
+            {
+              "word": "Durable",
+              "start": 8.888,
+              "end": 9.287
+            },
+            {
+              "word": "Execution",
+              "start": 9.3,
+              "end": 10.025
+            },
+            {
+              "word": "Memoization",
+              "start": 10.112,
+              "end": 10.25
+            }
+          ]
+        },
+        {
+          "start": 10.263,
+          "end": 10.925,
+          "text": "Behavior.",
+          "words": [
+            {
+              "word": "Behavior.",
+              "start": 10.263,
+              "end": 10.925
+            }
+          ]
+        },
+        {
+          "start": 10.938,
+          "end": 13.575,
+          "text": "Inngest Retries and Error Handling.",
+          "words": [
+            {
+              "word": "Inngest",
+              "start": 10.938,
+              "end": 11.487
+            },
+            {
+              "word": "Retries",
+              "start": 11.9,
+              "end": 12.313
+            },
+            {
+              "word": "and",
+              "start": 12.325,
+              "end": 13.012
+            },
+            {
+              "word": "Error",
+              "start": 13.15,
+              "end": 13.275
+            },
+            {
+              "word": "Handling.",
+              "start": 13.35,
+              "end": 13.575
+            }
+          ]
+        },
+        {
+          "start": 13.587,
+          "end": 14.025,
+          "text": "Handling",
+          "words": [
+            {
+              "word": "Handling",
+              "start": 13.587,
+              "end": 14.025
+            }
+          ]
+        }
+      ],
+      "start_time": 8.775,
+      "end_time": 14.275,
+      "duration": 5.5,
+      "theme": {
+        "primary": "#38bdf8",
+        "secondary": "#818cf8",
+        "accent": "#34d399",
+        "bg_card": "rgba(15, 23, 42, 0.75)",
+        "border": "rgba(56, 189, 248, 0.25)",
+        "text": "#f8fafc"
+      },
+      "domain": "code"
+    },
+    {
+      "scene_id": 4,
+      "title": "Durable Execution & Memoization Behavior",
+      "spoken_text": "Durable Execution & Memoization Behavior External side effects inside a retried step must be idempotent or handled safely",
+      "visual_type": "bento_grid",
+      "evidence_ids": [
+        "ev_04",
+        "ev_17",
+        "ev_15",
+        "ev_16"
+      ],
+      "narration_segments": [
+        {
+          "text": "Durable Execution & Memoization Behavior External side effects inside a retried step must be idempotent or handled safely",
+          "evidence_ids": [
+            "ev_04",
+            "ev_17",
+            "ev_15",
+            "ev_16"
+          ]
+        }
+      ],
+      "visual_representation": "illustrative",
+      "emphasis_word": "guarantees",
+      "items": [
+        {
+          "title": "DURABLE EXECUTION & MEMOIZATION BEHAVIOR",
+          "value": "STATE SAVED",
+          "subtitle": "Durable Execution & Memoization Behavior",
+          "tag": "DURABILITY",
+          "evidence_id": "ev_04"
+        },
+        {
+          "title": "INNGEST RETRIES AND ERROR HANDLING",
+          "value": "INDEPENDENT RETRY",
+          "subtitle": "Inngest Retries and Error Handling",
+          "tag": "RESILIENCE",
+          "evidence_id": "ev_17"
+        },
+        {
+          "title": "EXTERNAL SIDE EFFECTS INSIDE A",
+          "value": "SAFETY CONSTRAINT",
+          "subtitle": "External side effects inside a retried step must be idempotent or handled safely",
+          "tag": "LIMITATION",
+          "evidence_id": "ev_15"
+        },
+        {
+          "title": "IMPORTANT LIMITATIONS",
+          "value": "SAFETY CONSTRAINT",
+          "subtitle": "Important Limitations",
+          "tag": "LIMITATION",
+          "evidence_id": "ev_16"
+        }
+      ],
+      "emphasis_time": 14.275,
+      "caption_chunks": [
+        {
+          "start": 14.375,
+          "end": 15.825,
+          "text": "Durable Execution Memoization",
+          "words": [
+            {
+              "word": "Durable",
+              "start": 14.375,
+              "end": 14.837
+            },
+            {
+              "word": "Execution",
+              "start": 14.85,
+              "end": 15.6
+            },
+            {
+              "word": "Memoization",
+              "start": 15.662,
+              "end": 15.825
+            }
+          ]
+        },
+        {
+          "start": 15.837,
+          "end": 17.837,
+          "text": "Behavior External side effects",
+          "words": [
+            {
+              "word": "Behavior",
+              "start": 15.837,
+              "end": 16.512
+            },
+            {
+              "word": "External",
+              "start": 16.525,
+              "end": 17.025
+            },
+            {
+              "word": "side",
+              "start": 17.038,
+              "end": 17.55
+            },
+            {
+              "word": "effects",
+              "start": 17.563,
+              "end": 17.837
+            }
+          ]
+        },
+        {
+          "start": 17.85,
+          "end": 19.975,
+          "text": "inside a retried step must",
+          "words": [
+            {
+              "word": "inside",
+              "start": 17.85,
+              "end": 18.3
+            },
+            {
+              "word": "a",
+              "start": 18.363,
+              "end": 18.85
+            },
+            {
+              "word": "retried",
+              "start": 18.863,
+              "end": 18.913
+            },
+            {
+              "word": "step",
+              "start": 18.925,
+              "end": 19.55
+            },
+            {
+              "word": "must",
+              "start": 19.562,
+              "end": 19.975
+            }
+          ]
+        },
+        {
+          "start": 20.25,
+          "end": 22.163,
+          "text": "be idempotent or handled safely",
+          "words": [
+            {
+              "word": "be",
+              "start": 20.25,
+              "end": 20.463
+            },
+            {
+              "word": "idempotent",
+              "start": 20.475,
+              "end": 20.675
+            },
+            {
+              "word": "or",
+              "start": 20.687,
+              "end": 21.437
+            },
+            {
+              "word": "handled",
+              "start": 21.663,
+              "end": 21.775
+            },
+            {
+              "word": "safely",
+              "start": 21.788,
+              "end": 22.163
+            }
+          ]
+        },
+        {
+          "start": 22.175,
+          "end": 22.687,
+          "text": "safely",
+          "words": [
+            {
+              "word": "safely",
+              "start": 22.175,
+              "end": 22.687
+            }
+          ]
+        }
+      ],
+      "start_time": 14.275,
+      "end_time": 22.937,
+      "duration": 8.662,
+      "theme": {
+        "primary": "#38bdf8",
+        "secondary": "#818cf8",
+        "accent": "#34d399",
+        "bg_card": "rgba(15, 23, 42, 0.75)",
+        "border": "rgba(56, 189, 248, 0.25)",
+        "text": "#f8fafc"
+      },
+      "domain": "code"
+    },
+    {
+      "scene_id": 5,
+      "title": "Durable Execution & Memoization Behavior",
+      "spoken_text": "Durable Execution & Memoization Behavior. Check the official docs to get started.",
+      "visual_type": "takeaway_cta",
+      "evidence_ids": [
+        "ev_04"
+      ],
+      "narration_segments": [
+        {
+          "text": "Durable Execution & Memoization Behavior. Check the official docs to get started.",
+          "evidence_ids": [
+            "ev_04"
+          ]
+        }
+      ],
+      "visual_representation": "illustrative",
+      "display_text": "DURABLE EXECUTION & MEMOIZATION BEHAVIOR",
+      "emphasis_word": "docs",
+      "cta_url": "https://www.inngest.com/docs/durable-execution/primitives/step-run",
+      "emphasis_time": 26.362,
+      "caption_chunks": [
+        {
+          "start": 23.05,
+          "end": 24.412,
+          "text": "Durable Execution Memoization",
+          "words": [
+            {
+              "word": "Durable",
+              "start": 23.05,
+              "end": 23.449
+            },
+            {
+              "word": "Execution",
+              "start": 23.462,
+              "end": 24.187
+            },
+            {
+              "word": "Memoization",
+              "start": 24.274,
+              "end": 24.412
+            }
+          ]
+        },
+        {
+          "start": 24.425,
+          "end": 25.087,
+          "text": "Behavior.",
+          "words": [
+            {
+              "word": "Behavior.",
+              "start": 24.425,
+              "end": 25.087
+            }
+          ]
+        },
+        {
+          "start": 25.1,
+          "end": 27.137,
+          "text": "Check the official docs to",
+          "words": [
+            {
+              "word": "Check",
+              "start": 25.1,
+              "end": 25.649
+            },
+            {
+              "word": "the",
+              "start": 26.062,
+              "end": 26.249
+            },
+            {
+              "word": "official",
+              "start": 26.262,
+              "end": 26.35
+            },
+            {
+              "word": "docs",
+              "start": 26.362,
+              "end": 26.774
+            },
+            {
+              "word": "to",
+              "start": 26.787,
+              "end": 27.137
+            }
+          ]
+        },
+        {
+          "start": 27.15,
+          "end": 27.387,
+          "text": "get started.",
+          "words": [
+            {
+              "word": "get",
+              "start": 27.15,
+              "end": 27.237
+            },
+            {
+              "word": "started.",
+              "start": 27.249,
+              "end": 27.387
+            }
+          ]
+        },
+        {
+          "start": 27.4,
+          "end": 27.825,
+          "text": "started",
+          "words": [
+            {
+              "word": "started",
+              "start": 27.4,
+              "end": 27.825
+            }
+          ]
+        }
+      ],
+      "start_time": 22.937,
+      "end_time": 28.075,
+      "duration": 5.138,
+      "theme": {
+        "primary": "#38bdf8",
+        "secondary": "#818cf8",
+        "accent": "#34d399",
+        "bg_card": "rgba(15, 23, 42, 0.75)",
+        "border": "rgba(56, 189, 248, 0.25)",
+        "text": "#f8fafc"
+      },
+      "domain": "code"
+    }
+  ],
+  "words": [
+    {
+      "word": "Failure",
+      "start": 0.175,
+      "end": 0.487
+    },
+    {
+      "word": "Behavior",
+      "start": 0.5,
+      "end": 1.038
+    },
+    {
+      "word": "and",
+      "start": 1.275,
+      "end": 1.337
+    },
+    {
+      "word": "Step",
+      "start": 1.35,
+      "end": 1.613
+    },
+    {
+      "word": "Isolation",
+      "start": 1.625,
+      "end": 2.225
+    },
+    {
+      "word": "To",
+      "start": 2.588,
+      "end": 2.712
+    },
+    {
+      "word": "execute",
+      "start": 2.725,
+      "end": 3.262
+    },
+    {
+      "word": "synchronous",
+      "start": 3.275,
+      "end": 3.913
+    },
+    {
+      "word": "or",
+      "start": 4.037,
+      "end": 4.225
+    },
+    {
+      "word": "asynchronous",
+      "start": 4.312,
+      "end": 4.988
+    },
+    {
+      "word": "operations",
+      "start": 5.0,
+      "end": 5.675
+    },
+    {
+      "word": "durably,",
+      "start": 5.687,
+      "end": 6.187
+    },
+    {
+      "word": "wrap",
+      "start": 6.575,
+      "end": 6.75
+    },
+    {
+      "word": "your",
+      "start": 6.762,
+      "end": 6.887
+    },
+    {
+      "word": "operation",
+      "start": 6.9,
+      "end": 7.525
+    },
+    {
+      "word": "in",
+      "start": 7.613,
+      "end": 7.712
+    },
+    {
+      "word": "step.run().",
+      "start": 7.725,
+      "end": 8.525
+    },
+    {
+      "word": "Durable",
+      "start": 8.888,
+      "end": 9.287
+    },
+    {
+      "word": "Execution",
+      "start": 9.3,
+      "end": 10.025
+    },
+    {
+      "word": "Memoization",
+      "start": 10.112,
+      "end": 10.25
+    },
+    {
+      "word": "Behavior.",
+      "start": 10.263,
+      "end": 10.925
+    },
+    {
+      "word": "Inngest",
+      "start": 10.938,
+      "end": 11.487
+    },
+    {
+      "word": "Retries",
+      "start": 11.9,
+      "end": 12.313
+    },
+    {
+      "word": "and",
+      "start": 12.325,
+      "end": 13.012
+    },
+    {
+      "word": "Error",
+      "start": 13.15,
+      "end": 13.275
+    },
+    {
+      "word": "Handling.",
+      "start": 13.35,
+      "end": 13.575
+    },
+    {
+      "word": "Handling",
+      "start": 13.587,
+      "end": 14.025
+    },
+    {
+      "word": "Durable",
+      "start": 14.375,
+      "end": 14.837
+    },
+    {
+      "word": "Execution",
+      "start": 14.85,
+      "end": 15.6
+    },
+    {
+      "word": "Memoization",
+      "start": 15.662,
+      "end": 15.825
+    },
+    {
+      "word": "Behavior",
+      "start": 15.837,
+      "end": 16.512
+    },
+    {
+      "word": "External",
+      "start": 16.525,
+      "end": 17.025
+    },
+    {
+      "word": "side",
+      "start": 17.038,
+      "end": 17.55
+    },
+    {
+      "word": "effects",
+      "start": 17.563,
+      "end": 17.837
+    },
+    {
+      "word": "inside",
+      "start": 17.85,
+      "end": 18.3
+    },
+    {
+      "word": "a",
+      "start": 18.363,
+      "end": 18.85
+    },
+    {
+      "word": "retried",
+      "start": 18.863,
+      "end": 18.913
+    },
+    {
+      "word": "step",
+      "start": 18.925,
+      "end": 19.55
+    },
+    {
+      "word": "must",
+      "start": 19.562,
+      "end": 19.975
+    },
+    {
+      "word": "be",
+      "start": 20.25,
+      "end": 20.463
+    },
+    {
+      "word": "idempotent",
+      "start": 20.475,
+      "end": 20.675
+    },
+    {
+      "word": "or",
+      "start": 20.687,
+      "end": 21.437
+    },
+    {
+      "word": "handled",
+      "start": 21.663,
+      "end": 21.775
+    },
+    {
+      "word": "safely",
+      "start": 21.788,
+      "end": 22.163
+    },
+    {
+      "word": "safely",
+      "start": 22.175,
+      "end": 22.687
+    },
+    {
+      "word": "Durable",
+      "start": 23.05,
+      "end": 23.449
+    },
+    {
+      "word": "Execution",
+      "start": 23.462,
+      "end": 24.187
+    },
+    {
+      "word": "Memoization",
+      "start": 24.274,
+      "end": 24.412
+    },
+    {
+      "word": "Behavior.",
+      "start": 24.425,
+      "end": 25.087
+    },
+    {
+      "word": "Check",
+      "start": 25.1,
+      "end": 25.649
+    },
+    {
+      "word": "the",
+      "start": 26.062,
+      "end": 26.249
+    },
+    {
+      "word": "official",
+      "start": 26.262,
+      "end": 26.35
+    },
+    {
+      "word": "docs",
+      "start": 26.362,
+      "end": 26.774
+    },
+    {
+      "word": "to",
+      "start": 26.787,
+      "end": 27.137
+    },
+    {
+      "word": "get",
+      "start": 27.15,
+      "end": 27.237
+    },
+    {
+      "word": "started.",
+      "start": 27.249,
+      "end": 27.387
+    },
+    {
+      "word": "started",
+      "start": 27.4,
+      "end": 27.825
+    }
+  ],
+  "audio_file": "runs/run_20261030_191600_7f3392/audio.wav",
+  "evidence_pack": {
+    "project": "Inngest",
+    "sources": [
+      {
+        "source_url": "https://www.inngest.com/docs/durable-execution/primitives/step-run",
+        "title": "Inngest step.run() Documentation",
+        "retrieved_at": "2026-10-30T19:16:03.646095+00:00",
+        "content_hash": "7b2d5da48167be076ed1fdf0390deaafc8ba132683fbb9e9b9a8a948987ade42",
+        "raw_content": "# Inngest step.run()\n\n`step.run()` is a core durable execution primitive in Inngest that enables developers to break workflows into isolated, retried, and memoized steps.\n\n## Definition and Syntax\n\nTo execute synchronous or asynchronous operations durably, wrap your operation in `await step.run(\"step-id\", async () => { ... })`.\n\n```typescript\nexport const processOrder = inngest.createFunction(\n  { id: \"process-order\" },\n  { event: \"order.created\" },\n  async ({ event, step }) => {\n    const billing = await step.run(\"fetch-billing-data\", async () => {\n      return await getBillingAccount(event.data.customerId);\n    });\n    const receipt = await step.run(\"charge-customer\", async () => {\n      return await paymentGateway.charge({ customerId: billing.id, amount: event.data.amount });\n    });\n    return { status: \"completed\", receiptId: receipt.id };\n  }\n);\n```\n\n## Durable Execution & Memoization Behavior\n\nWhen a function executes:\n1. Each step executes in its own isolated execution context.\n2. When `step.run()` completes successfully, its return value is serialized and saved in durable workflow state.\n3. If a subsequent step throws an error or fails, the function execution pauses and schedules an automatic retry.\n4. On retry, Inngest does not re-execute previously completed steps. Instead, it reuses the memoized return value from workflow state and resumes execution at the failed step.\n\n## Failure Behavior and Step Isolation\n\nIf step 2 (`\"charge-customer\"`) encounters a transient error such as a network timeout or HTTP 503 from an external API:\n- Inngest retries only the failed step (`\"charge-customer\"`).\n- Step 1 (`\"fetch-billing-data\"`) is not re-executed, preventing redundant external API calls and database loads.\n- This guarantees reliable recovery while minimizing duplicate operations across distributed services.\n\n## Important Limitations\n\n> [!WARNING]\n> External side effects inside a retried step must be idempotent or handled safely.\n> Because Inngest retries the entire callback inside a failed `step.run()` until it succeeds or exhausts retries, non-idempotent side effects inside an uncommitted step can execute more than once if failure occurs mid-step."
+      },
+      {
+        "source_url": "https://www.inngest.com/docs/features/retries",
+        "title": "Inngest Retries and Error Handling",
+        "retrieved_at": "2026-10-30T19:16:03.646095+00:00",
+        "content_hash": "11645049ded74761d3b1942bedd9e1478025103fbb5a36c87fa0114636d5e4bb",
+        "raw_content": "# Inngest Retries and Error Handling\n\nInngest provides built-in automatic retries with configurable exponential backoff for all workflow steps.\n\n## Automatic Step-Level Retries\n\nWhen code inside `step.run()` throws an unhandled error:\n- Inngest intercepts the failure and captures the error stack trace.\n- The step enters a retry queue with exponential backoff and jitter.\n- Only the specific step that threw the exception is scheduled for retry.\n- Completed steps prior to the failure remain memoized and are never re-run upon step retry.\n\n## Retry Guarantees and Idempotency\n\nStep execution guarantees at-least-once delivery:\n- Steps that complete successfully have their return values persisted permanently in workflow state.\n- Upon retry, previous step results are loaded directly from cache.\n- Side effects within a step must be designed to tolerate retries safely."
+      }
+    ],
+    "records": [
+      {
+        "id": "ev_01",
+        "kind": "behavior",
+        "claim": "step.run() is a core durable execution primitive in Inngest that enables developers to break workflows into isolated, retried, and memoized steps.",
+        "source_url": "https://www.inngest.com/docs/durable-execution/primitives/step-run",
+        "source_section": "Inngest step.run()",
+        "excerpt": "`step.run()` is a core durable execution primitive in Inngest that enables developers to break workflows into isolated, retried, and memoized steps.",
+        "retrieved_at": "2026-10-30T19:16:03.646095+00:00",
+        "content_hash": "1bee487af044eb8532a46182910b922c281eb5052f59ee5ffea26582ad861d4e",
+        "confidence": "source_supported",
+        "code_evidence": null,
+        "provenance": "documented",
+        "execution_artifact_id": null
+      },
+      {
+        "id": "ev_02",
+        "kind": "code_evidence",
+        "claim": "Code snippet in typescript for Definition and Syntax: export const processOrder = inngest.createFunction(",
+        "source_url": "https://www.inngest.com/docs/durable-execution/primitives/step-run",
+        "source_section": "Definition and Syntax",
+        "excerpt": "export const processOrder = inngest.createFunction(\n  { id: \"process-order\" },\n  { event: \"order.created\" },\n  async ({ event, step }) => {\n    const billing = await step.run(\"fetch-billing-data\", async () => {\n      return await getBillingAccount(event.data.customerId);\n    });\n    const receipt = await step.run(\"charge-customer\", async () => {\n      return await paymentGateway.charge({ customerId: billing.id, amount: event.data.amount });\n    });\n    return { status: \"completed\", receiptId: receipt.id };\n  }\n);",
+        "retrieved_at": "2026-10-30T19:16:03.646095+00:00",
+        "content_hash": "21455aae0b5d2a18015f72dfd5fa92ee4b09a6782f9b20c04511b53e8e1e4a21",
+        "confidence": "source_supported",
+        "code_evidence": "export const processOrder = inngest.createFunction(\n  { id: \"process-order\" },\n  { event: \"order.created\" },\n  async ({ event, step }) => {\n    const billing = await step.run(\"fetch-billing-data\", async () => {\n      return await getBillingAccount(event.data.customerId);\n    });\n    const receipt = await step.run(\"charge-customer\", async () => {\n      return await paymentGateway.charge({ customerId: billing.id, amount: event.data.amount });\n    });\n    return { status: \"completed\", receiptId: receipt.id };\n  }\n);",
+        "provenance": "documented",
+        "execution_artifact_id": null
+      },
+      {
+        "id": "ev_03",
+        "kind": "developer_action",
+        "claim": "To execute synchronous or asynchronous operations durably, wrap your operation in await step.run(\"step-id\", async () => { ...",
+        "source_url": "https://www.inngest.com/docs/durable-execution/primitives/step-run",
+        "source_section": "Definition and Syntax",
+        "excerpt": "To execute synchronous or asynchronous operations durably, wrap your operation in `await step.run(\"step-id\", async () => { ...",
+        "retrieved_at": "2026-10-30T19:16:03.646095+00:00",
+        "content_hash": "3f274ae591a3e74b5c43f7f7c6bb30723ea092f1a47de498e8b71f55770d416b",
+        "confidence": "source_supported",
+        "code_evidence": null,
+        "provenance": "documented",
+        "execution_artifact_id": null
+      },
+      {
+        "id": "ev_04",
+        "kind": "behavior",
+        "claim": "Durable Execution & Memoization Behavior",
+        "source_url": "https://www.inngest.com/docs/durable-execution/primitives/step-run",
+        "source_section": "Durable Execution & Memoization Behavior",
+        "excerpt": "## Durable Execution & Memoization Behavior",
+        "retrieved_at": "2026-10-30T19:16:03.646095+00:00",
+        "content_hash": "f1d62757b38941c8b5f7ad83703c4fff16b3c42d06f3da6582a91c63e377aeeb",
+        "confidence": "source_supported",
+        "code_evidence": null,
+        "provenance": "documented",
+        "execution_artifact_id": null
+      },
+      {
+        "id": "ev_05",
+        "kind": "behavior",
+        "claim": "When a function executes:\n1.",
+        "source_url": "https://www.inngest.com/docs/durable-execution/primitives/step-run",
+        "source_section": "Durable Execution & Memoization Behavior",
+        "excerpt": "When a function executes:\n1.",
+        "retrieved_at": "2026-10-30T19:16:03.646095+00:00",
+        "content_hash": "b7851a05683d1645a6c73f784a8d8c2f4b749350b1b0d9cd72cca99bd93b919f",
+        "confidence": "source_supported",
+        "code_evidence": null,
+        "provenance": "documented",
+        "execution_artifact_id": null
+      },
+      {
+        "id": "ev_06",
+        "kind": "behavior",
+        "claim": "Each step executes in its own isolated execution context.",
+        "source_url": "https://www.inngest.com/docs/durable-execution/primitives/step-run",
+        "source_section": "Durable Execution & Memoization Behavior",
+        "excerpt": "Each step executes in its own isolated execution context.",
+        "retrieved_at": "2026-10-30T19:16:03.646095+00:00",
+        "content_hash": "b031b306ce979e4b9f12d7187eeef1cc494fc0d536b19f65469a26fbba6cf2d6",
+        "confidence": "source_supported",
+        "code_evidence": null,
+        "provenance": "documented",
+        "execution_artifact_id": null
+      },
+      {
+        "id": "ev_07",
+        "kind": "behavior",
+        "claim": "When step.run() completes successfully, its return value is serialized and saved in durable workflow state.",
+        "source_url": "https://www.inngest.com/docs/durable-execution/primitives/step-run",
+        "source_section": "Durable Execution & Memoization Behavior",
+        "excerpt": "When `step.run()` completes successfully, its return value is serialized and saved in durable workflow state.",
+        "retrieved_at": "2026-10-30T19:16:03.646095+00:00",
+        "content_hash": "4472b2792f7229f6cd2a035682d738e1a89b8b169c766c02524e0a06cd6e5ddc",
+        "confidence": "source_supported",
+        "code_evidence": null,
+        "provenance": "documented",
+        "execution_artifact_id": null
+      },
+      {
+        "id": "ev_08",
+        "kind": "failure_behavior",
+        "claim": "If a subsequent step throws an error or fails, the function execution pauses and schedules an automatic retry.",
+        "source_url": "https://www.inngest.com/docs/durable-execution/primitives/step-run",
+        "source_section": "Durable Execution & Memoization Behavior",
+        "excerpt": "If a subsequent step throws an error or fails, the function execution pauses and schedules an automatic retry.",
+        "retrieved_at": "2026-10-30T19:16:03.646095+00:00",
+        "content_hash": "fa283cb272f853a1bac9178fd53ba632558b4470837366e70b055dd1c9f22809",
+        "confidence": "source_supported",
+        "code_evidence": null,
+        "provenance": "documented",
+        "execution_artifact_id": null
+      },
+      {
+        "id": "ev_09",
+        "kind": "failure_behavior",
+        "claim": "On retry, Inngest does not re-execute previously completed steps.",
+        "source_url": "https://www.inngest.com/docs/durable-execution/primitives/step-run",
+        "source_section": "Durable Execution & Memoization Behavior",
+        "excerpt": "On retry, Inngest does not re-execute previously completed steps.",
+        "retrieved_at": "2026-10-30T19:16:03.646095+00:00",
+        "content_hash": "1d36ffc9a102757e5219a5f07fe5d4d713ccebcfb4e32dc40c9bd19f0c7b06a0",
+        "confidence": "source_supported",
+        "code_evidence": null,
+        "provenance": "documented",
+        "execution_artifact_id": null
+      },
+      {
+        "id": "ev_10",
+        "kind": "behavior",
+        "claim": "Instead, it reuses the memoized return value from workflow state and resumes execution at the failed step.",
+        "source_url": "https://www.inngest.com/docs/durable-execution/primitives/step-run",
+        "source_section": "Durable Execution & Memoization Behavior",
+        "excerpt": "Instead, it reuses the memoized return value from workflow state and resumes execution at the failed step.",
+        "retrieved_at": "2026-10-30T19:16:03.646095+00:00",
+        "content_hash": "9dbe7cb38b3ca4433eb6977b63277fd8b37454a4f9455388476de3785046d656",
+        "confidence": "source_supported",
+        "code_evidence": null,
+        "provenance": "documented",
+        "execution_artifact_id": null
+      },
+      {
+        "id": "ev_11",
+        "kind": "failure_behavior",
+        "claim": "Failure Behavior and Step Isolation",
+        "source_url": "https://www.inngest.com/docs/durable-execution/primitives/step-run",
+        "source_section": "Failure Behavior and Step Isolation",
+        "excerpt": "## Failure Behavior and Step Isolation",
+        "retrieved_at": "2026-10-30T19:16:03.646095+00:00",
+        "content_hash": "24b4cdf3d0fe40ad84437df4197ce0d7886651e56527ce703f812c381282acc9",
+        "confidence": "source_supported",
+        "code_evidence": null,
+        "provenance": "documented",
+        "execution_artifact_id": null
+      },
+      {
+        "id": "ev_12",
+        "kind": "failure_behavior",
+        "claim": "If step 2 (\"charge-customer\") encounters a transient error such as a network timeout or HTTP 503 from an external API:\n- Inngest retries only the failed step (\"charge-customer\").",
+        "source_url": "https://www.inngest.com/docs/durable-execution/primitives/step-run",
+        "source_section": "Failure Behavior and Step Isolation",
+        "excerpt": "If step 2 (`\"charge-customer\"`) encounters a transient error such as a network timeout or HTTP 503 from an external API:\n- Inngest retries only the failed step (`\"charge-customer\"`).",
+        "retrieved_at": "2026-10-30T19:16:03.646095+00:00",
+        "content_hash": "1c319feb42f7a787383d4fcbd78479d3de90bc11125d88f5a710fb9a5beaf69e",
+        "confidence": "source_supported",
+        "code_evidence": null,
+        "provenance": "documented",
+        "execution_artifact_id": null
+      },
+      {
+        "id": "ev_13",
+        "kind": "behavior",
+        "claim": "- Step 1 (\"fetch-billing-data\") is not re-executed, preventing redundant external API calls and database loads.",
+        "source_url": "https://www.inngest.com/docs/durable-execution/primitives/step-run",
+        "source_section": "Failure Behavior and Step Isolation",
+        "excerpt": "- Step 1 (`\"fetch-billing-data\"`) is not re-executed, preventing redundant external API calls and database loads.",
+        "retrieved_at": "2026-10-30T19:16:03.646095+00:00",
+        "content_hash": "72ef9999c19aecac741040173139931636274055502b263e10e17ff4ec1a202d",
+        "confidence": "source_supported",
+        "code_evidence": null,
+        "provenance": "documented",
+        "execution_artifact_id": null
+      },
+      {
+        "id": "ev_14",
+        "kind": "failure_behavior",
+        "claim": "- This guarantees reliable recovery while minimizing duplicate operations across distributed services.",
+        "source_url": "https://www.inngest.com/docs/durable-execution/primitives/step-run",
+        "source_section": "Failure Behavior and Step Isolation",
+        "excerpt": "- This guarantees reliable recovery while minimizing duplicate operations across distributed services.",
+        "retrieved_at": "2026-10-30T19:16:03.646095+00:00",
+        "content_hash": "09ffa9dbf872d17c609df2e768f542df289ec3caa6da579ff2a3e3b6c44f74a9",
+        "confidence": "source_supported",
+        "code_evidence": null,
+        "provenance": "documented",
+        "execution_artifact_id": null
+      },
+      {
+        "id": "ev_15",
+        "kind": "limitation",
+        "claim": "External side effects inside a retried step must be idempotent or handled safely",
+        "source_url": "https://www.inngest.com/docs/durable-execution/primitives/step-run",
+        "source_section": "Important Limitations",
+        "excerpt": "External side effects inside a retried step must be idempotent or handled safely.\nBecause Inngest retries the entire callback inside a failed `step.run()` until it succeeds or exhausts retries, non-idempotent side effects inside an uncommitted step can execute more than once if failure occurs mid-step.",
+        "retrieved_at": "2026-10-30T19:16:03.646095+00:00",
+        "content_hash": "0eaa09ba5bf64114d3cfa8daeff5d71c98b705a7ae5f332c46ab23f109ecb638",
+        "confidence": "source_supported",
+        "code_evidence": null,
+        "provenance": "documented",
+        "execution_artifact_id": null
+      },
+      {
+        "id": "ev_16",
+        "kind": "limitation",
+        "claim": "Important Limitations",
+        "source_url": "https://www.inngest.com/docs/durable-execution/primitives/step-run",
+        "source_section": "Important Limitations",
+        "excerpt": "## Important Limitations",
+        "retrieved_at": "2026-10-30T19:16:03.646095+00:00",
+        "content_hash": "8ede7cfd01e0dc66c21d9523635d11fda8bf97abae977aaad5cd879a00ce790c",
+        "confidence": "source_supported",
+        "code_evidence": null,
+        "provenance": "documented",
+        "execution_artifact_id": null
+      },
+      {
+        "id": "ev_17",
+        "kind": "failure_behavior",
+        "claim": "Inngest Retries and Error Handling",
+        "source_url": "https://www.inngest.com/docs/features/retries",
+        "source_section": "Inngest Retries and Error Handling",
+        "excerpt": "# Inngest Retries and Error Handling",
+        "retrieved_at": "2026-10-30T19:16:03.646095+00:00",
+        "content_hash": "39a78964a6efe64be1ee078a8ce4f0bdcddd256bcb757ee37e2bfbf290582718",
+        "confidence": "source_supported",
+        "code_evidence": null,
+        "provenance": "documented",
+        "execution_artifact_id": null
+      },
+      {
+        "id": "ev_18",
+        "kind": "failure_behavior",
+        "claim": "Inngest provides built-in automatic retries with configurable exponential backoff for all workflow steps.",
+        "source_url": "https://www.inngest.com/docs/features/retries",
+        "source_section": "Inngest Retries and Error Handling",
+        "excerpt": "Inngest provides built-in automatic retries with configurable exponential backoff for all workflow steps.",
+        "retrieved_at": "2026-10-30T19:16:03.646095+00:00",
+        "content_hash": "7ed548776cb5d081cf4909cc0cc18516a873710dcc974bc5ae079a352291c59d",
+        "confidence": "source_supported",
+        "code_evidence": null,
+        "provenance": "documented",
+        "execution_artifact_id": null
+      },
+      {
+        "id": "ev_19",
+        "kind": "failure_behavior",
+        "claim": "Automatic Step-Level Retries",
+        "source_url": "https://www.inngest.com/docs/features/retries",
+        "source_section": "Automatic Step-Level Retries",
+        "excerpt": "## Automatic Step-Level Retries",
+        "retrieved_at": "2026-10-30T19:16:03.646095+00:00",
+        "content_hash": "a71658d23d1213ead5f14f3426cde14c35eab96fbf32fb38cf5f69e5530c53fe",
+        "confidence": "source_supported",
+        "code_evidence": null,
+        "provenance": "documented",
+        "execution_artifact_id": null
+      },
+      {
+        "id": "ev_20",
+        "kind": "failure_behavior",
+        "claim": "When code inside step.run() throws an unhandled error:\n- Inngest intercepts the failure and captures the error stack trace.",
+        "source_url": "https://www.inngest.com/docs/features/retries",
+        "source_section": "Automatic Step-Level Retries",
+        "excerpt": "When code inside `step.run()` throws an unhandled error:\n- Inngest intercepts the failure and captures the error stack trace.",
+        "retrieved_at": "2026-10-30T19:16:03.646095+00:00",
+        "content_hash": "a84a9e60360136bf1d274c785f6fd0f665df74f9fe779273120a49a1229106b9",
+        "confidence": "source_supported",
+        "code_evidence": null,
+        "provenance": "documented",
+        "execution_artifact_id": null
+      },
+      {
+        "id": "ev_21",
+        "kind": "failure_behavior",
+        "claim": "- The step enters a retry queue with exponential backoff and jitter.",
+        "source_url": "https://www.inngest.com/docs/features/retries",
+        "source_section": "Automatic Step-Level Retries",
+        "excerpt": "- The step enters a retry queue with exponential backoff and jitter.",
+        "retrieved_at": "2026-10-30T19:16:03.646095+00:00",
+        "content_hash": "a8d65be3d334ced0a6c92d6da1406a9a4583d5e98e6062a099d7e9442ca0e74b",
+        "confidence": "source_supported",
+        "code_evidence": null,
+        "provenance": "documented",
+        "execution_artifact_id": null
+      },
+      {
+        "id": "ev_22",
+        "kind": "failure_behavior",
+        "claim": "- Only the specific step that threw the exception is scheduled for retry.",
+        "source_url": "https://www.inngest.com/docs/features/retries",
+        "source_section": "Automatic Step-Level Retries",
+        "excerpt": "- Only the specific step that threw the exception is scheduled for retry.",
+        "retrieved_at": "2026-10-30T19:16:03.646095+00:00",
+        "content_hash": "fc933dafe5101349e2b662deaf3cef1440fbcd291da5fd9b705abc617e8ffc6d",
+        "confidence": "source_supported",
+        "code_evidence": null,
+        "provenance": "documented",
+        "execution_artifact_id": null
+      },
+      {
+        "id": "ev_23",
+        "kind": "failure_behavior",
+        "claim": "- Completed steps prior to the failure remain memoized and are never re-run upon step retry.",
+        "source_url": "https://www.inngest.com/docs/features/retries",
+        "source_section": "Automatic Step-Level Retries",
+        "excerpt": "- Completed steps prior to the failure remain memoized and are never re-run upon step retry.",
+        "retrieved_at": "2026-10-30T19:16:03.646095+00:00",
+        "content_hash": "498dd61632e248286c5d0bf67f8c54e835822738fc34d3207a91c926cabbdd91",
+        "confidence": "source_supported",
+        "code_evidence": null,
+        "provenance": "documented",
+        "execution_artifact_id": null
+      },
+      {
+        "id": "ev_24",
+        "kind": "failure_behavior",
+        "claim": "Retry Guarantees and Idempotency",
+        "source_url": "https://www.inngest.com/docs/features/retries",
+        "source_section": "Retry Guarantees and Idempotency",
+        "excerpt": "## Retry Guarantees and Idempotency",
+        "retrieved_at": "2026-10-30T19:16:03.646095+00:00",
+        "content_hash": "1c1a90e496b173acc7548ac88807d498dc0d595611285ad84617c4f05109eaff",
+        "confidence": "source_supported",
+        "code_evidence": null,
+        "provenance": "documented",
+        "execution_artifact_id": null
+      },
+      {
+        "id": "ev_25",
+        "kind": "behavior",
+        "claim": "Step execution guarantees at-least-once delivery:\n- Steps that complete successfully have their return values persisted permanently in workflow state.",
+        "source_url": "https://www.inngest.com/docs/features/retries",
+        "source_section": "Retry Guarantees and Idempotency",
+        "excerpt": "Step execution guarantees at-least-once delivery:\n- Steps that complete successfully have their return values persisted permanently in workflow state.",
+        "retrieved_at": "2026-10-30T19:16:03.646095+00:00",
+        "content_hash": "ff298951439f7641e3cd5a190661c25d879b69e094de37686c5569fb614441a6",
+        "confidence": "source_supported",
+        "code_evidence": null,
+        "provenance": "documented",
+        "execution_artifact_id": null
+      },
+      {
+        "id": "ev_26",
+        "kind": "failure_behavior",
+        "claim": "- Upon retry, previous step results are loaded directly from cache.",
+        "source_url": "https://www.inngest.com/docs/features/retries",
+        "source_section": "Retry Guarantees and Idempotency",
+        "excerpt": "- Upon retry, previous step results are loaded directly from cache.",
+        "retrieved_at": "2026-10-30T19:16:03.646095+00:00",
+        "content_hash": "04f98a037c00f0f43d9041a8a7411d2db6a178578e9dcf78fe40c4c23353bb5e",
+        "confidence": "source_supported",
+        "code_evidence": null,
+        "provenance": "documented",
+        "execution_artifact_id": null
+      },
+      {
+        "id": "ev_27",
+        "kind": "failure_behavior",
+        "claim": "- Side effects within a step must be designed to tolerate retries safely.",
+        "source_url": "https://www.inngest.com/docs/features/retries",
+        "source_section": "Retry Guarantees and Idempotency",
+        "excerpt": "- Side effects within a step must be designed to tolerate retries safely.",
+        "retrieved_at": "2026-10-30T19:16:03.646095+00:00",
+        "content_hash": "f4a5f65689ff79c4c5fa3481c224f9a494717ba4b1d69df4a37e12951dd420aa",
+        "confidence": "source_supported",
+        "code_evidence": null,
+        "provenance": "documented",
+        "execution_artifact_id": null
+      }
+    ],
+    "execution_artifacts": [],
+    "generated_at": "2026-10-30T19:16:03.841478+00:00"
+  },
+  "workflow": {
+    "id": "wf_primary_verified_workflow",
+    "title": "Inngest: Explain one practical durable execution feature in a 30-second video",
+    "description": "To execute synchronous or asynchronous operations durably, wrap your operation in await step.run(\"step-id\", async () => { ... step.run() is a core durable execution primitive in Inngest that enables developers to break workflows into isolated, retried, and memoized steps.",
+    "problem_statement": "If a subsequent step throws an error or fails, the function execution pauses and schedules an automatic retry.",
+    "implementation_summary": "To execute synchronous or asynchronous operations durably, wrap your operation in await step.run(\"step-id\", async () => { ...",
+    "demonstration_behavior": "step.run() is a core durable execution primitive in Inngest that enables developers to break workflows into isolated, retried, and memoized steps.",
+    "payoff": "Zero duplicate operations, verified state recovery, and system resilience.",
+    "takeaway": "Use Inngest for safe production operations.",
+    "evidence_ids": [
+      "ev_03",
+      "ev_01",
+      "ev_04",
+      "ev_08",
+      "ev_09",
+      "ev_02"
+    ],
+    "code_snippet": "export const processOrder = inngest.createFunction(\n  { id: \"process-order\" },\n  { event: \"order.created\" },\n  async ({ event, step }) => {\n    const billing = await step.run(\"fetch-billing-data\", async () => {\n      return await getBillingAccount(event.data.customerId);\n    });\n    const receipt = await step.run(\"charge-customer\", async () => {\n      return await paymentGateway.charge({ customerId: billing.id, amount: event.data.amount });\n    });\n    return { status: \"completed\", receiptId: receipt.id };\n  }\n);",
+    "release": null,
+    "scores": {
+      "supported_by_evidence": 10.0,
+      "understandable_in_30s": 9.5,
+      "visible_before_and_after": 9.5,
+      "code_and_behavior_demonstrable": 10.0,
+      "single_clear_takeaway": 9.5,
+      "visual_story_works_without_long_prose": 9.5,
+      "total_score": 58.0
+    }
+  },
+  "validation_report": {
+    "passed": true,
+    "claim_coverage_pct": 100.0,
+    "total_claims": 5,
+    "backed_claims": 5,
+    "unsupported_numbers": [],
+    "banned_tokens_found": [],
+    "missing_evidence_ids": [],
+    "contradiction_errors": [],
+    "provenance_errors": [],
+    "schema_lineage_errors": [],
+    "gate1_errors": [],
+    "gate2_errors": [],
+    "gate3_errors": [],
+    "gate4_errors": [],
+    "gate5_errors": [],
+    "gate6_errors": [],
+    "needs_review": false,
+    "review_reasons": [],
+    "checks": [
+      {
+        "check": "evidence_pack_presence",
+        "passed": true,
+        "details": "EvidencePack populated with 27 verified records.",
+        "scene_id": null
+      },
+      {
+        "check": "claim_citation",
+        "passed": true,
+        "details": "Scene 1 backed by verified record(s): ['ev_11', 'ev_24']",
+        "scene_id": 1
+      },
+      {
+        "check": "claim_citation",
+        "passed": true,
+        "details": "Scene 2 backed by verified record(s): ['ev_02', 'ev_03']",
+        "scene_id": 2
+      },
+      {
+        "check": "claim_citation",
+        "passed": true,
+        "details": "Scene 3 backed by verified record(s): ['ev_04', 'ev_17']",
+        "scene_id": 3
+      },
+      {
+        "check": "claim_citation",
+        "passed": true,
+        "details": "Scene 4 backed by verified record(s): ['ev_04', 'ev_15', 'ev_16', 'ev_17']",
+        "scene_id": 4
+      },
+      {
+        "check": "claim_citation",
+        "passed": true,
+        "details": "Scene 5 backed by verified record(s): ['ev_04']",
+        "scene_id": 5
+      },
+      {
+        "check": "gate1_schema_and_lineage",
+        "passed": true,
+        "details": "Schema, citations, branding, and lineage verified.",
+        "scene_id": null
+      },
+      {
+        "check": "gate1_provenance_integrity",
+        "passed": true,
+        "details": "Execution artifacts and visual representation provenance verified.",
+        "scene_id": null
+      },
+      {
+        "check": "gate1_contiguous_code_equality",
+        "passed": true,
+        "details": "Code matches exact source snippet with balanced delimiters and zero fences.",
+        "scene_id": null
+      },
+      {
+        "check": "gate2_quote_paraphrase",
+        "passed": true,
+        "details": "All on-screen titles, subtitles, and card claims have >= 0.35 content-word overlap with cited records.",
+        "scene_id": null
+      },
+      {
+        "check": "numerical_claims",
+        "passed": true,
+        "details": "All numeric values in narration and cards verified against cited evidence.",
+        "scene_id": null
+      },
+      {
+        "check": "semantic_contradiction",
+        "passed": true,
+        "details": "Zero direct polarity contradictions or unsupported guarantees.",
+        "scene_id": null
+      },
+      {
+        "check": "gate3_limitation_gate",
+        "passed": true,
+        "details": "Relevant documented limitations cited and displayed accurately without fake placeholders.",
+        "scene_id": null
+      },
+      {
+        "check": "gate4_component_literal_lint",
+        "passed": true,
+        "details": "Zero hardcoded copy or fake assurance defaults in React components.",
+        "scene_id": null
+      }
+    ],
+    "timestamp": "2026-10-30T19:16:03.993846+00:00"
+  },
+  "project_profile": {
+    "product": "Inngest",
+    "product_subject": "step.run() Durable Execution",
+    "product_company": "Inngest",
+    "publisher_brand": "Inngest",
+    "client_brand": "Inngest",
+    "audience": "Backend developers",
+    "goal": "Explain one practical durable execution feature in a 30-second video",
+    "duration_target_seconds": 30,
+    "topic": "Inngest step.run() Durable Execution & Retries",
+    "subject": "code",
+    "video_intent": "developer_workflow_explainer",
+    "sources": [
+      {
+        "url": "https://www.inngest.com/docs/durable-execution/primitives/step-run",
+        "local_file": "examples/docs/inngest_step_run.md",
+        "title": "Inngest step.run() Documentation"
+      },
+      {
+        "url": "https://www.inngest.com/docs/features/retries",
+        "local_file": "examples/docs/inngest_retries.md",
+        "title": "Inngest Retries and Error Handling"
+      }
+    ],
+    "render_profile": {
+      "aspect_ratio": "16:9",
+      "width": 1920,
+      "height": 1080,
+      "fps": 30,
+      "theme": {
+        "background": "#0d1117",
+        "card_background": "#161b22",
+        "text_primary": "#f0f6fc",
+        "text_secondary": "#8b949e",
+        "accent": "#6366F1",
+        "success": "#10B981",
+        "danger": "#EF4444",
+        "warning": "#F59E0B"
+      },
+      "typography": {
+        "font_family_code": "JetBrains Mono, monospace",
+        "font_family_text": "Inter, sans-serif"
+      },
+      "caption_layout": {
+        "position": "bottom",
+        "max_words_per_line": 5
+      }
+    },
+    "brand": {
+      "company_name": "Inngest",
+      "logo_text": "INNGEST",
+      "primary_color": "#6366F1",
+      "secondary_color": "#10B981",
+      "warning_color": "#F59E0B",
+      "danger_color": "#EF4444",
+      "bg_canvas": "#090A0F",
+      "bg_surface": "#11131C",
+      "font_sans": "Inter, system-ui, sans-serif",
+      "font_mono": "JetBrains Mono, monospace",
+      "docs_url_display": "inngest.com/docs/step-run"
+    }
+  },
+  "brand": {
+    "company_name": "Inngest",
+    "logo_text": "INNGEST",
+    "primary_color": "#6366F1",
+    "secondary_color": "#10B981",
+    "warning_color": "#F59E0B",
+    "danger_color": "#EF4444",
+    "bg_canvas": "#090A0F",
+    "bg_surface": "#11131C",
+    "font_sans": "Inter, system-ui, sans-serif",
+    "font_mono": "JetBrains Mono, monospace",
+    "docs_url_display": "inngest.com/docs/step-run"
+  },
+  "render_profile": {
+    "aspect_ratio": "9:16",
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "theme": {
+      "background": "#0d1117",
+      "card_background": "#161b22",
+      "text_primary": "#f0f6fc",
+      "text_secondary": "#8b949e",
+      "accent": "#6366F1",
+      "success": "#10B981",
+      "danger": "#EF4444",
+      "warning": "#F59E0B"
+    },
+    "typography": {
+      "font_family_code": "JetBrains Mono, monospace",
+      "font_family_text": "Inter, sans-serif"
+    },
+    "caption_layout": {
+      "position": "bottom",
+      "max_words_per_line": 5
+    }
+  },
+  "caption_chunks": [
+    {
+      "start": 0.175,
+      "end": 2.225,
+      "text": "Failure Behavior and Step Isolation",
+      "words": [
+        {
+          "word": "Failure",
+          "start": 0.175,
+          "end": 0.487
+        },
+        {
+          "word": "Behavior",
+          "start": 0.5,
+          "end": 1.038
+        },
+        {
+          "word": "and",
+          "start": 1.275,
+          "end": 1.337
+        },
+        {
+          "word": "Step",
+          "start": 1.35,
+          "end": 1.613
+        },
+        {
+          "word": "Isolation",
+          "start": 1.625,
+          "end": 2.225
+        }
+      ]
+    },
+    {
+      "start": 2.588,
+      "end": 4.988,
+      "text": "To execute synchronous or asynchronous",
+      "words": [
+        {
+          "word": "To",
+          "start": 2.588,
+          "end": 2.712
+        },
+        {
+          "word": "execute",
+          "start": 2.725,
+          "end": 3.262
+        },
+        {
+          "word": "synchronous",
+          "start": 3.275,
+          "end": 3.913
+        },
+        {
+          "word": "or",
+          "start": 4.037,
+          "end": 4.225
+        },
+        {
+          "word": "asynchronous",
+          "start": 4.312,
+          "end": 4.988
+        }
+      ]
+    },
+    {
+      "start": 5.0,
+      "end": 6.187,
+      "text": "operations durably,",
+      "words": [
+        {
+          "word": "operations",
+          "start": 5.0,
+          "end": 5.675
+        },
+        {
+          "word": "durably,",
+          "start": 5.687,
+          "end": 6.187
+        }
+      ]
+    },
+    {
+      "start": 6.575,
+      "end": 8.525,
+      "text": "wrap your operation in step.run().",
+      "words": [
+        {
+          "word": "wrap",
+          "start": 6.575,
+          "end": 6.75
+        },
+        {
+          "word": "your",
+          "start": 6.762,
+          "end": 6.887
+        },
+        {
+          "word": "operation",
+          "start": 6.9,
+          "end": 7.525
+        },
+        {
+          "word": "in",
+          "start": 7.613,
+          "end": 7.712
+        },
+        {
+          "word": "step.run().",
+          "start": 7.725,
+          "end": 8.525
+        }
+      ]
+    },
+    {
+      "start": 8.888,
+      "end": 10.25,
+      "text": "Durable Execution Memoization",
+      "words": [
+        {
+          "word": "Durable",
+          "start": 8.888,
+          "end": 9.287
+        },
+        {
+          "word": "Execution",
+          "start": 9.3,
+          "end": 10.025
+        },
+        {
+          "word": "Memoization",
+          "start": 10.112,
+          "end": 10.25
+        }
+      ]
+    },
+    {
+      "start": 10.263,
+      "end": 10.925,
+      "text": "Behavior.",
+      "words": [
+        {
+          "word": "Behavior.",
+          "start": 10.263,
+          "end": 10.925
+        }
+      ]
+    },
+    {
+      "start": 10.938,
+      "end": 13.575,
+      "text": "Inngest Retries and Error Handling.",
+      "words": [
+        {
+          "word": "Inngest",
+          "start": 10.938,
+          "end": 11.487
+        },
+        {
+          "word": "Retries",
+          "start": 11.9,
+          "end": 12.313
+        },
+        {
+          "word": "and",
+          "start": 12.325,
+          "end": 13.012
+        },
+        {
+          "word": "Error",
+          "start": 13.15,
+          "end": 13.275
+        },
+        {
+          "word": "Handling.",
+          "start": 13.35,
+          "end": 13.575
+        }
+      ]
+    },
+    {
+      "start": 13.587,
+      "end": 15.825,
+      "text": "Handling Durable Execution Memoization",
+      "words": [
+        {
+          "word": "Handling",
+          "start": 13.587,
+          "end": 14.025
+        },
+        {
+          "word": "Durable",
+          "start": 14.375,
+          "end": 14.837
+        },
+        {
+          "word": "Execution",
+          "start": 14.85,
+          "end": 15.6
+        },
+        {
+          "word": "Memoization",
+          "start": 15.662,
+          "end": 15.825
+        }
+      ]
+    },
+    {
+      "start": 15.837,
+      "end": 17.837,
+      "text": "Behavior External side effects",
+      "words": [
+        {
+          "word": "Behavior",
+          "start": 15.837,
+          "end": 16.512
+        },
+        {
+          "word": "External",
+          "start": 16.525,
+          "end": 17.025
+        },
+        {
+          "word": "side",
+          "start": 17.038,
+          "end": 17.55
+        },
+        {
+          "word": "effects",
+          "start": 17.563,
+          "end": 17.837
+        }
+      ]
+    },
+    {
+      "start": 17.85,
+      "end": 19.975,
+      "text": "inside a retried step must",
+      "words": [
+        {
+          "word": "inside",
+          "start": 17.85,
+          "end": 18.3
+        },
+        {
+          "word": "a",
+          "start": 18.363,
+          "end": 18.85
+        },
+        {
+          "word": "retried",
+          "start": 18.863,
+          "end": 18.913
+        },
+        {
+          "word": "step",
+          "start": 18.925,
+          "end": 19.55
+        },
+        {
+          "word": "must",
+          "start": 19.562,
+          "end": 19.975
+        }
+      ]
+    },
+    {
+      "start": 20.25,
+      "end": 22.163,
+      "text": "be idempotent or handled safely",
+      "words": [
+        {
+          "word": "be",
+          "start": 20.25,
+          "end": 20.463
+        },
+        {
+          "word": "idempotent",
+          "start": 20.475,
+          "end": 20.675
+        },
+        {
+          "word": "or",
+          "start": 20.687,
+          "end": 21.437
+        },
+        {
+          "word": "handled",
+          "start": 21.663,
+          "end": 21.775
+        },
+        {
+          "word": "safely",
+          "start": 21.788,
+          "end": 22.163
+        }
+      ]
+    },
+    {
+      "start": 22.175,
+      "end": 24.412,
+      "text": "safely Durable Execution Memoization",
+      "words": [
+        {
+          "word": "safely",
+          "start": 22.175,
+          "end": 22.687
+        },
+        {
+          "word": "Durable",
+          "start": 23.05,
+          "end": 23.449
+        },
+        {
+          "word": "Execution",
+          "start": 23.462,
+          "end": 24.187
+        },
+        {
+          "word": "Memoization",
+          "start": 24.274,
+          "end": 24.412
+        }
+      ]
+    },
+    {
+      "start": 24.425,
+      "end": 25.087,
+      "text": "Behavior.",
+      "words": [
+        {
+          "word": "Behavior.",
+          "start": 24.425,
+          "end": 25.087
+        }
+      ]
+    },
+    {
+      "start": 25.1,
+      "end": 27.137,
+      "text": "Check the official docs to",
+      "words": [
+        {
+          "word": "Check",
+          "start": 25.1,
+          "end": 25.649
+        },
+        {
+          "word": "the",
+          "start": 26.062,
+          "end": 26.249
+        },
+        {
+          "word": "official",
+          "start": 26.262,
+          "end": 26.35
+        },
+        {
+          "word": "docs",
+          "start": 26.362,
+          "end": 26.774
+        },
+        {
+          "word": "to",
+          "start": 26.787,
+          "end": 27.137
+        }
+      ]
+    },
+    {
+      "start": 27.15,
+      "end": 27.387,
+      "text": "get started.",
+      "words": [
+        {
+          "word": "get",
+          "start": 27.15,
+          "end": 27.237
+        },
+        {
+          "word": "started.",
+          "start": 27.249,
+          "end": 27.387
+        }
+      ]
+    },
+    {
+      "start": 27.4,
+      "end": 27.825,
+      "text": "started",
+      "words": [
+        {
+          "word": "started",
+          "start": 27.4,
+          "end": 27.825
+        }
+      ]
+    }
+  ],
+  "aspect_ratio": "9:16"
+}

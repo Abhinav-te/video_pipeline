@@ -95,7 +95,7 @@ def chunk_caption_words(
         ends_clause = bool(re.search(r"[,;:]$", word_str))
         is_too_long = len(current_words) >= max_words or len(current_text) >= max_chars
 
-        if ends_sentence or (len(current_words) >= 3 and ends_clause) or is_too_long:
+        if ends_sentence or (len(current_words) >= 2 and ends_clause) or is_too_long:
             chunks.append({
                 "start": round(float(current_words[0].get("start", 0.0)), 3),
                 "end": round(float(current_words[-1].get("end", 0.0)), 3),

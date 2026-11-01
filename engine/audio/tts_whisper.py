@@ -441,6 +441,20 @@ async def synthesize_voice_with_boundaries(
     spoken_text, mappings = prepare_tts_text_with_token_map(text)
     active_voice = voice or os.getenv("EDGE_TTS_VOICE", "en-US-AndrewNeural")
 
+    # Offline Audio Cache Check
+    cache_key = hashlib.sha256(f"{spoken_text}:{active_voice}".encode("utf-8")).hexdigest()
+    cached_mp3 = AUDIO_CACHE_DIR / f"{cache_key}.mp3"
+    cached_words = AUDIO_CACHE_DIR / f"{cache_key}.words.json"
+    if cached_mp3.exists() and cached_words.exists() and cached_mp3.stat().st_size > 0:
+        try:
+            with open(cached_words, "r", encoding="utf-8") as wf:
+                display_words = json.load(wf)
+            audio_bytes = cached_mp3.read_bytes()
+            print(f"[AUDIO:CACHE] ⚡ Reused cached neural audio with boundaries ({len(display_words)} words) -> {cache_key[:8]}", flush=True)
+            return audio_bytes, display_words
+        except Exception:
+            pass
+
     last_err = None
     for attempt in range(max_retries):
         try:
@@ -468,6 +482,15 @@ async def synthesize_voice_with_boundaries(
             # Collapse multi-word spoken spans back to display tokens
             display_words = collapse_spoken_word_boundaries(raw_word_events, mappings)
             display_words = validate_and_sanitize_word_timestamps(display_words)
+
+            AUDIO_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+            try:
+                with open(cached_mp3, "wb") as f:
+                    f.write(audio_bytes)
+                with open(cached_words, "w", encoding="utf-8") as wf:
+                    json.dump(display_words, wf, indent=2)
+            except Exception:
+                pass
 
             return bytes(audio_bytes), display_words
         except Exception as e:

@@ -117,13 +117,17 @@ export const EvidenceBentoScene: React.FC<EvidenceBentoSceneProps> = ({
         {headline}
       </h1>
 
-      {/* Responsive Bento Grid */}
+      {/* Responsive Bento Grid: balanced layouts for 1, 2, 3, 4, and 5 cards */}
       <div
         style={{
           width: '100%',
-          maxWidth: isWidescreen ? '1440px' : '920px',
+          maxWidth: isWidescreen
+            ? (cards.length === 1 ? '760px' : (cards.length === 2 ? '1200px' : (cards.length === 4 ? '1360px' : '1440px')))
+            : '920px',
           display: 'grid',
-          gridTemplateColumns: isWidescreen ? `repeat(${Math.min(cards.length, 3)}, 1fr)` : '1fr',
+          gridTemplateColumns: isWidescreen
+            ? (cards.length === 1 ? '1fr' : (cards.length === 2 || cards.length === 4 ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)'))
+            : '1fr',
           gap: isWidescreen ? '28px' : '20px',
         }}
       >
@@ -213,10 +217,11 @@ export const EvidenceBentoScene: React.FC<EvidenceBentoSceneProps> = ({
               <div>
                 <div
                   style={{
-                    fontSize: isWidescreen ? '32px' : '28px',
+                    fontSize: cards.length >= 4 ? (isWidescreen ? '26px' : '24px') : (isWidescreen ? '32px' : '28px'),
                     fontWeight: 800,
                     color: '#f8fafc',
                     marginBottom: '6px',
+                    lineHeight: 1.25,
                   }}
                 >
                   {title}
@@ -224,9 +229,9 @@ export const EvidenceBentoScene: React.FC<EvidenceBentoSceneProps> = ({
                 {subtitle ? (
                   <div
                     style={{
-                      fontSize: isWidescreen ? '24px' : '20px',
+                      fontSize: cards.length >= 4 ? (isWidescreen ? '18px' : '17px') : (isWidescreen ? '22px' : '20px'),
                       color: '#94a3b8',
-                      lineHeight: 1.45,
+                      lineHeight: 1.4,
                     }}
                   >
                     {subtitle}

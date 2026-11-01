@@ -28,7 +28,7 @@ export const TakeawayCTAScene: React.FC<TakeawayCTASceneProps> = ({
   const headline = scene?.title || brand.company_name || 'Workflow Architecture';
   const takeaway = scene?.spoken_text || scene?.narration || '';
   const quickstart = scene?.quickstart || (brand.company_name ? `npm install ${brand.company_name.toLowerCase()}` : '');
-  const docsUrl = scene?.cta_url || brand.docs_url_display || '';
+  const docsUrl = brand.docs_url_display || (scene?.cta_url ? scene.cta_url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '') : '');
 
   const cardOpacity = interpolate(localFrame, [0, 10], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
   const cardScale = interpolate(localFrame, [0, 10], [0.95, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
@@ -176,10 +176,11 @@ export const TakeawayCTAScene: React.FC<TakeawayCTASceneProps> = ({
             fontFamily: brand.font_mono,
             boxShadow: '0 12px 28px -6px rgba(99, 102, 241, 0.6)',
             letterSpacing: '0.02em',
+            maxWidth: '92%',
           }}
         >
-          <span>Official Docs:</span>
-          <span style={{ textDecoration: 'underline', color: '#ffffff' }}>
+          <span style={{ whiteSpace: 'nowrap' }}>Official Docs:</span>
+          <span style={{ textDecoration: 'underline', color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {docsUrl}
           </span>
           <CheckIcon size={18} color="#ffffff" />

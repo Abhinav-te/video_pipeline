@@ -24,6 +24,19 @@ try:
 except ImportError:
     from ingestion.code_sanitizer import sanitize_code
 
+try:
+    from engine.security import (
+        safe_fetch_remote_url,
+        get_allowed_source_dirs,
+        validate_path_containment,
+    )
+except ImportError:
+    from security import (
+        safe_fetch_remote_url,
+        get_allowed_source_dirs,
+        validate_path_containment,
+    )
+
 
 class HTMLToMarkdownParser(HTMLParser):
     """Clean HTML to Markdown parser preserving headings, code blocks, lists, and paragraphs."""
@@ -112,7 +125,7 @@ def html_to_markdown(raw_html: str) -> str:
 
 
 def fetch_url_content(url: str, timeout_sec: int = 15) -> str:
-    """Fetch documentation or README from a public URL."""
+    """Fetch documentation or README from a public URL safely with SSRF protection."""
     url = url.strip()
     if not (url.startswith("http://") or url.startswith("https://")):
         url = "https://" + url
@@ -125,42 +138,20 @@ def fetch_url_content(url: str, timeout_sec: int = 15) -> str:
             branch = branch or "main"
             raw_candidate = f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/README.md"
             try:
-                req = urllib.request.Request(
-                    raw_candidate,
-                    headers={"User-Agent": "Mozilla/5.0 (compatible; VideoGenPipeline/1.0)"},
-                )
-                with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
-                    if resp.status == 200:
-                        return resp.read().decode("utf-8", errors="replace")
+                body, _ = safe_fetch_remote_url(raw_candidate, timeout_sec=timeout_sec)
+                return body
             except Exception:
                 # If 'main' failed, try 'master'
                 if branch == "main":
                     try:
                         raw_master = f"https://raw.githubusercontent.com/{owner}/{repo}/master/README.md"
-                        req = urllib.request.Request(
-                            raw_master,
-                            headers={"User-Agent": "Mozilla/5.0 (compatible; VideoGenPipeline/1.0)"},
-                        )
-                        with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
-                            if resp.status == 200:
-                                return resp.read().decode("utf-8", errors="replace")
+                        body, _ = safe_fetch_remote_url(raw_master, timeout_sec=timeout_sec)
+                        return body
                     except Exception:
                         pass
 
-    # Standard URL fetch
-    req = urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "text/html,text/plain,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        },
-    )
-    with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
-        content_type = resp.headers.get("Content-Type", "").lower()
-        charset = "utf-8"
-        if "charset=" in content_type:
-            charset = content_type.split("charset=")[-1].split(";")[0].strip()
-        body = resp.read().decode(charset, errors="replace")
+    # Standard URL fetch with SSRF guards and bounded size check
+    body, _ = safe_fetch_remote_url(url, timeout_sec=timeout_sec)
 
     # If the response looks like HTML, convert it to clean markdown
     if "<html" in body.lower() or "<body" in body.lower() or "<!doctype" in body.lower():
@@ -178,23 +169,26 @@ def load_source_content(
 
     Priority:
     1. source_text (if provided and non-empty)
-    2. source_file (read local file path)
-    3. source_url (fetch via HTTP)
+    2. source_file (read local file path within allowed boundaries)
+    3. source_url (fetch via HTTP with SSRF guards)
     """
     if source_text and source_text.strip():
         return source_text.strip()
 
     if source_file and source_file.strip():
-        file_path = Path(source_file.strip()).resolve()
-        if not file_path.exists():
-            # Check relative to repository root if cwd is a subdirectory (e.g. engine/)
-            repo_candidate = (Path(__file__).resolve().parent.parent.parent / source_file.strip()).resolve()
-            if repo_candidate.exists():
-                file_path = repo_candidate
-            else:
-                raise FileNotFoundError(f"Source file not found at: {file_path}")
-        raw = file_path.read_text(encoding="utf-8", errors="replace")
-        if file_path.suffix.lower() == ".html" or "<html" in raw.lower() or "<!doctype" in raw.lower():
+        file_path = Path(source_file.strip())
+        if not file_path.is_absolute():
+            file_path = (Path(__file__).resolve().parent.parent.parent / source_file.strip())
+
+        # Constrain local file reading to permitted directories (repo root, /tmp)
+        allowed_dirs = get_allowed_source_dirs()
+        resolved_file = validate_path_containment(file_path, allowed_dirs)
+
+        if not resolved_file.exists():
+            raise FileNotFoundError(f"Source file not found at: {resolved_file}")
+
+        raw = resolved_file.read_text(encoding="utf-8", errors="replace")
+        if resolved_file.suffix.lower() == ".html" or "<html" in raw.lower() or "<!doctype" in raw.lower():
             return html_to_markdown(raw)
         return raw.strip()
 

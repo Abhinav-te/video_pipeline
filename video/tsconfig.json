@@ -5,7 +5,8 @@
     "jsx": "react-jsx",
     "strict": false,
     "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
     "lib": ["es2022", "dom"]
   }
 }
-

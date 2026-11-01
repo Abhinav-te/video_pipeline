@@ -28,14 +28,8 @@ except ImportError:
     except ImportError:
         DOMAINS = {
             "code",
-            "math",
-            "physics",
+            "devtools",
             "systems",
-            "ml",
-            "chemistry",
-            "quantum_physics",
-            "mechanics",
-            "electrical",
         }
         detect_domain = None
 

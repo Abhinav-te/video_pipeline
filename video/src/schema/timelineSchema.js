@@ -24,9 +24,11 @@ export const SceneSchema = z
     emphasis_word: z.string().nullish(),
     emphasis_time: z.number().nullish(),
     display_text: z.string().nullish(),
+    visual_representation: z.enum(['observed_capture', 'illustrative', 'composite']).nullish(),
+    execution_artifact_id: z.string().nullish(),
     manim_asset_url: z.string().nullish(),
     manim_video_src: z.string().nullish(),
-    manim_spec: z.record(z.any()).nullish(),
+    manim_spec: z.record(z.string(), z.any()).nullish(),
     badge: z.any().nullish(),
     choreography: z.any().nullish(),
     code: z.string().nullish(),
@@ -48,7 +50,7 @@ export const SceneSchema = z
         }).passthrough()
       )
       .nullish(),
-    nodes: z.array(z.union([z.string(), z.record(z.any())])).nullish(),
+    nodes: z.array(z.union([z.string(), z.record(z.string(), z.any())])).nullish(),
     request_payload: z.string().nullish(),
     response_payload: z.string().nullish(),
     request_method: z.string().nullish(),
@@ -59,11 +61,11 @@ export const SceneSchema = z
     solution_code: z.string().nullish(),
     comparison_sides: z.any().nullish(),
     comparison_footer: z.string().nullish(),
-    entities: z.array(z.record(z.any())).nullish(),
-    events: z.array(z.record(z.any())).nullish(),
+    entities: z.array(z.record(z.string(), z.any())).nullish(),
+    events: z.array(z.record(z.string(), z.any())).nullish(),
     evidence_ids: z.array(z.string()).nullish(),
     cta_url: z.string().nullish(),
-    items: z.array(z.record(z.any())).nullish(),
+    items: z.array(z.record(z.string(), z.any())).nullish(),
   })
   .passthrough()
   .refine(
@@ -84,8 +86,8 @@ export const TimelineSchema = z
     scenes: z.array(SceneSchema).min(2, { message: "Timeline must contain at least 2 scenes" }),
     words: z.array(WordTimestampSchema),
     aspect_ratio: z.enum(["16:9", "9:16"]).nullish(),
-    brand: z.record(z.any()).nullish(),
-    render_profile: z.record(z.any()).nullish(),
+    brand: z.record(z.string(), z.any()).nullish(),
+    render_profile: z.record(z.string(), z.any()).nullish(),
   })
   .passthrough();
 

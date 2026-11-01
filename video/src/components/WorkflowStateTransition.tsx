@@ -170,6 +170,20 @@ export const WorkflowStateTransition: React.FC<WorkflowStateTransitionProps> = (
   const proof = scene.proof_card || scene.callout || (scene.takeaway ? { title: scene.takeaway } : null);
   const showProofColumn = isWidescreen && Boolean(proof);
 
+  // Dynamic vertical scaling to fill scene height effectively
+  const entityCount = entities.length;
+  const isCompact = entityCount >= 4;
+  const isSpacious = entityCount <= 2;
+
+  const cardPadding = isWidescreen
+    ? (isSpacious ? '26px 30px' : (isCompact ? '16px 18px' : '20px 22px'))
+    : '16px 16px';
+  const cardGap = isWidescreen ? (isSpacious ? '16px' : '12px') : '10px';
+  const titleSize = isWidescreen ? (isSpacious ? '20px' : (isCompact ? '15px' : '17px')) : '15px';
+  const subLabelSize = isWidescreen ? (isSpacious ? '14px' : '12px') : '12px';
+  const badgeSize = isWidescreen ? (isSpacious ? '13px' : '11px') : '11px';
+  const progressBarHeight = isWidescreen ? (isSpacious ? '14px' : '10px') : '8px';
+
   return (
     <div
       style={{
@@ -191,15 +205,17 @@ export const WorkflowStateTransition: React.FC<WorkflowStateTransitionProps> = (
           flex: showProofColumn ? '0 0 68%' : '1 1 auto',
           maxWidth: showProofColumn ? '1140px' : (isWidescreen ? '1400px' : '960px'),
           width: '100%',
+          minHeight: isWidescreen ? (isSpacious ? '500px' : '420px') : 'auto',
           backgroundColor: brand?.bg_surface || '#0c0e17',
           borderRadius: '24px',
           border: `1.5px solid ${brand?.primary_color ? `${brand.primary_color}55` : 'rgba(99, 102, 241, 0.35)'}`,
           boxShadow: '0 32px 64px -16px rgba(0, 0, 0, 0.95)',
-          padding: isWidescreen ? '28px 32px' : '24px 20px',
+          padding: isWidescreen ? (isSpacious ? '36px 40px' : '28px 32px') : '24px 20px',
           boxSizing: 'border-box',
           display: 'flex',
           flexDirection: 'column',
-          gap: '24px',
+          justifyContent: isSpacious ? 'space-between' : 'flex-start',
+          gap: isWidescreen ? (isSpacious ? '28px' : '20px') : '16px',
           backdropFilter: 'blur(16px)',
         }}
       >
@@ -270,29 +286,29 @@ export const WorkflowStateTransition: React.FC<WorkflowStateTransitionProps> = (
                   backgroundColor: 'rgba(17, 19, 28, 0.8)',
                   borderRadius: '16px',
                   border: `1.5px solid ${st.borderColor}`,
-                  padding: '18px 20px',
+                  padding: cardPadding,
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '12px',
+                  gap: cardGap,
                   boxShadow: `0 8px 24px rgba(0, 0, 0, 0.5), 0 0 16px ${st.bgColor}`,
                   transition: 'all 0.2s ease',
                 }}
               >
                 {/* Step Title & Status Badge */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     {isFirst && st.isMemoized ? (
                       <div
                         style={{
-                          width: '28px',
-                          height: '28px',
+                          width: isSpacious ? '34px' : '28px',
+                          height: isSpacious ? '34px' : '28px',
                           borderRadius: '8px',
                           backgroundColor: 'rgba(52, 211, 153, 0.2)',
                           border: '1px solid #34d399',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          fontSize: '14px',
+                          fontSize: isSpacious ? '16px' : '14px',
                         }}
                       >
                         🔒
@@ -300,14 +316,14 @@ export const WorkflowStateTransition: React.FC<WorkflowStateTransitionProps> = (
                     ) : (
                       <div
                         style={{
-                          width: '28px',
-                          height: '28px',
+                          width: isSpacious ? '34px' : '28px',
+                          height: isSpacious ? '34px' : '28px',
                           borderRadius: '8px',
                           backgroundColor: 'rgba(255, 255, 255, 0.06)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          fontSize: '12px',
+                          fontSize: isSpacious ? '14px' : '12px',
                           fontWeight: 700,
                           color: '#94a3b8',
                           fontFamily: brand?.font_mono || 'monospace',
@@ -321,7 +337,7 @@ export const WorkflowStateTransition: React.FC<WorkflowStateTransitionProps> = (
                       <div
                         style={{
                           fontFamily: brand?.font_mono || 'monospace',
-                          fontSize: '15px',
+                          fontSize: titleSize,
                           fontWeight: 700,
                           color: '#f1f5f9',
                         }}
@@ -329,7 +345,7 @@ export const WorkflowStateTransition: React.FC<WorkflowStateTransitionProps> = (
                         {ent.label}
                       </div>
                       {ent.sub_label && (
-                        <div style={{ fontSize: '12px', color: '#94a3b8' }}>
+                        <div style={{ fontSize: subLabelSize, color: '#94a3b8' }}>
                           {ent.sub_label}
                         </div>
                       )}
@@ -360,15 +376,19 @@ export const WorkflowStateTransition: React.FC<WorkflowStateTransitionProps> = (
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
-                        padding: '6px 12px',
+                        padding: isSpacious ? '8px 16px' : '6px 12px',
                         borderRadius: '8px',
                         backgroundColor: st.bgColor,
                         border: `1px solid ${st.borderColor}`,
                         color: st.color,
-                        fontSize: '12px',
+                        fontSize: badgeSize,
                         fontWeight: 800,
                         fontFamily: brand?.font_mono || 'monospace',
                         textTransform: 'uppercase',
+                        maxWidth: '440px',
+                        lineHeight: 1.35,
+                        textAlign: 'right',
+                        whiteSpace: 'normal',
                       }}
                     >
                       {st.isMemoized && '🔒 '}
@@ -381,7 +401,7 @@ export const WorkflowStateTransition: React.FC<WorkflowStateTransitionProps> = (
                 <div
                   style={{
                     width: '100%',
-                    height: '10px',
+                    height: progressBarHeight,
                     backgroundColor: 'rgba(255, 255, 255, 0.06)',
                     borderRadius: '999px',
                     overflow: 'hidden',

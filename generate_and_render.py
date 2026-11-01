@@ -93,7 +93,7 @@ def main():
     parser.add_argument("--topic", type=str, default=None, help="Topic for the video short")
     parser.add_argument("--length", type=int, choices=[15, 30, 35, 60], default=60, help="Target duration in seconds")
     parser.add_argument("--project", type=str, default=None, help="Path to project configuration JSON file (e.g. projects/project_profile.json)")
-    parser.add_argument("--subject", type=str, choices=["auto", "code", "devtools", "math", "physics", "systems", "ml", "chemistry", "quantum_physics", "mechanics", "electrical"], default="auto", help="Subject domain for video")
+    parser.add_argument("--subject", type=str, choices=["auto", "code", "devtools", "systems"], default="auto", help="Subject domain for video")
     parser.add_argument("--source-file", type=str, default=None, help="Path to source documentation, README, changelog, or code snippet")
     parser.add_argument("--source-url", type=str, default=None, help="Public documentation or GitHub README URL to ingest")
     parser.add_argument("--source-text", type=str, default=None, help="Raw source markdown or code text")
@@ -102,7 +102,6 @@ def main():
     parser.add_argument("--output", type=str, default=None, help="Explicit output MP4 path")
     parser.add_argument("--frames", type=str, default=None, help="Frame range to render (e.g. '0-89') for benchmarks")
     parser.add_argument("--fast-test", action="store_true", help="Quick 90-frame (3s) benchmark render (equivalent to --frames 0-89)")
-    parser.add_argument("--no-manim", action="store_true", help="Disable Stage 4.5 Manim Community pre-rendering")
     parser.add_argument("--mock", action="store_true", help="Bypass Gemini API calls and load pre-validated mock script")
     parser.add_argument("--render-backend", choices=["local", "lambda"], default="local", help="Rendering backend (local or AWS Remotion Lambda)")
     # Revision CLI Entrypoints (Checkpoint 02)
@@ -179,6 +178,16 @@ def main():
     run_dir.mkdir(parents=True, exist_ok=True)
     data_file_path = run_dir / "data.json"
 
+    try:
+        from engine.pipeline.manifest import RevisionLock
+    except ImportError:
+        from pipeline.manifest import RevisionLock
+
+    import atexit
+    lock = RevisionLock(run_dir)
+    lock.acquire()
+    atexit.register(lock.release)
+
     # Step 1: Execute Python Generation Subprocess
     cmd = [
         str(python_exec), str(gen_script),
@@ -192,8 +201,6 @@ def main():
         cmd.extend(["--project", str(Path(args.project).resolve())])
     if args.no_cache:
         cmd.append("--no-cache")
-    if args.no_manim:
-        cmd.append("--no-manim")
     if args.mock:
         cmd.append("--mock")
     if args.source_file:
@@ -205,16 +212,13 @@ def main():
 
     gen_env = os.environ.copy()
     gen_env["PYTHONPATH"] = f"{REPO_DIR}:{ENGINE_DIR}:{gen_env.get('PYTHONPATH', '')}"
+    gen_env["ENGINE_LOCK_HELD"] = "1"
 
     try:
         res = subprocess.run(cmd, cwd=str(ENGINE_DIR), env=gen_env)
         if res.returncode != 0:
-            if run_dir.exists():
-                shutil.rmtree(run_dir, ignore_errors=True)
             stage_error("PIPELINE", f"AI generation stage failed with exit code {res.returncode}.", exit_code=res.returncode)
     except Exception as exc:
-        if run_dir.exists():
-            shutil.rmtree(run_dir, ignore_errors=True)
         stage_error("PIPELINE", f"Failed to execute generation script: {exc}", exit_code=1)
 
     # Pre-render verification: ensure data.json exists and is populated
@@ -253,7 +257,14 @@ def main():
             val_report = validate_evidence_and_plan(ev_pack_data, data_json_payload)
             with open(run_dir / "validation_report.json", "w", encoding="utf-8") as f:
                 json.dump(val_report.model_dump(), f, indent=2)
-            if not val_report.passed:
+            if val_report.needs_review:
+                write_reflection_error(
+                    run_dir=run_dir,
+                    stage="evidence_gate",
+                    message=f"Evidence validation requires human review: {val_report.review_reasons}",
+                )
+                stage_error("EVIDENCE_GATE", f"Evidence validation requires human review: {'; '.join(val_report.review_reasons)}", exit_code=1)
+            elif not val_report.passed:
                 write_reflection_error(
                     run_dir=run_dir,
                     stage="evidence_gate",
@@ -340,18 +351,59 @@ def main():
 
     stage_success("RENDER", f"Video rendered successfully: {out_file_path}")
 
+    audio_file_path = run_dir / "audio.wav" if (run_dir / "audio.wav").exists() else run_dir / "audio.mp3"
+    active_audio_path = None
+
+    if audio_file_path.exists():
+        if args.frames:
+            try:
+                from audio.scene_audio import slice_audio_for_frame_range
+            except ImportError:
+                from engine.audio.scene_audio import slice_audio_for_frame_range
+            fps_val = 30.0
+            if "d_payload" in locals() and isinstance(d_payload, dict):
+                fps_val = float(d_payload.get("render_profile", {}).get("fps") or d_payload.get("fps") or 30.0)
+            preview_clean_frames = str(args.frames).strip().replace("-", "_")
+            temp_sliced_audio = run_dir / f"audio_preview_{preview_clean_frames}.wav"
+            sliced = slice_audio_for_frame_range(
+                audio_path=audio_file_path,
+                frames_spec=str(args.frames),
+                fps=fps_val,
+                output_path=temp_sliced_audio,
+            )
+            if sliced and sliced.exists():
+                active_audio_path = sliced
+        else:
+            active_audio_path = audio_file_path
+
+    # Synchronize pristine source master narration directly into final MP4 container.
+    # Remotion internally renders audio to an intermediate ADTS file (audio.aac), which discards
+    # container metadata and causes a 2048-sample (42.7ms) priming offset and untrimmed padding in MP4.
+    # Direct FFmpeg muxing from the pristine master WAV (or frame-sliced WAV for previews) writes
+    # compliant MP4 edit lists (elst), preserves sample-accurate alignment (offset 0),
+    # and ensures exact A/V duration agreement (<= 0.05s).
+    if active_audio_path and active_audio_path.exists():
+        try:
+            from audio.scene_audio import mux_master_audio_into_video
+        except ImportError:
+            from engine.audio.scene_audio import mux_master_audio_into_video
+        stage_start("AUDIO_MUX", f"Muxing pristine source narration ({active_audio_path.name}) with Remotion video stream...")
+        mux_ok = mux_master_audio_into_video(video_path=out_file_path, audio_path=active_audio_path)
+        if mux_ok:
+            stage_success("AUDIO_MUX", "Synchronized source narration directly into MP4 container with sample-accurate alignment.")
+        else:
+            print("[AUDIO_MUX:WARN] Direct audio mux failed, proceeding with Remotion audio stream.", file=sys.stderr)
+
     # Step 5: Stage 6 - Post-Render Output Validation
     stage_start("OUTPUT_VALIDATION", f"Inspecting rendered video: {out_file_path.name}")
-
-    audio_file_path = run_dir / "audio.wav" if (run_dir / "audio.wav").exists() else run_dir / "audio.mp3"
 
     try:
         from validation.evidence_validator import validate_post_render_qa
         is_valid, errors, meta = validate_post_render_qa(
             video_path=out_file_path,
-            expected_audio_path=audio_file_path if (audio_file_path.exists() and not args.frames) else None,
+            expected_audio_path=active_audio_path if (active_audio_path and active_audio_path.exists()) else None,
             aspect_ratio=aspect_ratio,
-            tolerance_sec=1.5,
+            tolerance_sec=0.05,
         )
     except Exception as exc:
         is_valid = False

@@ -98,9 +98,10 @@ Each scene should have a stable `scene_id`, purpose, supported visual primitive,
 
 Contains presentation-only settings: brand tokens, fonts, aspect ratio, output resolution, safe areas, caption style, and documented source/CTA display rules. Do not use presentation settings as hidden factual inputs.
 
-### `run_manifest.json` and `dependency_graph.json`
+### `manifest.json` and Target `dependency_graph.json`
 
-Track input and artifact hashes, versions, selected workflow, per-gate status, source lineage, generated assets, timings, render output, and unresolved warnings. Represent dependencies such as:
+Track input and artifact hashes, versions, selected workflow, per-gate status, source lineage, generated assets, timings, render output, and unresolved warnings.
+Active runs maintain `manifest.json` recording per-scene `visual_hash` and `audio_hash`. The target dependency graph represents:
 
 `source -> evidence record -> claim/scene -> narration -> word timings -> timeline -> render`
 
@@ -162,16 +163,16 @@ The target output is a premium, clear technical explanation—not a set of gener
 
 ## 10. Six Validation Gates
 
-Use explicit pass/fail/needs-review results. Gate names and implementation may be mapped onto existing validators, but the contracts must remain testable.
+Use explicit pass/fail/needs-review results. The authoritative mapping to the codebase validators is:
 
-1. **Schema and lineage:** all artifacts validate; evidence IDs exist; source/artifact hashes are coherent; project and branding identities are valid.
-2. **Source-code fidelity:** displayed code is a source-backed contiguous excerpt after documented sanitization, with balanced syntax and no Markdown fences.
-3. **Claim support:** every material claim/title/metric has applicable evidence; unbacked numbers and contradictions are rejected. Text overlap is heuristic only.
-4. **Limitation and nuance:** relevant caveats are represented accurately; unsupported guarantees are blocked.
-5. **Component/data integrity:** generic UI components contain no fake product-specific content, metrics, default company names or silent fallback claims; visual props are schema-valid.
-6. **Final artifact QA:** after rendering, verify container/streams, intended resolution/FPS, audio and timing tolerances, keyframes, non-blank output, and visual defects detectable by tests.
+1. **Gate 1 — Schema and Lineage:** (Pre-render) `validate_evidence_and_plan` (`claim_citation`, `banned_contamination_tokens`, `evidence_pack_presence`). All artifacts validate; evidence IDs exist in `evidence_pack.json`; project, company, and publisher branding identities are distinct and non-empty; placeholder tokens (`lorem`, `todo`, `mock_metric`) are blocked.
+2. **Gate 2 — Source-Code Fidelity:** (Pre-render) `validate_evidence_and_plan` (internal check: `gate1_contiguous_code_equality`). Displayed code is an exact contiguous slice (or normalized whitespace match) of source `code_evidence` after documented sanitization, with balanced syntax delimiters (`{}`, `()`, `[]`) and no Markdown fences (` ``` `).
+3. **Gate 3 — Claim Support:** (Pre-render) `validate_evidence_and_plan` (internal checks: `gate2_quote_paraphrase`, `numerical_claims`). Every material claim, title, and metric has applicable evidence. Unbacked numbers in narration and metric cards are rejected. On-screen text requires >= 0.35 content-word overlap with cited evidence excerpts.
+4. **Gate 4 — Limitation and Nuance:** (Pre-render) `validate_evidence_and_plan` (internal check: `gate3_limitation_propagation`). When limitation records exist, documented caveats must be cited and displayed on-screen (>= 2 content-word overlap); the `"GUARDED"` anti-pattern placeholder is blocked.
+5. **Gate 5 — Component/Data Integrity & Timeline Schema:** (Pre-render) `validate_evidence_and_plan` (internal check: `gate4_component_literal_lint`) and `video/scripts/validate_timeline.mjs`. Generic UI components contain no hardcoded product-specific content, metrics, default company names (`inngest`, `stripe`, `resend`), or secret fallback claims. Assembled `data.json` is verified against the Node.js TypeScript Zod schema (`timelineSchema.mjs`).
+6. **Gate 6 — Final Artifact QA:** (Post-render) `validate_post_render_qa` (wrapping `output.py` + keyframe extraction). After rendering, verify container/streams (h264/aac), intended resolution (1920x1080 or 1080x1920), 30 FPS, audio/video duration agreement within <= 0.05s tolerance, internal stream synchronization, non-blank frames, and midpoint keyframe integrity. Quarantines corrupt video to `.corrupt.mp4`.
 
-Gates 1–5 are pre-render gates where applicable. Gate 6 is post-render. Some checks may need to run again after a repair; report the actual sequence.
+Gates 1–5 are pre-render gates. Gate 6 is post-render. On surgical revisions, Gates 1–5 and Gate 6 must be re-run on changed artifacts.
 
 ## 11. Testing and Completion Reports
 

@@ -146,8 +146,10 @@ def auto_heal_timeline_payload(payload: Dict[str, Any]) -> Tuple[Dict[str, Any],
                 s = prev_scene_start
                 modified = True
                 
-            if e < s + 2.5:
-                sc["end_time"] = round(s + 2.5, 3)
+            dur = float(sc.get("duration", 0.0))
+            min_dur = dur if dur > 0 else 2.5
+            if e < s + min_dur:
+                sc["end_time"] = round(s + min_dur, 3)
                 e = sc["end_time"]
                 modified = True
                 

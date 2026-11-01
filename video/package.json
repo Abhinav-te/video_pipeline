@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "start": "remotion preview src/index.js",
-    "build": "remotion render src/index.js CodingShort out/video.mp4"
+    "build": "remotion render src/index.js CodingShort out/video.mp4",
+    "typecheck": "tsc --noEmit",
+    "test": "node test_camerarig.mjs && node test_kinetic_callouts.mjs && node test_scene_badge.mjs && node test_bento_and_code_fitting.mjs"
   },
   "dependencies": {
     "@remotion/captions": "4.0.522",
@@ -14,5 +16,8 @@
     "react-dom": "^18.0.0",
     "remotion": "4.0.522",
     "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
   }
 }

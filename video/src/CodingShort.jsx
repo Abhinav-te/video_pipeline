@@ -180,7 +180,7 @@ export const Subtitles = ({ words: rawWords, captionChunks: preChunked, isWidesc
       const endsWithClausePunct = /[,;:]$/.test(wordStr);
       const isTooLong = currentWords.length >= 5 || currentText.length >= 28;
 
-      if (endsWithSentencePunct || (currentWords.length >= 3 && endsWithClausePunct) || isTooLong) {
+      if (endsWithSentencePunct || (currentWords.length >= 2 && endsWithClausePunct) || isTooLong) {
         generated.push({
           start: currentWords[0].start,
           end: currentWords[currentWords.length - 1].end,
@@ -238,61 +238,63 @@ export const Subtitles = ({ words: rawWords, captionChunks: preChunked, isWidesc
     <div
       style={{
         position: 'absolute',
-        bottom: isWidescreen ? '40px' : '120px',
+        bottom: isWidescreen ? '36px' : '160px',
         width: '100%',
         textAlign: 'center',
-        padding: isWidescreen ? '0 100px' : '0 40px',
+        padding: isWidescreen ? '0 120px' : '0 40px',
         boxSizing: 'border-box',
-        height: isWidescreen ? '60px' : '100px',
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
         zIndex: 50,
         pointerEvents: 'none',
         opacity,
-        transition: 'opacity 0.1s ease',
+        transition: 'opacity 0.12s ease',
       }}
     >
       <div
         style={{
-          fontSize: isWidescreen ? '42px' : '48px',
-          fontWeight: 900,
-          textTransform: 'uppercase',
-          lineHeight: isWidescreen ? '52px' : '60px',
-          height: isWidescreen ? '52px' : '60px',
-          display: 'flex',
+          display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: isWidescreen ? '10px' : '14px',
+          flexWrap: 'wrap',
+          gap: isWidescreen ? '8px' : '10px',
+          padding: isWidescreen ? '8px 24px' : '10px 22px',
+          borderRadius: '999px',
+          backgroundColor: 'rgba(10, 13, 20, 0.82)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          border: '1px solid rgba(255, 255, 255, 0.09)',
+          boxShadow: '0 10px 30px -4px rgba(0, 0, 0, 0.7)',
+          maxWidth: isWidescreen ? '1280px' : '940px',
         }}
       >
         {chunkWords.map((w, i) => {
           const isActive = currentTime >= w.start && currentTime <= w.end;
+          const isCodeToken = /[.()[\]{}_<>]/.test(w.word) || /^[a-z]+[A-Z]/.test(w.word);
           const cleanWord = (w.word || '').replace(/[^a-zA-Z0-9_-]/g, '').toUpperCase();
           const isFunctional = FUNCTIONAL_WORDS.has(cleanWord);
-          const isTechnical = TECHNICAL_KEYWORDS.has(cleanWord) || (!isFunctional && cleanWord.length >= 6);
+          const isTechnical = isCodeToken || TECHNICAL_KEYWORDS.has(cleanWord);
 
-          let wordColor = '#ffffff';
+          let wordColor = 'rgba(226, 232, 240, 0.65)';
           let bgColor = 'transparent';
           let borderStyle = '1px solid transparent';
-          let textShadow = '0 4px 12px rgba(0,0,0,0.9)';
+          let fontWeight = 500;
 
           if (isActive) {
-            if (isFunctional) {
-              wordColor = '#e2e8f0';
-              bgColor = 'rgba(255, 255, 255, 0.08)';
-              borderStyle = '1px solid rgba(255, 255, 255, 0.15)';
-              textShadow = '0 2px 8px rgba(0,0,0,0.8)';
-            } else if (isTechnical) {
-              wordColor = '#ffd633';
-              bgColor = 'rgba(255, 214, 51, 0.22)';
-              borderStyle = '1.5px solid rgba(255, 214, 51, 0.6)';
-              textShadow = '0 0 28px rgba(255, 214, 51, 0.85)';
+            fontWeight = 700;
+            if (isTechnical) {
+              wordColor = '#60a5fa';
+              bgColor = 'rgba(96, 165, 250, 0.14)';
+              borderStyle = '1px solid rgba(96, 165, 250, 0.35)';
+            } else if (isFunctional) {
+              wordColor = '#f1f5f9';
+              bgColor = 'rgba(255, 255, 255, 0.06)';
+              borderStyle = '1px solid rgba(255, 255, 255, 0.12)';
             } else {
-              wordColor = '#f8fafc';
-              bgColor = 'rgba(255, 255, 255, 0.14)';
-              borderStyle = '1px solid rgba(255, 255, 255, 0.25)';
-              textShadow = '0 0 16px rgba(255, 255, 255, 0.5)';
+              wordColor = '#ffffff';
+              bgColor = 'rgba(255, 255, 255, 0.10)';
+              borderStyle = '1px solid rgba(255, 255, 255, 0.18)';
             }
           }
 
@@ -302,16 +304,17 @@ export const Subtitles = ({ words: rawWords, captionChunks: preChunked, isWidesc
               style={{
                 color: wordColor,
                 backgroundColor: bgColor,
-                borderRadius: '8px',
-                padding: '2px 14px',
-                height: '56px',
-                lineHeight: '56px',
+                borderRadius: '6px',
+                padding: '2px 8px',
+                fontSize: isWidescreen ? '24px' : '28px',
+                lineHeight: isWidescreen ? '34px' : '38px',
+                fontWeight,
+                fontFamily: isCodeToken ? 'JetBrains Mono, monospace' : 'Inter, -apple-system, sans-serif',
                 display: 'inline-flex',
                 alignItems: 'center',
-                transform: 'none',
-                textShadow,
                 border: borderStyle,
                 boxSizing: 'border-box',
+                textShadow: isActive ? '0 2px 8px rgba(0,0,0,0.8)' : 'none',
                 transition: 'background-color 0.08s ease, color 0.08s ease',
               }}
             >
@@ -467,13 +470,11 @@ export const CodingShort = ({ data }) => {
 
   const layoutDensity = activeScene?.choreography?.layout_density || activeScene?.layout_density || 'full_dashboard';
 
-  const rawSceneType = activeScene?.scene_type || activeScene?.visual_type;
-  const hasManim = Boolean(activeScene?.manim_asset_url || activeScene?.manim_video_src);
-  const sceneType = hasManim ? 'manim_scene' : rawSceneType;
+  const sceneType = activeScene?.scene_type || activeScene?.visual_type;
 
-  let stageTop = isWidescreen ? '40px' : '90px';
-  let stageLeft = isWidescreen ? '180px' : '60px';
-  let stageWidth = isWidescreen ? '1560px' : '960px';
+  let stageTop = isWidescreen ? '36px' : '90px';
+  let stageLeft = isWidescreen ? '140px' : '60px';
+  let stageWidth = isWidescreen ? '1640px' : '960px';
   let stageHeight = isWidescreen ? '840px' : '1360px';
   let stageJustify = 'center';
 

@@ -4,7 +4,7 @@ engine/audio/scene_audio.py
 Per-Scene Audio Synthesis & Master Audio Recomposition.
 - Isolated scene audio synthesis: scenes/<scene_id>/audio_v<N>.wav (uncompressed PCM WAV, 48000Hz)
 - Native Edge-TTS WordBoundary events with spoken-to-display code mapping
-- Deterministic atrim (end=last_word_end + 0.15) + apad (pad_dur=0.25)
+- Deterministic atrim (end=last_word_end + 0.05) + apad (pad_dur=0.20) for 0.25s total tail
 - Lossless PCM concatenation into master audio.wav & audio.mp3
 - Single master loudnorm pass (I=-16, TP=-1.5, LRA=11)
 - Microsecond-exact cumulative scene offsets and global word timestamps
@@ -14,6 +14,7 @@ import asyncio
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -75,14 +76,14 @@ async def synthesize_scene_audio_async(
 
     try:
         last_word_end = words[-1]["end"] if words else 1.0
-        trim_end = last_word_end + 0.15
+        trim_end = last_word_end + 0.05
 
         # Deterministic atrim + apad on Uncompressed PCM WAV (NO silenceremove)
         # Leaving leading ~40ms untouched so t=0 matches edge-tts word offsets
         cmd = [
             "ffmpeg", "-y",
             "-i", str(temp_mp3),
-            "-af", f"atrim=end={trim_end:.4f},asetpts=PTS-STARTPTS,apad=pad_dur=0.25",
+            "-af", f"atrim=end={trim_end:.4f},asetpts=PTS-STARTPTS,apad=pad_dur=0.20",
             "-c:a", "pcm_s16le",
             "-ar", "48000",
             "-ac", "2",
@@ -135,9 +136,26 @@ def concatenate_scene_audios(
         raise ValueError("Cannot concatenate empty scene audio list.")
 
     # Concat demuxer list
+    converted_wavs = []
     with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False, encoding="utf-8") as f:
         for item in scene_items:
             p = Path(item["audio_path"]).resolve()
+            # FFmpeg concat demuxer requires uniform PCM WAV format
+            if p.suffix.lower() != ".wav":
+                sibling_wav = p.with_suffix(".wav")
+                if sibling_wav.exists():
+                    p = sibling_wav
+                else:
+                    tmp_wav = tempfile.NamedTemporaryFile("wb", suffix=".wav", delete=False)
+                    tmp_wav.close()
+                    tmp_p = Path(tmp_wav.name)
+                    subprocess.run([
+                        "ffmpeg", "-y", "-i", str(p),
+                        "-c:a", "pcm_s16le", "-ar", "48000", "-ac", "2",
+                        str(tmp_p)
+                    ], capture_output=True, check=True)
+                    converted_wavs.append(tmp_p)
+                    p = tmp_p
             f.write(f"file '{p.as_posix()}'\n")
         concat_list_path = Path(f.name)
 
@@ -200,6 +218,11 @@ def concatenate_scene_audios(
             concat_list_path.unlink(missing_ok=True)
         if temp_master_wav.exists():
             temp_master_wav.unlink(missing_ok=True)
+        for cw in converted_wavs:
+            try:
+                cw.unlink(missing_ok=True)
+            except Exception:
+                pass
 
     # Duration assertion against lossless WAV
     sum_scene_durations = sum(float(item["duration"]) for item in scene_items)
@@ -242,3 +265,118 @@ def concatenate_scene_audios(
         current_time = end_time
 
     return updated_scenes, master_words
+
+
+def mux_master_audio_into_video(
+    video_path: Union[str, Path],
+    audio_path: Union[str, Path],
+    output_path: Optional[Union[str, Path]] = None,
+    audio_bitrate: str = "320k",
+) -> bool:
+    """
+    Muxes pristine master narration directly into the MP4 video container using FFmpeg.
+
+    Remotion internally renders audio to an intermediate ADTS file (audio.aac), which discards
+    container metadata and causes a 2048-sample (42.7ms) priming offset and untrimmed padding in MP4.
+    Direct FFmpeg muxing from the pristine master WAV writes compliant MP4 edit lists (elst),
+    preserves sample-accurate alignment (offset 0), and ensures exact A/V duration agreement (<= 0.05s).
+    """
+    v_path = Path(video_path).resolve()
+    a_path = Path(audio_path).resolve()
+    target_out = Path(output_path).resolve() if output_path else v_path
+
+    if not v_path.exists() or v_path.stat().st_size == 0:
+        return False
+    if not a_path.exists() or a_path.stat().st_size == 0:
+        return False
+    if not shutil.which("ffmpeg"):
+        return False
+
+    temp_out = target_out.with_name(f"{target_out.stem}.mux_tmp{target_out.suffix}")
+    cmd = [
+        "ffmpeg", "-y",
+        "-i", str(v_path),
+        "-i", str(a_path),
+        "-map", "0:v:0",
+        "-map", "1:a:0",
+        "-c:v", "copy",
+        "-c:a", "aac",
+        "-ar", "48000",
+        "-b:a", audio_bitrate,
+        str(temp_out),
+    ]
+    try:
+        subprocess.run(cmd, capture_output=True, text=True, check=True)
+        shutil.move(str(temp_out), str(target_out))
+        return True
+    except Exception:
+        if temp_out.exists():
+            temp_out.unlink(missing_ok=True)
+        return False
+
+
+def slice_audio_for_frame_range(
+    audio_path: Union[str, Path],
+    frames_spec: str,
+    fps: float = 30.0,
+    output_path: Optional[Union[str, Path]] = None,
+) -> Optional[Path]:
+    """
+    Slices pristine uncompressed master audio (WAV) to match the exact duration
+    and offset of a Remotion preview frame range (--frames=<start>-<end>).
+
+    Remotion CLI renders frames [start_frame, end_frame] inclusive (duration_frames = end - start + 1).
+    This function slices the corresponding time span [start_frame / fps, (end_frame + 1) / fps]
+    as uncompressed PCM WAV, ensuring sample-accurate alignment and exact duration match
+    when muxed directly into the preview MP4 container.
+    """
+    in_p = Path(audio_path).resolve()
+    if not in_p.exists() or in_p.stat().st_size == 0:
+        return None
+    if not shutil.which("ffmpeg"):
+        return None
+
+    cleaned = str(frames_spec).strip()
+    if "-" in cleaned:
+        parts = cleaned.split("-", 1)
+        try:
+            start_f = int(parts[0].strip())
+            end_f = int(parts[1].strip())
+        except ValueError:
+            return None
+    else:
+        try:
+            start_f = int(cleaned)
+            end_f = start_f
+        except ValueError:
+            return None
+
+    if end_f < start_f or fps <= 0:
+        return None
+
+    dur_frames = end_f - start_f + 1
+    start_sec = start_f / fps
+    dur_sec = dur_frames / fps
+
+    out_p = Path(output_path).resolve() if output_path else in_p.with_name(f"{in_p.stem}_slice_{start_f}_{end_f}.wav")
+
+    cmd = [
+        "ffmpeg", "-y",
+        "-ss", f"{start_sec:.6f}",
+        "-t", f"{dur_sec:.6f}",
+        "-i", str(in_p),
+        "-c:a", "pcm_s16le",
+        "-ar", "48000",
+        "-ac", "2",
+        str(out_p),
+    ]
+    try:
+        subprocess.run(cmd, capture_output=True, text=True, check=True)
+        if out_p.exists() and out_p.stat().st_size > 0:
+            return out_p
+    except Exception as e:
+        print(f"[AUDIO:ERROR] Failed to slice audio for preview: {e}", file=sys.stderr)
+        if out_p.exists():
+            out_p.unlink(missing_ok=True)
+    return None
+

@@ -310,6 +310,17 @@ Connecting to Studio Terminal...
 
   <!-- STUDIO UI CLIENT JAVASCRIPT -->
   <script>
+    // Local session authentication token securely injected by the server on GET /
+    const STUDIO_AUTH_TOKEN = '__STUDIO_AUTH_TOKEN_PLACEHOLDER__';
+
+    function getAuthHeaders(extraHeaders = {}) {
+      const headers = { ...extraHeaders };
+      if (STUDIO_AUTH_TOKEN && STUDIO_AUTH_TOKEN !== '__STUDIO_AUTH_TOKEN_PLACEHOLDER__') {
+        headers['X-Studio-Token'] = STUDIO_AUTH_TOKEN;
+      }
+      return headers;
+    }
+
     let activeRunId = null;
     let activeProjectData = null;
     let visualTypesList = [];
@@ -325,7 +336,7 @@ Connecting to Studio Terminal...
       masterVid.addEventListener('timeupdate', () => {
         const cur = masterVid.currentTime.toFixed(2);
         const dur = (masterVid.duration || 0).toFixed(2);
-        document.getElementById('master-time-display').innerText = `${cur}s / ${dur}s`;
+        document.getElementById('master-time-display').textContent = `${cur}s / ${dur}s`;
       });
     });
 
@@ -336,7 +347,9 @@ Connecting to Studio Terminal...
                  type === 'success' ? 'bg-emerald-900/90 border-emerald-500 text-emerald-100' :
                  'bg-blue-900/90 border-blue-500 text-blue-100';
       toast.className = `p-3 rounded-lg border shadow-xl text-xs flex items-center gap-2 pointer-events-auto transition-opacity duration-300 ${bg}`;
-      toast.innerHTML = `<span>${message}</span>`;
+      const span = document.createElement('span');
+      span.textContent = message;
+      toast.appendChild(span);
       container.appendChild(toast);
       setTimeout(() => {
         toast.style.opacity = '0';
@@ -347,7 +360,7 @@ Connecting to Studio Terminal...
     function setStudioStatus(text, isBusy = false) {
       const pill = document.getElementById('status-pill');
       const label = document.getElementById('status-text');
-      label.innerText = text;
+      label.textContent = text;
       if (isBusy) {
         pill.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 font-mono';
       } else {
@@ -386,12 +399,15 @@ Connecting to Studio Terminal...
     }
 
     function renderProjectsList(projects) {
-      document.getElementById('projects-count').innerText = projects.length;
+      document.getElementById('projects-count').textContent = projects.length;
       const listEl = document.getElementById('projects-list');
-      listEl.innerHTML = '';
+      listEl.replaceChildren();
 
       if (projects.length === 0) {
-        listEl.innerHTML = '<div class="p-4 text-gray-500 text-center">No projects found. Generate one above!</div>';
+        const emptyDiv = document.createElement('div');
+        emptyDiv.className = 'p-4 text-gray-500 text-center';
+        emptyDiv.textContent = 'No projects found. Generate one above!';
+        listEl.appendChild(emptyDiv);
         return;
       }
 
@@ -401,35 +417,58 @@ Connecting to Studio Terminal...
         item.className = `p-3 cursor-pointer transition-colors border-l-2 ${
           isSelected ? 'bg-blue-900/20 border-blue-500' : 'hover:bg-gray-800/50 border-transparent'
         }`;
-        item.onclick = () => selectProject(p.run_id);
+        item.addEventListener('click', () => selectProject(p.run_id));
 
-        item.innerHTML = `
-          <div class="flex items-center justify-between gap-1 mb-1">
-            <span class="font-mono font-bold text-gray-200 truncate ${isSelected ? 'text-blue-300' : ''}">${p.run_id}</span>
-            <span class="px-1.5 py-0.5 rounded font-mono text-[10px] ${
-              p.has_output ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-gray-800 text-gray-400'
-            }">rev ${p.current_revision}</span>
-          </div>
-          <div class="text-gray-400 truncate text-[11px] mb-1.5">${p.topic || 'Untitled Video'}</div>
-          <div class="flex items-center justify-between text-[10px] text-gray-500 font-mono">
-            <span class="capitalize px-1.5 py-0.5 rounded bg-gray-900 text-gray-400">${p.subject}</span>
-            <span>${p.duration}s • ${p.scene_count} scenes</span>
-          </div>
-        `;
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'flex items-center justify-between gap-1 mb-1';
+
+        const runSpan = document.createElement('span');
+        runSpan.className = `font-mono font-bold text-gray-200 truncate ${isSelected ? 'text-blue-300' : ''}`;
+        runSpan.textContent = p.run_id;
+
+        const revSpan = document.createElement('span');
+        revSpan.className = `px-1.5 py-0.5 rounded font-mono text-[10px] ${
+          p.has_output ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-gray-800 text-gray-400'
+        }`;
+        revSpan.textContent = `rev ${p.current_revision}`;
+
+        headerDiv.appendChild(runSpan);
+        headerDiv.appendChild(revSpan);
+
+        const topicDiv = document.createElement('div');
+        topicDiv.className = 'text-gray-400 truncate text-[11px] mb-1.5';
+        topicDiv.textContent = p.topic || 'Untitled Video';
+
+        const metaDiv = document.createElement('div');
+        metaDiv.className = 'flex items-center justify-between text-[10px] text-gray-500 font-mono';
+
+        const subjectSpan = document.createElement('span');
+        subjectSpan.className = 'capitalize px-1.5 py-0.5 rounded bg-gray-900 text-gray-400';
+        subjectSpan.textContent = p.subject;
+
+        const durSpan = document.createElement('span');
+        durSpan.textContent = `${p.duration}s • ${p.scene_count} scenes`;
+
+        metaDiv.appendChild(subjectSpan);
+        metaDiv.appendChild(durSpan);
+
+        item.appendChild(headerDiv);
+        item.appendChild(topicDiv);
+        item.appendChild(metaDiv);
         listEl.appendChild(item);
       });
     }
 
     async function selectProject(runId) {
       activeRunId = runId;
-      document.getElementById('header-run-id').innerText = runId;
+      document.getElementById('header-run-id').textContent = runId;
 
       // Update selection styling in list
       fetchProjects();
 
       try {
         setStudioStatus(`Loading ${runId}...`, true);
-        const res = await fetch(`/api/projects/${runId}`);
+        const res = await fetch(`/api/projects/${encodeURIComponent(runId)}`);
         if (!res.ok) throw new Error('Project not found');
         const state = await res.json();
         activeProjectData = state;
@@ -443,28 +482,43 @@ Connecting to Studio Terminal...
     }
 
     function renderProjectDetails(state) {
-      document.getElementById('header-rev-badge').innerText = `rev ${state.current_revision}`;
-      document.getElementById('storyboard-scene-count').innerText = `${state.scenes_resolved?.length || 0} Scenes`;
-      document.getElementById('storyboard-subtitle').innerText = `${state.topic} • ${state.duration}s`;
-      document.getElementById('project-subject-badge').innerText = state.subject;
+      document.getElementById('header-rev-badge').textContent = `rev ${state.current_revision}`;
+      document.getElementById('storyboard-scene-count').textContent = `${state.scenes_resolved?.length || 0} Scenes`;
+      document.getElementById('storyboard-subtitle').textContent = `${state.topic} • ${state.duration}s`;
+      document.getElementById('project-subject-badge').textContent = state.subject;
 
       // Diagnostics
-      document.getElementById('diag-dur').innerText = `${state.duration}s`;
-      document.getElementById('diag-scenes').innerText = state.scenes_resolved?.length || 0;
+      document.getElementById('diag-dur').textContent = `${state.duration}s`;
+      document.getElementById('diag-scenes').textContent = state.scenes_resolved?.length || 0;
       const manimEl = document.getElementById('diag-manim');
       if (state.diagnostics?.manim_verified) {
-        manimEl.innerText = 'VERIFIED';
+        manimEl.textContent = 'VERIFIED';
         manimEl.className = 'text-emerald-400 font-bold';
       } else {
-        manimEl.innerText = 'N/A';
+        manimEl.textContent = 'N/A';
         manimEl.className = 'text-gray-400 font-bold';
+      }
+
+      // Update Diagnostics Badge accurately (distinguish mock/fixture from validated renders)
+      const diagBadge = document.getElementById('diag-badge');
+      if (state.data?.mock || state.diagnostics?.is_mock) {
+        diagBadge.textContent = 'FIXTURE / MOCK';
+        diagBadge.className = 'px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30';
+      } else if (state.diagnostics?.validation_report_status) {
+        diagBadge.textContent = 'VALIDATED';
+        diagBadge.className = 'px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+      } else if (state.diagnostics?.validation_status === 'NEEDS_RENDER') {
+        diagBadge.textContent = 'NEEDS RENDER';
+        diagBadge.className = 'px-2 py-0.5 rounded text-[10px] font-mono bg-blue-500/20 text-blue-300 border border-blue-500/30';
+      } else {
+        diagBadge.textContent = 'UNVERIFIED';
+        diagBadge.className = 'px-2 py-0.5 rounded text-[10px] font-mono bg-gray-500/20 text-gray-300 border border-gray-500/30';
       }
 
       // Master Video Player
       const masterVid = document.getElementById('master-video');
       const emptyVid = document.getElementById('master-video-empty');
       if (state.master_video_url) {
-        // Cache bust query string ?t=Date.now()
         masterVid.src = `${state.master_video_url}?t=${Date.now()}`;
         masterVid.classList.remove('hidden');
         emptyVid.classList.add('hidden');
@@ -487,18 +541,27 @@ Connecting to Studio Terminal...
       const facts = state.source_facts || state.data?.source_facts;
       if (facts && (facts.cli_commands?.length || facts.code_snippets?.length || facts.product_name)) {
         sfCard.classList.remove('hidden');
-        sfTag.innerText = facts.product_name || 'Customer Source';
-        let html = '';
+        sfTag.textContent = facts.product_name || 'Customer Source';
+        sfContent.replaceChildren();
+
         if (facts.cli_commands?.length) {
-          html += `<div class="text-emerald-400 truncate">CLI: ${facts.cli_commands[0]}</div>`;
+          const cliEl = document.createElement('div');
+          cliEl.className = 'text-emerald-400 truncate';
+          cliEl.textContent = `CLI: ${facts.cli_commands[0]}`;
+          sfContent.appendChild(cliEl);
         }
         if (facts.code_snippets?.length) {
-          html += `<div class="text-blue-300">${facts.code_snippets.length} Code Snippet(s) (&le; 46 chars)</div>`;
+          const codeEl = document.createElement('div');
+          codeEl.className = 'text-blue-300';
+          codeEl.textContent = `${facts.code_snippets.length} Code Snippet(s) (≤ 46 chars)`;
+          sfContent.appendChild(codeEl);
         }
         if (facts.api_endpoints?.length) {
-          html += `<div class="text-amber-300">API: ${facts.api_endpoints[0]}</div>`;
+          const apiEl = document.createElement('div');
+          apiEl.className = 'text-amber-300';
+          apiEl.textContent = `API: ${facts.api_endpoints[0]}`;
+          sfContent.appendChild(apiEl);
         }
-        sfContent.innerHTML = html;
       } else {
         sfCard.classList.add('hidden');
       }
@@ -509,12 +572,12 @@ Connecting to Studio Terminal...
 
     function renderJumpStrip(scenes) {
       const strip = document.getElementById('jump-scene-strip');
-      strip.innerHTML = '';
+      strip.replaceChildren();
       scenes.forEach(s => {
         const btn = document.createElement('button');
         btn.className = 'px-2 py-0.5 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-[10px] font-mono';
-        btn.innerText = `Sc ${s.scene_id} (${s.start_time}s)`;
-        btn.onclick = () => jumpToTime(s.start_time);
+        btn.textContent = `Sc ${s.scene_id} (${s.start_time}s)`;
+        btn.addEventListener('click', () => jumpToTime(s.start_time));
         strip.appendChild(btn);
       });
     }
@@ -528,68 +591,235 @@ Connecting to Studio Terminal...
     }
 
     function renderSnapshots(snapshots) {
-      document.getElementById('snapshots-count').innerText = `${snapshots.length} revs`;
+      document.getElementById('snapshots-count').textContent = `${snapshots.length} revs`;
       const list = document.getElementById('snapshots-list');
-      list.innerHTML = '';
+      list.replaceChildren();
 
       if (snapshots.length === 0) {
-        list.innerHTML = '<div class="text-gray-500 text-center py-2">No historical snapshots found.</div>';
+        const emptyDiv = document.createElement('div');
+        emptyDiv.className = 'text-gray-500 text-center py-2';
+        emptyDiv.textContent = 'No historical snapshots found.';
+        list.appendChild(emptyDiv);
         return;
       }
 
       snapshots.forEach(sn => {
         const el = document.createElement('div');
         el.className = 'flex items-center justify-between p-2 rounded bg-gray-900 border border-gray-800';
-        el.innerHTML = `
-          <div>
-            <div class="font-mono font-bold text-gray-200 flex items-center gap-1.5">
-              <span>${sn.rev_id}</span>
-              ${sn.has_video ? '<span class="text-[9px] text-emerald-400">● MP4</span>' : ''}
-            </div>
-            <div class="text-[10px] text-gray-400 truncate max-w-[150px]">${sn.action || 'Snapshot'}</div>
-          </div>
-          <button onclick="handleRestore('${sn.rev_id}')" class="px-2 py-1 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 rounded text-[10px] font-semibold flex items-center gap-1 transition-colors">
-            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
-            Restore
-          </button>
-        `;
+
+        const infoDiv = document.createElement('div');
+        const titleDiv = document.createElement('div');
+        titleDiv.className = 'font-mono font-bold text-gray-200 flex items-center gap-1.5';
+        const idSpan = document.createElement('span');
+        idSpan.textContent = sn.rev_id;
+        titleDiv.appendChild(idSpan);
+
+        if (sn.has_video) {
+          const mp4Badge = document.createElement('span');
+          mp4Badge.className = 'text-[9px] text-emerald-400';
+          mp4Badge.textContent = '● MP4';
+          titleDiv.appendChild(mp4Badge);
+        }
+
+        const actionDiv = document.createElement('div');
+        actionDiv.className = 'text-[10px] text-gray-400 truncate max-w-[150px]';
+        actionDiv.textContent = sn.action || 'Snapshot';
+
+        infoDiv.appendChild(titleDiv);
+        infoDiv.appendChild(actionDiv);
+
+        const restoreBtn = document.createElement('button');
+        restoreBtn.className = 'px-2 py-1 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 rounded text-[10px] font-semibold flex items-center gap-1 transition-colors';
+        restoreBtn.textContent = 'Restore';
+        restoreBtn.addEventListener('click', () => handleRestore(sn.rev_id));
+
+        el.appendChild(infoDiv);
+        el.appendChild(restoreBtn);
         list.appendChild(el);
       });
     }
 
     function renderStoryboard(state) {
       const container = document.getElementById('scenes-container');
-      container.innerHTML = '';
+      container.replaceChildren();
 
       const scenes = state.scenes_resolved || [];
       if (scenes.length === 0) {
-        container.innerHTML = '<div class="text-gray-500 text-center py-10">No scenes in this project timeline.</div>';
+        const emptyDiv = document.createElement('div');
+        emptyDiv.className = 'text-gray-500 text-center py-10';
+        emptyDiv.textContent = 'No scenes in this project timeline.';
+        container.appendChild(emptyDiv);
         return;
       }
+
+      const vTypes = (visualTypesList.length > 0 ? visualTypesList : [
+        { id: 'code_reveal', label: 'Code Spotlight / Reveal' },
+        { id: 'code_transform', label: 'Code Transform / Release Diff' },
+        { id: 'workflow_state_transition', label: 'Workflow State Transition' },
+        { id: 'terminal', label: 'Terminal CLI Simulator' },
+        { id: 'diagram', label: 'Architecture & API Payloads' },
+        { id: 'bento_grid', label: 'Evidence Bento & Guarantees' },
+        { id: 'takeaway_cta', label: 'Takeaway & Official Docs CTA' },
+        { id: 'hook_scene', label: 'Problem Hook' },
+      ]);
 
       scenes.forEach(sc => {
         const card = document.createElement('div');
         card.id = `scene-card-${sc.scene_id}`;
         card.className = 'bg-[#111827] border border-gray-800 rounded-xl overflow-hidden shadow-lg';
 
-        // Word timestamp chips
-        const wordChipsHtml = (sc.words || []).map(w =>
-          `<span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-gray-800 text-gray-300 text-[10px] font-mono border border-gray-700">
-            ${w.word} <span class="text-blue-400 text-[9px]">[${w.start}s]</span>
-           </span>`
-        ).join(' ');
+        // 1. Header
+        const header = document.createElement('div');
+        header.className = 'px-4 py-3 bg-[#151c2c] border-b border-gray-800 flex items-center justify-between';
 
-        // Visual types options
-        const vTypesOptions = (visualTypesList.length > 0 ? visualTypesList : [
-          { id: 'code_reveal', label: 'Code Spotlight / Reveal' },
-          { id: 'code_transform', label: 'Code Transform / Release Diff' },
-          { id: 'workflow_state_transition', label: 'Workflow State Transition' },
-          { id: 'terminal', label: 'Terminal CLI Simulator' },
-          { id: 'diagram', label: 'Architecture & API Payloads' },
-          { id: 'bento_grid', label: 'Evidence Bento & Guarantees' },
-          { id: 'takeaway_cta', label: 'Takeaway & Official Docs CTA' },
-          { id: 'fullscreen_text', label: 'Problem Hook / Fullscreen Callout' }
-        ]).map(t => `<option value="${t.id}" ${t.id === sc.visual_type ? 'selected' : ''}>${t.label}</option>`).join('');
+        const titleSide = document.createElement('div');
+        titleSide.className = 'flex items-center gap-2';
+        const numCircle = document.createElement('span');
+        numCircle.className = 'w-6 h-6 rounded-full bg-blue-600/30 text-blue-400 border border-blue-500/40 flex items-center justify-center font-bold text-xs';
+        numCircle.textContent = sc.scene_id;
+        const titleText = document.createElement('span');
+        titleText.className = 'font-bold text-sm text-white';
+        titleText.textContent = sc.title;
+        titleSide.appendChild(numCircle);
+        titleSide.appendChild(titleText);
+
+        const timeSide = document.createElement('div');
+        timeSide.className = 'flex items-center gap-1.5 text-xs font-mono';
+        const timeBadge = document.createElement('span');
+        timeBadge.className = 'px-2 py-0.5 rounded bg-gray-800 text-gray-300 border border-gray-700';
+        timeBadge.textContent = `${sc.start_time}s – ${sc.end_time}s (${sc.duration}s)`;
+        const seekBtn = document.createElement('button');
+        seekBtn.className = 'px-2 py-0.5 rounded bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 flex items-center gap-1';
+        seekBtn.textContent = 'Seek';
+        seekBtn.title = 'Jump to this scene in Master Player';
+        seekBtn.addEventListener('click', () => jumpToTime(sc.start_time));
+        timeSide.appendChild(timeBadge);
+        timeSide.appendChild(seekBtn);
+
+        header.appendChild(titleSide);
+        header.appendChild(timeSide);
+        card.appendChild(header);
+
+        // 2. Hashes Pill Bar
+        const hashBar = document.createElement('div');
+        hashBar.className = 'px-4 py-1.5 bg-[#0e1422] border-b border-gray-800 flex items-center justify-between text-[10px] font-mono text-gray-400';
+        const hashesDiv = document.createElement('div');
+        hashesDiv.className = 'flex items-center gap-2 truncate';
+        const vHashLabel = document.createElement('span');
+        vHashLabel.textContent = 'v_hash: ';
+        const vHashCode = document.createElement('code');
+        vHashCode.className = 'text-blue-400';
+        vHashCode.textContent = (sc.visual_hash || '').slice(0, 8);
+        vHashLabel.appendChild(vHashCode);
+
+        const aHashLabel = document.createElement('span');
+        aHashLabel.textContent = 'a_hash: ';
+        const aHashCode = document.createElement('code');
+        aHashCode.className = 'text-emerald-400';
+        aHashCode.textContent = (sc.audio_hash || '').slice(0, 8);
+        aHashLabel.appendChild(aHashCode);
+
+        hashesDiv.appendChild(vHashLabel);
+        hashesDiv.appendChild(aHashLabel);
+
+        const typeBadge = document.createElement('span');
+        typeBadge.className = 'px-1.5 py-0.5 rounded bg-gray-900 border border-gray-800 text-gray-400 uppercase';
+        typeBadge.textContent = sc.visual_type;
+
+        hashBar.appendChild(hashesDiv);
+        hashBar.appendChild(typeBadge);
+        card.appendChild(hashBar);
+
+        // 3. Body
+        const body = document.createElement('div');
+        body.className = 'p-4 space-y-4 text-xs';
+
+        // 3.1 Video segment preview
+        const vidSection = document.createElement('div');
+        const vidHeader = document.createElement('div');
+        vidHeader.className = 'flex items-center justify-between mb-1.5 text-[11px] font-semibold text-gray-400';
+        const vidLabel = document.createElement('span');
+        vidLabel.textContent = 'Scene Segment Video';
+        vidHeader.appendChild(vidLabel);
+
+        if (sc.has_manim_asset) {
+          const manimToggle = document.createElement('button');
+          manimToggle.id = `toggle-manim-btn-${sc.scene_id}`;
+          manimToggle.className = 'text-[10px] px-2 py-0.5 rounded bg-purple-900/30 text-purple-300 border border-purple-800 hover:bg-purple-900/50';
+          manimToggle.textContent = 'Switch to Raw Manim Clip';
+          manimToggle.addEventListener('click', () => toggleSceneVideoSource(sc.scene_id, sc.segment_video_url, sc.manim_asset_url));
+          vidHeader.appendChild(manimToggle);
+        }
+        vidSection.appendChild(vidHeader);
+
+        if (sc.has_segment_video) {
+          const vidContainer = document.createElement('div');
+          vidContainer.className = 'rounded-lg overflow-hidden bg-black border border-gray-800 max-h-48 flex items-center justify-center';
+          const vidEl = document.createElement('video');
+          vidEl.id = `scene-video-${sc.scene_id}`;
+          vidEl.controls = true;
+          vidEl.className = 'w-full max-h-48 object-contain';
+          vidEl.src = `${sc.segment_video_url}?t=${Date.now()}`;
+          vidContainer.appendChild(vidEl);
+          vidSection.appendChild(vidContainer);
+        } else {
+          const noVid = document.createElement('div');
+          noVid.className = 'p-4 bg-gray-900 border border-dashed border-gray-800 rounded-lg text-center text-gray-500';
+          noVid.textContent = `Segment video not yet rendered for Scene ${sc.scene_id}.`;
+          vidSection.appendChild(noVid);
+        }
+        body.appendChild(vidSection);
+
+        // 3.2 Mode A Visual Controls Panel
+        const modeABox = document.createElement('div');
+        modeABox.className = 'p-3 bg-gray-900/60 border border-gray-800 rounded-lg space-y-2.5';
+        const modeAHeader = document.createElement('div');
+        modeAHeader.className = 'flex items-center justify-between';
+        const modeATitle = document.createElement('span');
+        modeATitle.className = 'font-bold text-gray-200 flex items-center gap-1.5';
+        modeATitle.textContent = '⚡ Mode A: Visual Controls';
+        const modeASub = document.createElement('span');
+        modeASub.className = 'text-[10px] text-gray-500 font-mono';
+        modeASub.textContent = 'Zero Narration Drift';
+        modeAHeader.appendChild(modeATitle);
+        modeAHeader.appendChild(modeASub);
+        modeABox.appendChild(modeAHeader);
+
+        const modeAGrid = document.createElement('div');
+        modeAGrid.className = 'grid grid-cols-2 gap-2';
+
+        const typeCol = document.createElement('div');
+        const typeLbl = document.createElement('label');
+        typeLbl.className = 'block text-gray-400 text-[11px] mb-1';
+        typeLbl.textContent = 'Visual Type';
+        const typeSelect = document.createElement('select');
+        typeSelect.id = `modeA-type-${sc.scene_id}`;
+        typeSelect.className = 'w-full bg-gray-950 border border-gray-700 rounded px-2 py-1 text-gray-100 text-xs focus:outline-none focus:border-blue-500';
+        vTypes.forEach(t => {
+          const opt = document.createElement('option');
+          opt.value = t.id;
+          opt.textContent = t.label;
+          if (t.id === sc.visual_type) opt.selected = true;
+          typeSelect.appendChild(opt);
+        });
+        typeCol.appendChild(typeLbl);
+        typeCol.appendChild(typeSelect);
+
+        const titleCol = document.createElement('div');
+        const titleLbl = document.createElement('label');
+        titleLbl.className = 'block text-gray-400 text-[11px] mb-1';
+        titleLbl.textContent = 'Scene Title';
+        const titleInput = document.createElement('input');
+        titleInput.type = 'text';
+        titleInput.id = `modeA-title-${sc.scene_id}`;
+        titleInput.value = sc.title || '';
+        titleInput.className = 'w-full bg-gray-950 border border-gray-700 rounded px-2.5 py-1 text-gray-100 text-xs focus:outline-none focus:border-blue-500';
+        titleCol.appendChild(titleLbl);
+        titleCol.appendChild(titleInput);
+
+        modeAGrid.appendChild(typeCol);
+        modeAGrid.appendChild(titleCol);
+        modeABox.appendChild(modeAGrid);
 
         // Visual props JSON prefill (exclude basic metadata)
         const vPropsObj = {};
@@ -600,147 +830,151 @@ Connecting to Studio Terminal...
         }
         const vPropsFormatted = JSON.stringify(vPropsObj, null, 2);
 
-        card.innerHTML = `
-          <!-- Scene Card Header -->
-          <div class="px-4 py-3 bg-[#151c2c] border-b border-gray-800 flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <span class="w-6 h-6 rounded-full bg-blue-600/30 text-blue-400 border border-blue-500/40 flex items-center justify-center font-bold text-xs">
-                ${sc.scene_id}
-              </span>
-              <span class="font-bold text-sm text-white">${sc.title}</span>
-            </div>
+        const detailsEl = document.createElement('details');
+        detailsEl.className = 'text-[11px]';
+        const summaryEl = document.createElement('summary');
+        summaryEl.className = 'text-gray-400 hover:text-gray-200 cursor-pointer select-none';
+        summaryEl.textContent = 'Advanced Visual JSON Props';
+        const jsonTextarea = document.createElement('textarea');
+        jsonTextarea.id = `modeA-json-${sc.scene_id}`;
+        jsonTextarea.rows = 4;
+        jsonTextarea.value = vPropsFormatted;
+        jsonTextarea.className = 'w-full mt-1.5 bg-black font-mono text-[11px] border border-gray-700 rounded p-2 text-gray-200 focus:outline-none focus:border-blue-500';
+        detailsEl.appendChild(summaryEl);
+        detailsEl.appendChild(jsonTextarea);
+        modeABox.appendChild(detailsEl);
 
-            <div class="flex items-center gap-1.5 text-xs font-mono">
-              <span class="px-2 py-0.5 rounded bg-gray-800 text-gray-300 border border-gray-700">
-                ${sc.start_time}s – ${sc.end_time}s (${sc.duration}s)
-              </span>
-              <button onclick="jumpToTime(${sc.start_time})" class="px-2 py-0.5 rounded bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 flex items-center gap-1" title="Jump to this scene in Master Player">
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/></svg>
-                Seek
-              </button>
-            </div>
-          </div>
+        const modeABtn = document.createElement('button');
+        modeABtn.id = `btn-modeA-${sc.scene_id}`;
+        modeABtn.className = 'w-full py-1.5 px-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded flex items-center justify-center gap-1.5 transition-colors shadow';
+        modeABtn.textContent = '⚡ Rerender Visual Only (Mode A)';
+        modeABtn.addEventListener('click', () => handleModeARevision(sc.scene_id));
+        modeABox.appendChild(modeABtn);
+        body.appendChild(modeABox);
 
-          <!-- Hashes Pill Bar -->
-          <div class="px-4 py-1.5 bg-[#0e1422] border-b border-gray-800 flex items-center justify-between text-[10px] font-mono text-gray-400">
-            <div class="flex items-center gap-2 truncate">
-              <span>v_hash: <code class="text-blue-400">${(sc.visual_hash || '').slice(0, 8)}</code></span>
-              <span>a_hash: <code class="text-emerald-400">${(sc.audio_hash || '').slice(0, 8)}</code></span>
-            </div>
-            <div>
-              <span class="px-1.5 py-0.5 rounded bg-gray-900 border border-gray-800 text-gray-400 uppercase">${sc.visual_type}</span>
-            </div>
-          </div>
+        // 3.3 Mode B Narration & Timing Panel
+        const modeBBox = document.createElement('div');
+        modeBBox.className = 'p-3 bg-gray-900/60 border border-gray-800 rounded-lg space-y-2.5';
+        const modeBHeader = document.createElement('div');
+        modeBHeader.className = 'flex items-center justify-between';
+        const modeBTitle = document.createElement('span');
+        modeBTitle.className = 'font-bold text-gray-200 flex items-center gap-1.5';
+        modeBTitle.textContent = '🎙️ Mode B: Spoken Narration & Timing';
+        const modeBSub = document.createElement('span');
+        modeBSub.className = 'text-[10px] text-gray-500 font-mono';
+        modeBSub.textContent = 'Regen TTS & Realign Downstream';
+        modeBHeader.appendChild(modeBTitle);
+        modeBHeader.appendChild(modeBSub);
+        modeBBox.appendChild(modeBHeader);
 
-          <!-- Scene Body: Segment Video & Editing Panels -->
-          <div class="p-4 space-y-4 text-xs">
+        const narrField = document.createElement('div');
+        const narrLbl = document.createElement('label');
+        narrLbl.className = 'block text-gray-400 text-[11px] mb-1';
+        narrLbl.textContent = 'Spoken Narration';
+        const narrTextarea = document.createElement('textarea');
+        narrTextarea.id = `modeB-narration-${sc.scene_id}`;
+        narrTextarea.rows = 2;
+        narrTextarea.value = sc.spoken_text || '';
+        narrTextarea.className = 'w-full bg-gray-950 border border-gray-700 rounded p-2 text-gray-100 text-xs focus:outline-none focus:border-purple-500';
+        narrField.appendChild(narrLbl);
+        narrField.appendChild(narrTextarea);
+        modeBBox.appendChild(narrField);
 
-            <!-- 1. Video Segment Preview -->
-            <div>
-              <div class="flex items-center justify-between mb-1.5 text-[11px] font-semibold text-gray-400">
-                <span>Scene Segment Video</span>
-                ${sc.has_manim_asset ? `
-                  <button id="toggle-manim-btn-${sc.scene_id}" onclick="toggleSceneVideoSource(${sc.scene_id}, '${sc.segment_video_url}', '${sc.manim_asset_url}')" class="text-[10px] px-2 py-0.5 rounded bg-purple-900/30 text-purple-300 border border-purple-800 hover:bg-purple-900/50">
-                    Switch to Raw Manim Clip
-                  </button>
-                ` : ''}
-              </div>
+        // Word timestamp chips
+        const chipsSection = document.createElement('div');
+        const chipsLbl = document.createElement('div');
+        chipsLbl.className = 'text-[10px] text-gray-500 mb-1';
+        chipsLbl.textContent = 'Whisper Word Alignment:';
+        chipsSection.appendChild(chipsLbl);
 
-              ${sc.has_segment_video ? `
-                <div class="rounded-lg overflow-hidden bg-black border border-gray-800 max-h-48 flex items-center justify-center">
-                  <video id="scene-video-${sc.scene_id}" controls class="w-full max-h-48 object-contain" src="${sc.segment_video_url}?t=${Date.now()}"></video>
-                </div>
-              ` : `
-                <div class="p-4 bg-gray-900 border border-dashed border-gray-800 rounded-lg text-center text-gray-500">
-                  Segment video not yet rendered for Scene ${sc.scene_id}.
-                </div>
-              `}
-            </div>
+        const chipsContainer = document.createElement('div');
+        chipsContainer.className = 'flex flex-wrap gap-1 max-h-20 overflow-y-auto p-1 bg-black/40 rounded border border-gray-800/80';
+        if (sc.words && sc.words.length > 0) {
+          sc.words.forEach(w => {
+            const chip = document.createElement('span');
+            chip.className = 'inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-gray-800 text-gray-300 text-[10px] font-mono border border-gray-700';
+            const wText = document.createElement('span');
+            wText.textContent = w.word;
+            const tText = document.createElement('span');
+            tText.className = 'text-blue-400 text-[9px]';
+            tText.textContent = ` [${w.start}s]`;
+            chip.appendChild(wText);
+            chip.appendChild(tText);
+            chipsContainer.appendChild(chip);
+          });
+        } else {
+          const noChips = document.createElement('span');
+          noChips.className = 'text-gray-600 text-[10px]';
+          noChips.textContent = 'No alignment chips.';
+          chipsContainer.appendChild(noChips);
+        }
+        chipsSection.appendChild(chipsContainer);
+        modeBBox.appendChild(chipsSection);
 
-            <!-- 2. Mode A: Visual Controls Panel -->
-            <div class="p-3 bg-gray-900/60 border border-gray-800 rounded-lg space-y-2.5">
-              <div class="flex items-center justify-between">
-                <span class="font-bold text-gray-200 flex items-center gap-1.5">
-                  <span class="text-amber-400 font-mono">⚡</span> Mode A: Visual Controls
-                </span>
-                <span class="text-[10px] text-gray-500 font-mono">Zero Narration Drift</span>
-              </div>
+        const modeBBtn = document.createElement('button');
+        modeBBtn.id = `btn-modeB-${sc.scene_id}`;
+        modeBBtn.className = 'w-full py-1.5 px-3 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded flex items-center justify-center gap-1.5 transition-colors shadow';
+        modeBBtn.textContent = '🎙️ Revise Narration & Realign (Mode B)';
+        modeBBtn.addEventListener('click', () => handleModeBRevision(sc.scene_id));
+        modeBBox.appendChild(modeBBtn);
+        body.appendChild(modeBBox);
 
-              <div class="grid grid-cols-2 gap-2">
-                <div>
-                  <label class="block text-gray-400 text-[11px] mb-1">Visual Type</label>
-                  <select id="modeA-type-${sc.scene_id}" class="w-full bg-gray-950 border border-gray-700 rounded px-2 py-1 text-gray-100 text-xs focus:outline-none focus:border-blue-500">
-                    ${vTypesOptions}
-                  </select>
-                </div>
-                <div>
-                  <label class="block text-gray-400 text-[11px] mb-1">Scene Title</label>
-                  <input type="text" id="modeA-title-${sc.scene_id}" value="${sc.title}" class="w-full bg-gray-950 border border-gray-700 rounded px-2.5 py-1 text-gray-100 text-xs focus:outline-none focus:border-blue-500">
-                </div>
-              </div>
+        // 3.4 Verified Evidence Citations Panel
+        const evBox = document.createElement('div');
+        evBox.className = 'p-3 bg-gray-900/60 border border-gray-800 rounded-lg space-y-2';
+        const evHeader = document.createElement('div');
+        evHeader.className = 'flex items-center justify-between';
+        const evTitle = document.createElement('span');
+        evTitle.className = 'font-bold text-gray-200 flex items-center gap-1.5';
+        evTitle.textContent = '🔗 Verified Evidence Citations';
+        const evCount = document.createElement('span');
+        evCount.className = 'text-[10px] text-gray-500 font-mono';
+        evCount.textContent = `${(sc.evidence_ids || []).length} cited records`;
+        evHeader.appendChild(evTitle);
+        evHeader.appendChild(evCount);
+        evBox.appendChild(evHeader);
 
-              <details class="text-[11px]">
-                <summary class="text-gray-400 hover:text-gray-200 cursor-pointer select-none">Advanced Visual JSON Props</summary>
-                <textarea id="modeA-json-${sc.scene_id}" rows="4" class="w-full mt-1.5 bg-black font-mono text-[11px] border border-gray-700 rounded p-2 text-gray-200 focus:outline-none focus:border-blue-500">${vPropsFormatted}</textarea>
-              </details>
+        const evList = document.createElement('div');
+        evList.className = 'space-y-1.5';
+        if (sc.evidence_records && sc.evidence_records.length > 0) {
+          sc.evidence_records.forEach(r => {
+            const rCard = document.createElement('div');
+            rCard.className = 'p-2 bg-black/50 border border-gray-800 rounded text-[11px]';
 
-              <button onclick="handleModeARevision(${sc.scene_id})" id="btn-modeA-${sc.scene_id}" class="w-full py-1.5 px-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded flex items-center justify-center gap-1.5 transition-colors shadow">
-                <span>⚡ Rerender Visual Only (Mode A)</span>
-              </button>
-            </div>
+            const rTop = document.createElement('div');
+            rTop.className = 'flex items-center justify-between text-[10px] text-gray-400 mb-1';
+            const rId = document.createElement('span');
+            rId.className = 'font-mono text-emerald-400';
+            rId.textContent = r.id;
+            const rKind = document.createElement('span');
+            rKind.className = 'uppercase px-1 py-0.5 rounded bg-gray-800 text-gray-300 text-[9px]';
+            rKind.textContent = r.kind;
+            rTop.appendChild(rId);
+            rTop.appendChild(rKind);
 
-            <!-- 3. Mode B: Narration & Timing Panel -->
-            <div class="p-3 bg-gray-900/60 border border-gray-800 rounded-lg space-y-2.5">
-              <div class="flex items-center justify-between">
-                <span class="font-bold text-gray-200 flex items-center gap-1.5">
-                  <span class="text-purple-400">🎙️</span> Mode B: Spoken Narration & Timing
-                </span>
-                <span class="text-[10px] text-gray-500 font-mono">Regen TTS & Realign Downstream</span>
-              </div>
+            const rClaim = document.createElement('div');
+            rClaim.className = 'font-semibold text-gray-200 mb-0.5';
+            rClaim.textContent = r.claim;
 
-              <div>
-                <label class="block text-gray-400 text-[11px] mb-1">Spoken Narration</label>
-                <textarea id="modeB-narration-${sc.scene_id}" rows="2" class="w-full bg-gray-950 border border-gray-700 rounded p-2 text-gray-100 text-xs focus:outline-none focus:border-purple-500">${sc.spoken_text}</textarea>
-              </div>
+            const rSource = document.createElement('div');
+            rSource.className = 'text-gray-400 font-mono text-[10px] truncate';
+            rSource.textContent = r.source_section || r.source_url || '';
 
-              <!-- Whisper Word Timestamp Alignment Chips -->
-              <div>
-                <div class="text-[10px] text-gray-500 mb-1">Whisper Word Alignment:</div>
-                <div class="flex flex-wrap gap-1 max-h-20 overflow-y-auto p-1 bg-black/40 rounded border border-gray-800/80">
-                  ${wordChipsHtml || '<span class="text-gray-600">No alignment chips.</span>'}
-                </div>
-              </div>
+            rCard.appendChild(rTop);
+            rCard.appendChild(rClaim);
+            rCard.appendChild(rSource);
+            evList.appendChild(rCard);
+          });
+        } else {
+          const noEv = document.createElement('div');
+          noEv.className = 'text-gray-500 text-[11px] italic';
+          noEv.textContent = 'No evidence records directly linked.';
+          evList.appendChild(noEv);
+        }
+        evBox.appendChild(evList);
+        body.appendChild(evBox);
 
-              <button onclick="handleModeBRevision(${sc.scene_id})" id="btn-modeB-${sc.scene_id}" class="w-full py-1.5 px-3 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded flex items-center justify-center gap-1.5 transition-colors shadow">
-                <span>🎙️ Revise Narration & Realign (Mode B)</span>
-              </button>
-            </div>
-
-            <!-- 4. Verified Evidence Citations Panel -->
-            <div class="p-3 bg-gray-900/60 border border-gray-800 rounded-lg space-y-2">
-              <div class="flex items-center justify-between">
-                <span class="font-bold text-gray-200 flex items-center gap-1.5">
-                  <span class="text-emerald-400">🔗</span> Verified Evidence Citations
-                </span>
-                <span class="text-[10px] text-gray-500 font-mono">${(sc.evidence_ids || []).length} cited records</span>
-              </div>
-              <div class="space-y-1.5">
-                ${(sc.evidence_records || []).map(r => `
-                  <div class="p-2 bg-black/50 border border-gray-800 rounded text-[11px]">
-                    <div class="flex items-center justify-between text-[10px] text-gray-400 mb-1">
-                      <span class="font-mono text-emerald-400">${r.id}</span>
-                      <span class="uppercase px-1 py-0.5 rounded bg-gray-800 text-gray-300 text-[9px]">${r.kind}</span>
-                    </div>
-                    <div class="font-semibold text-gray-200 mb-0.5">${r.claim}</div>
-                    <div class="text-gray-400 font-mono text-[10px] truncate">${r.source_section || r.source_url}</div>
-                  </div>
-                `).join('') || '<div class="text-gray-500 text-[11px] italic">No evidence records directly linked.</div>'}
-              </div>
-            </div>
-
-          </div>
-        `;
-
+        card.appendChild(body);
         container.appendChild(card);
       });
     }
@@ -753,11 +987,11 @@ Connecting to Studio Terminal...
       const isViewingManim = vid.src.includes('manim');
       if (isViewingManim) {
         vid.src = `${segUrl}?t=${Date.now()}`;
-        btn.innerText = 'Switch to Raw Manim Clip';
+        btn.textContent = 'Switch to Raw Manim Clip';
         btn.className = 'text-[10px] px-2 py-0.5 rounded bg-purple-900/30 text-purple-300 border border-purple-800 hover:bg-purple-900/50';
       } else {
         vid.src = `${manimUrl}?t=${Date.now()}`;
-        btn.innerText = 'Switch to Rendered Segment';
+        btn.textContent = 'Switch to Rendered Segment';
         btn.className = 'text-[10px] px-2 py-0.5 rounded bg-blue-900/30 text-blue-300 border border-blue-800 hover:bg-blue-900/50';
       }
       vid.load();
@@ -782,15 +1016,15 @@ Connecting to Studio Terminal...
       }
 
       const btn = document.getElementById(`btn-modeA-${sceneId}`);
-      const origText = btn.innerHTML;
-      btn.innerHTML = `<span class="animate-spin">🔄</span> Rerendering Scene ${sceneId}...`;
+      const origText = btn.textContent;
+      btn.textContent = `🔄 Rerendering Scene ${sceneId}...`;
       btn.disabled = true;
       setStudioStatus(`Rerendering Scene ${sceneId} (Mode A)...`, true);
 
       try {
-        const res = await fetch(`/api/projects/${activeRunId}/scenes/${sceneId}/revise-visual`, {
+        const res = await fetch(`/api/projects/${encodeURIComponent(activeRunId)}/scenes/${encodeURIComponent(sceneId)}/revise-visual`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({
             visual_type: visualType,
             title: title,
@@ -799,7 +1033,7 @@ Connecting to Studio Terminal...
         });
 
         if (!res.ok) {
-          const errData = await res.json();
+          const errData = await res.json().catch(() => ({}));
           throw new Error(errData.detail || 'Mode A revision failed');
         }
 
@@ -812,7 +1046,7 @@ Connecting to Studio Terminal...
         setStudioStatus('Error', false);
         showToast(`Revision failed: ${err.message}`, 'error');
       } finally {
-        btn.innerHTML = origText;
+        btn.textContent = origText;
         btn.disabled = false;
       }
     }
@@ -822,26 +1056,26 @@ Connecting to Studio Terminal...
       if (!activeRunId) return;
 
       const narration = document.getElementById(`modeB-narration-${sceneId}`).value;
-      if (!narration || !narration.strip()) {
+      if (!narration || !narration.trim()) {
         showToast('Narration text cannot be empty.', 'error');
         return;
       }
 
       const btn = document.getElementById(`btn-modeB-${sceneId}`);
-      const origText = btn.innerHTML;
-      btn.innerHTML = `<span class="animate-spin">🔄</span> Realiging Scene ${sceneId}...`;
+      const origText = btn.textContent;
+      btn.textContent = `🔄 Realigning Scene ${sceneId}...`;
       btn.disabled = true;
       setStudioStatus(`Regenerating Audio for Scene ${sceneId} (Mode B)...`, true);
 
       try {
-        const res = await fetch(`/api/projects/${activeRunId}/scenes/${sceneId}/revise-narration`, {
+        const res = await fetch(`/api/projects/${encodeURIComponent(activeRunId)}/scenes/${encodeURIComponent(sceneId)}/revise-narration`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ narration: narration.trim() })
         });
 
         if (!res.ok) {
-          const errData = await res.json();
+          const errData = await res.json().catch(() => ({}));
           throw new Error(errData.detail || 'Mode B revision failed');
         }
 
@@ -854,7 +1088,7 @@ Connecting to Studio Terminal...
         setStudioStatus('Error', false);
         showToast(`Narration revision failed: ${err.message}`, 'error');
       } finally {
-        btn.innerHTML = origText;
+        btn.textContent = origText;
         btn.disabled = false;
       }
     }
@@ -869,12 +1103,13 @@ Connecting to Studio Terminal...
 
       setStudioStatus(`Restoring snapshot ${revId}...`, true);
       try {
-        const res = await fetch(`/api/projects/${activeRunId}/restore/${revId}`, {
-          method: 'POST'
+        const res = await fetch(`/api/projects/${encodeURIComponent(activeRunId)}/restore/${encodeURIComponent(revId)}`, {
+          method: 'POST',
+          headers: getAuthHeaders()
         });
 
         if (!res.ok) {
-          const err = await res.json();
+          const err = await res.json().catch(() => ({}));
           throw new Error(err.detail || 'Restore failed');
         }
 
@@ -895,31 +1130,44 @@ Connecting to Studio Terminal...
 
       const customName = document.getElementById('export-filename').value;
       const btn = document.getElementById('btn-export');
-      const origText = btn.innerHTML;
-      btn.innerHTML = `<span>Exporting...</span>`;
+      const origText = btn.textContent;
+      btn.textContent = 'Exporting...';
       btn.disabled = true;
 
       try {
-        const res = await fetch(`/api/projects/${activeRunId}/export`, {
+        const res = await fetch(`/api/projects/${encodeURIComponent(activeRunId)}/export`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ custom_filename: customName || null })
         });
 
         if (!res.ok) {
-          const err = await res.json();
+          const err = await res.json().catch(() => ({}));
           throw new Error(err.detail || 'Export failed');
         }
 
         const data = await res.json();
         const resEl = document.getElementById('export-result');
+        resEl.replaceChildren();
         resEl.classList.remove('hidden');
-        resEl.innerHTML = `✅ Saved: <a href="${data.download_url}" target="_blank" class="underline hover:text-emerald-300">${data.filename}</a> (${(data.size_bytes / (1024*1024)).toFixed(2)} MB)`;
+
+        const prefix = document.createTextNode('✅ Saved: ');
+        const link = document.createElement('a');
+        link.href = data.download_url;
+        link.target = '_blank';
+        link.className = 'underline hover:text-emerald-300';
+        link.textContent = data.filename;
+        const sizeText = document.createTextNode(` (${(data.size_bytes / (1024*1024)).toFixed(2)} MB)`);
+
+        resEl.appendChild(prefix);
+        resEl.appendChild(link);
+        resEl.appendChild(sizeText);
+
         showToast(`Export complete: ${data.filename}`, 'success');
       } catch (err) {
         showToast('Export error: ' + err.message, 'error');
       } finally {
-        btn.innerHTML = origText;
+        btn.textContent = origText;
         btn.disabled = false;
       }
     }
@@ -937,18 +1185,18 @@ Connecting to Studio Terminal...
 
       const btn = document.getElementById('btn-generate');
       btn.disabled = true;
-      btn.innerHTML = `<span>Starting Generation...</span>`;
+      btn.textContent = 'Starting Generation...';
       setStudioStatus('Generating new project...', true);
 
       try {
         const res = await fetch('/api/projects/generate', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ topic, subject, length, aspect_ratio, mock, source_text, source_url })
         });
 
         if (!res.ok) {
-          const err = await res.json();
+          const err = await res.json().catch(() => ({}));
           throw new Error(err.detail || 'Generation failed');
         }
 
@@ -963,14 +1211,14 @@ Connecting to Studio Terminal...
         setStudioStatus('Studio Ready', false);
       } finally {
         btn.disabled = false;
-        btn.innerHTML = `<span>Generate Project</span>`;
+        btn.textContent = 'Generate Project';
       }
     }
 
     async function pollJob(jobId, runId) {
       const pollTimer = setInterval(async () => {
         try {
-          const res = await fetch(`/api/jobs/${jobId}`);
+          const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}`);
           if (res.ok) {
             const job = await res.json();
             if (job.status === 'completed') {
@@ -1004,7 +1252,7 @@ Connecting to Studio Terminal...
           const data = await res.json();
           const pre = document.getElementById('terminal-log-output');
           if (data.logs && data.logs.length > 0) {
-            pre.innerText = data.logs.join('\n');
+            pre.textContent = data.logs.join('\n');
             pre.scrollTop = pre.scrollHeight;
           }
         }
