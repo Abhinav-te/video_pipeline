@@ -75,11 +75,17 @@ cd video && npm install && cd ..
 
 ### Running Test Suites
 ```bash
-# Run all active Python unit and validation gate tests
+# Run all active Python unit and validation gate tests (157 tests across 18 modules)
 .venv/bin/python -m pytest
 
+# Run Remotion React visual primitive unit tests
+npm test --prefix video
+
+# Run TypeScript strict typecheck across video engine
+npm run typecheck --prefix video
+
 # Run Node.js timeline schema validation gate
-node video/scripts/validate_timeline.mjs video/public/data.json
+node video/scripts/validate_timeline.mjs video/public/runs/<run_id>/data.json
 ```
 
 ---
@@ -95,7 +101,7 @@ The engine enforces six testable validation gates across pre-render and post-ren
 | **Gate 3** | **Claim & Metric Support** | Pre-render | `validate_evidence_and_plan` (internal: `gate2_quote_paraphrase`, `numerical_claims`) | Rejects unbacked numbers in spoken text and metric cards. Enforces $\ge 0.35$ content-word overlap between on-screen text and cited evidence excerpts. |
 | **Gate 4** | **Limitation Propagation** | Pre-render | `validate_evidence_and_plan` (internal: `gate3_limitation_propagation`) | When limitation records exist, enforces that documented caveats are cited and displayed on-screen ($\ge 2$ content words). Rejects `"GUARDED"` placeholder anti-pattern. |
 | **Gate 5** | **Component Integrity & Timeline Schema** | Pre-render | `validate_evidence_and_plan` (internal: `gate4_component_literal_lint`) & `video/scripts/validate_timeline.mjs` | Lints React components to prevent hardcoded brand tokens (`inngest`, `stripe`, `resend`, `#00e599`, `step.run`). Validates assembled `data.json` against Node.js TypeScript Zod schema. |
-| **Gate 6** | **Post-Render Technical QA** | Post-render | `validate_post_render_qa` (`output.py` + keyframe check) | Inspects MP4 container streams (h264/aac), resolution (1920x1080 or 1080x1920), FPS (30), audio/video duration sync ($\le 0.5\text{s}$ tolerance), and extracts midpoint keyframe to verify non-blank video. Quarantines corrupt video to `.corrupt.mp4`. |
+| **Gate 6** | **Post-Render Technical QA** | Post-render | `validate_post_render_qa` (`output.py` + keyframe check) | Inspects MP4 container streams (h264/aac), resolution (1920x1080 or 1080x1920), FPS (30), audio/video duration sync ($\le 0.05\text{s}$ tolerance), and extracts midpoint keyframe to verify non-blank video. Quarantines corrupt video to `.corrupt.mp4`. |
 
 ---
 
@@ -103,10 +109,15 @@ The engine enforces six testable validation gates across pre-render and post-ren
 
 ### Current Production Capabilities (Implemented & Verified)
 - **Remotion-Only Video Generation:** Frame-accurate React rendering for both 16:9 widescreen and 9:16 vertical developer videos.
+- **Monochrome-First Design System (`BrandContext.tsx`):** Shared theme tokens (`theme.canvas`, `theme.surface`, `theme.surface_elevated`, `theme.border_subtle`, `theme.text_primary`, `theme.text_secondary`, `theme.text_muted`, and restrained semantic accents) providing a coherent, high-density developer tool aesthetic.
+- **Substantive Visual Primitives:**
+  - `CodeSpotlightScene`: Responsive 22–26px typography with hanging-indent line wrapping, Shiki syntax highlighting, and exact contiguous slice source matching.
+  - `WorkflowStateTransition`: Chronological multi-stage pipeline and state machine visualization, event propagation, retry indicators, and deterministic animation.
+  - `EvidenceBentoScene`: Structured two-tier evidence ledger separating primary architectural guarantees from documented operational constraints, with speech-synchronized active caveat auditing.
 - **Unified 11-Step Pipeline:** Single data-driven execution flow from documentation ingestion to final MP4 QA.
 - **Evidence-Linked Scene Planning:** Dynamic 5-beat story arcs derived from atomic evidence records without hardcoded company branches.
 - **Cross-Brand Isolation:** Strict separation of `product_subject`, `product_company`, and `publisher_brand` with zero asset/token leakage across Inngest, Stripe, and Resend runs.
-- **Zero-Drift Neural Audio:** Measured 48kHz PCM WAV headers drive Remotion frame counts and spoken-word subtitle chunking.
+- **Zero-Drift Neural Audio & Word Boundaries:** Measured 48kHz PCM WAV headers drive Remotion frame counts and spoken-word subtitle chunking with sub-0.05s AV sync tolerance across full and preview renders.
 - **Surgical Scene Revisions:** Mode A (visual-only) and Mode B (narration) scene re-rendering and FFmpeg segment stitching via Studio API.
 
 ### Future Roadmap (Under Specification)

@@ -148,7 +148,8 @@ def find_best_matching_record(
 
 
 DANGLING_CONJUNCTIONS = {
-    "and", "&", "or", "with", "in", "on", "at", "to", "for", "of", "via", "by", "vs", "versus"
+    "and", "&", "or", "with", "in", "on", "at", "to", "for", "of", "via", "by", "vs", "versus",
+    "a", "an", "the", "inside", "into", "from", "under", "across", "as"
 }
 
 
@@ -389,10 +390,39 @@ def build_scene_plan_deterministic(
 
     # Gate 3: Attach actual documented limitation verbatim / close paraphrase
     if limitation_records:
+        existing_values = {it.get("value") for it in b4_items}
         for lim in limitation_records:
+            lower_claim = lim.claim.lower()
+
+            # Classify into a unique, semantically accurate technical constraint value
+            if ("idempotent" in lower_claim or "side effect" in lower_claim) and "IDEMPOTENCY REQUIREMENT" not in existing_values:
+                lim_value = "IDEMPOTENCY REQUIREMENT"
+            elif any(k in lower_claim for k in ["timeout", "expire", "retention", "ttl", "retains"]) and "RETENTION CONSTRAINT" not in existing_values:
+                lim_value = "RETENTION CONSTRAINT"
+            elif any(k in lower_claim for k in ["rate limit", "concurrency", "threshold"]) and "CONCURRENCY LIMIT" not in existing_values:
+                lim_value = "CONCURRENCY LIMIT"
+            elif any(k in lower_claim for k in ["parameter", "payload", "size", "body"]) and "PAYLOAD CONSTRAINT" not in existing_values:
+                lim_value = "PAYLOAD CONSTRAINT"
+            elif any(k in lower_claim for k in ["network", "connection", "socket", "http"]) and "NETWORK REQUIREMENT" not in existing_values:
+                lim_value = "NETWORK REQUIREMENT"
+            elif any(k in lower_claim for k in ["important", "limitation", "caveat", "note"]) and "DOCUMENTED CAVEAT" not in existing_values:
+                lim_value = "DOCUMENTED CAVEAT"
+            elif "SAFETY CONSTRAINT" not in existing_values:
+                lim_value = "SAFETY CONSTRAINT"
+            elif "EXECUTION CONSTRAINT" not in existing_values:
+                lim_value = "EXECUTION CONSTRAINT"
+            else:
+                lim_value = f"CONSTRAINT #{len(existing_values) + 1}"
+
+            existing_values.add(lim_value)
+
+            clean_title = derive_clean_title_from_claim(lim.claim, max_words=6).upper()
+            if "idempotent" in lower_claim and "side effect" in lower_claim and "IDEMPOTENCY" not in clean_title:
+                clean_title = "EXTERNAL SIDE EFFECT IDEMPOTENCY"
+
             b4_items.append({
-                "title": derive_clean_title_from_claim(lim.claim, max_words=5).upper(),
-                "value": "SAFETY CONSTRAINT",
+                "title": clean_title,
+                "value": lim_value,
                 "subtitle": lim.claim,
                 "tag": "LIMITATION",
                 "evidence_id": lim.id,

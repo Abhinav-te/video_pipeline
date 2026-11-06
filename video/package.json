@@ -6,7 +6,7 @@
     "start": "remotion preview src/index.js",
     "build": "remotion render src/index.js CodingShort out/video.mp4",
     "typecheck": "tsc --noEmit",
-    "test": "node test_camerarig.mjs && node test_kinetic_callouts.mjs && node test_scene_badge.mjs && node test_bento_and_code_fitting.mjs"
+    "test": "node test_camerarig.mjs && node test_kinetic_callouts.mjs && node test_scene_badge.mjs && node test_bento_and_code_fitting.mjs && node test_workflow_transition.mjs && node test_evidence_bento.mjs"
   },
   "dependencies": {
     "@remotion/captions": "4.0.522",

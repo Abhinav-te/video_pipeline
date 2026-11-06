@@ -73,6 +73,10 @@ yarn-error.log*
 repomix*
 *.xml
 *.log
+scratch/
+*.corrupt.mp4
+desktop.ini
+Thumbs.db
 
 # Editor & IDE
 .vscode/
